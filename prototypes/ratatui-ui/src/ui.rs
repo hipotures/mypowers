@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use ratatui::{
     Frame,
     buffer::Buffer,
@@ -29,6 +31,7 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
         screen,
     );
     app.controls = [Rect::default(); 3];
+    app.title = Rect::default();
     if screen.width < MIN_WIDTH || screen.height < MIN_HEIGHT {
         let message = centered(screen, screen.width, 2);
         frame.render_widget(
@@ -43,7 +46,8 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
     }
 
     let area = centered(screen, screen.width.min(94), screen.height.min(22));
-    let outer = Block::default()
+    app.title = Rect::new(area.x + (area.width - 10) / 2 + 1, area.y, 8, 1);
+    let mut outer = Block::default()
         .borders(Borders::ALL)
         .border_type(BorderType::Rounded)
         .border_style(Style::default().fg(BORDER))
@@ -65,6 +69,19 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
             ])
             .centered(),
         );
+    if let Some((success, time)) = app.clipboard_notice
+        && time.elapsed() < Duration::from_secs(3)
+    {
+        outer = outer.title_top(
+            Line::from(if success {
+                " JSON copied "
+            } else {
+                " Copy failed "
+            })
+            .style(Style::default().fg(if success { GREEN } else { RED }))
+            .right_aligned(),
+        );
+    }
     let inner = outer.inner(area);
     frame.render_widget(outer, area);
     let content = Rect {
@@ -288,6 +305,10 @@ mod tests {
             let mut app = App::default();
             let buffer = render(width, height, &mut app);
             let text = lines(&buffer).join("\n");
+            let title: String = (app.title.x..app.title.right())
+                .map(|x| buffer[(x, app.title.y)].symbol())
+                .collect();
+            assert_eq!(title, "MYPOWERS");
             for expected in [
                 "MYPOWERS",
                 "AP S300 V2.0",
@@ -334,11 +355,38 @@ mod tests {
         for (width, height) in [(59, 18), (60, 17), (22, 4), (1, 1), (0, 0)] {
             let buffer = render(width, height, &mut app);
             assert!(app.controls.iter().all(|rect| rect.is_empty()));
+            assert!(app.title.is_empty());
             if width >= 22 && height >= 2 {
                 let text = lines(&buffer).join("\n");
                 assert!(text.contains("Terminal too small"));
                 assert!(text.contains("Need at least 60x18"));
             }
+        }
+    }
+
+    #[test]
+    fn clipboard_feedback_expires_without_moving_the_clickable_title() {
+        for (width, height) in [(60, 18), (61, 18), (80, 24), (81, 24), (120, 40)] {
+            let mut app = App::default();
+            render(width, height, &mut app);
+            let title = app.title;
+            for (success, expected) in [(true, "JSON copied"), (false, "Copy failed")] {
+                app.clipboard_notice = Some((success, std::time::Instant::now()));
+                let buffer = render(width, height, &mut app);
+                let text = lines(&buffer).join("\n");
+                assert!(text.contains(expected));
+                assert_eq!(app.title, title);
+                let title_text: String = (title.x..title.right())
+                    .map(|x| buffer[(x, title.y)].symbol())
+                    .collect();
+                assert_eq!(title_text, "MYPOWERS");
+            }
+            app.clipboard_notice = Some((true, std::time::Instant::now() - Duration::from_secs(4)));
+            assert!(
+                !lines(&render(width, height, &mut app))
+                    .join("\n")
+                    .contains("JSON copied")
+            );
         }
     }
 

@@ -24,10 +24,23 @@ if your environment sets it, use `env -u NO_COLOR cargo run` to evaluate colors.
 | `l` | Toggle mock lamps |
 | Left click on an output label/state | Toggle that mock output |
 | Mouse movement over an output | Highlight its region |
+| Double-click `MYPOWERS` in the top border | Copy current mock state as JSON |
 
 The most recently toggled output retains a subtle selection background.
 All toggles affect local fake state only. Both input and output readings remain
 visible regardless of those states.
+
+Two left clicks within 400 ms on the title copy a JSON snapshot with the station
+name, connection status, battery percentage, remaining minutes, current input
+and output watts, and local AC/DC/lamps states. The document explicitly includes
+`"mock": true`. A single click does not copy. Resizing cancels a pending double
+click. `JSON copied` appears beside the title for three seconds; a failed copy
+shows `Copy failed` without closing the prototype.
+
+Clipboard copying uses **Wayland and `wl-copy`** from `wl-clipboard`; it does not
+add Rust dependencies. JSON is copied as UTF-8 plain text so it can be pasted into
+text editors. This prototype's clipboard feature requires an accessible Wayland
+session and `wl-copy` on `PATH`.
 
 Connection status is a static, bold green circle (`●`); offline status uses a
 static red circle. Rendering updates at 8 FPS. Independent fake power readings and their
@@ -96,17 +109,21 @@ ls -lh target/release/mypowers-ratatui
 ```
 
 The release profile uses size optimization, thin LTO, and stripped symbols.
-The measured x86_64 Linux release binary is approximately **640 KiB** (654,776
+The measured x86_64 Linux release binary is approximately **645 KiB** (659,600
 bytes), dynamically linked. Its exact size varies with compiler and platform.
 Only Ratatui and Crossterm are direct dependencies; `Cargo.lock` fixes the
 resolved dependency graph.
 
-Verification includes seven state/rendering tests and four real Linux PTY
+Verification includes ten state/rendering tests and five real Linux PTY
 scenarios (plus a subprocess cleanup fixture). PTY tests require util-linux
 `script` and `stty`; they run the actual binary, inject keyboard and SGR mouse
 events, resize down and back up, check real RGB output, and compare terminal
 settings before and after exit. Separate probes verify restoration after an
 I/O error and a panic. These helpers are test tools, not runtime dependencies.
+Clipboard PTY tests use an isolated `wl-copy` test helper to capture the exact
+JSON, verify single versus double clicks, and exercise copy failures without
+changing the desktop clipboard. A separate manual run verified copying and
+reading valid JSON through the real Wayland clipboard.
 The prototype was also launched interactively with `cargo run`.
 
 Raw mode, alternate screen, mouse capture, and hidden cursor are managed by a
