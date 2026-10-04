@@ -17,7 +17,11 @@ jobs:
         with:
           python-version: ${{ matrix.python }}
           enable-cache: true
-      - run: uv sync --locked --python ${{ matrix.python }} --extra server --extra cli --extra tui --group dev
+      - run: uv sync --locked --python ${{ matrix.python }} --extra server --extra cli --group dev
+      - run: cargo build --locked --manifest-path frontends/tui/Cargo.toml
+      - run: cargo fmt --check --manifest-path frontends/tui/Cargo.toml
+      - run: cargo clippy --locked --manifest-path frontends/tui/Cargo.toml --all-targets -- -D warnings
+      - run: cargo test --locked --manifest-path frontends/tui/Cargo.toml
       - run: uv run ruff check src frontends tests
       - run: uv run ruff format --check src frontends tests
       - run: uv run mypy src frontends

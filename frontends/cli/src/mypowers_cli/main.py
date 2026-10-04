@@ -5,6 +5,7 @@ import asyncio
 import json
 import os
 import re
+import shutil
 import sys
 from datetime import UTC, datetime, timedelta
 from typing import Any
@@ -292,15 +293,24 @@ async def run(args: argparse.Namespace, config: ClientConfig) -> int:
 def main() -> None:
     args = parser().parse_args()
     try:
-        config = settings(args)
         if args.command == "tui":
-            try:
-                from mypowers_tui.main import launch
-            except ModuleNotFoundError:
-                print("Install mypowers[tui].", file=sys.stderr)
+            binary = shutil.which("mypowers-tui")
+            if binary is None:
+                print(
+                    "Install the Rust TUI: cargo install --locked --path frontends/tui",
+                    file=sys.stderr,
+                )
                 raise SystemExit(2) from None
-            launch(config, no_mouse=args.no_mouse)
-            return
+            arguments = [binary]
+            for name in ("env_file", "server", "token_file", "ca_file", "timeout", "timezone"):
+                value = getattr(args, name, None)
+                if value is not None:
+                    arguments.extend(["--" + name.replace("_", "-"), str(value)])
+            for name in ("utc", "no_color", "no_mouse"):
+                if getattr(args, name, False):
+                    arguments.append("--" + name.replace("_", "-"))
+            os.execv(binary, arguments)
+        config = settings(args)
         raise SystemExit(asyncio.run(run(args, config)))
     except AppError as error:
         emit(error.payload(), args, config)

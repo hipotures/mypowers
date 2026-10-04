@@ -42,7 +42,7 @@ def test_installed_cli_each_real_request(daemon_process, command):
         assert not result.stderr
 
 
-def test_unreachable_cli_non_tty_tui_and_token_command(tmp_path):
+def test_unreachable_cli_and_token_command(tmp_path):
     bindir = Path(sys.executable).parent
     env = {k: v for k, v in os.environ.items() if not k.startswith("MYPOWERS_")}
     result = subprocess.run(
@@ -54,8 +54,6 @@ def test_unreachable_cli_non_tty_tui_and_token_command(tmp_path):
     )
     assert result.returncode == 3
     assert json.loads(result.stdout)["error"]["code"] == "server_unreachable"
-    result = subprocess.run([str(bindir / "mypowers-tui")], env=env, capture_output=True, text=True)
-    assert result.returncode == 2 and "terminal" in result.stderr.lower()
     token = tmp_path / "api-token"
     result = subprocess.run(
         [str(bindir / "mypowersd"), "token", "generate", "--output", str(token)],

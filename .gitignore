@@ -12,6 +12,7 @@ __pycache__/
 .coverage*
 htmlcov/
 dist/
+**/target/
 *.db
 *.db-*
 *.sqlite*

@@ -13,18 +13,29 @@ dependencies = ["pydantic>=2.12,<3", "python-dotenv>=1.1,<2"]
 [project.optional-dependencies]
 server = ["bleak==3.0.2", "dbus-fast==3.1.2", "fastapi>=0.118,<1", "uvicorn>=0.37,<1", "aiosqlite>=0.21,<1", "PyYAML>=6.0.3,<7", "websockets>=15,<18"]
 cli = ["rich>=14,<15", "httpx>=0.28,<1", "websockets>=15,<18", "tzdata"]
-tui = ["rich>=14,<15", "httpx>=0.28,<1", "websockets>=15,<18", "tzdata"]
 
 [project.scripts]
 mypowersd = "mypowers.entrypoints:daemon"
 mypowers = "mypowers.entrypoints:cli"
-mypowers-tui = "mypowers.entrypoints:tui"
 
 [dependency-groups]
-dev = ["pytest>=8,<10", "pytest-asyncio>=1,<2", "pytest-cov>=6,<8", "ruff", "mypy", "types-PyYAML", "build", "pip-audit"]
+dev = [
+    "pytest>=8,<10",
+    "pytest-asyncio>=1,<2",
+    "pytest-cov>=6,<8",
+    "ruff",
+    "mypy",
+    "types-PyYAML",
+    "build",
+    "pip-audit",
+    "pyte>=0.8.2",
+]
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/mypowers", "frontends/cli/src/mypowers_cli", "frontends/tui/src/mypowers_tui"]
+packages = ["src/mypowers", "frontends/cli/src/mypowers_cli"]
+
+[tool.hatch.build.targets.sdist]
+exclude = ["**/target/**"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -41,8 +52,8 @@ select = ["E", "F", "I", "UP", "B", "ASYNC"]
 [tool.mypy]
 python_version = "3.12"
 strict = true
-mypy_path = ["src", "frontends/cli/src", "frontends/tui/src"]
+mypy_path = ["src", "frontends/cli/src"]
 
 [tool.coverage.run]
 branch = true
-source = ["mypowers", "mypowers_cli", "mypowers_tui"]
+source = ["mypowers", "mypowers_cli"]

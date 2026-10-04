@@ -19,7 +19,3 @@ def daemon() -> None:
 
 def cli() -> None:
     launch("mypowers_cli.main", "cli")
-
-
-def tui() -> None:
-    launch("mypowers_tui.main", "tui")

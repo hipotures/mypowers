@@ -27,7 +27,7 @@ def main() -> None:
     with zipfile.ZipFile(wheel) as archive:
         names = archive.namelist()
         assert any(name.startswith("mypowers_cli/") for name in names)
-        assert any(name.startswith("mypowers_tui/") for name in names)
+        assert not any(name.startswith("mypowers_tui/") for name in names)
         assert not any(
             name.startswith(("tests/", "docs/", "config/", ".env", ".local/")) for name in names
         )
@@ -56,7 +56,7 @@ def main() -> None:
                 "importlib.util.find_spec(name) is None for name in " + repr(absent) + ")"
             )
             execute([str(python), "-c", code], directory)
-            programs = ["mypowersd"] if kind == "server" else ["mypowers", "mypowers-tui"]
+            programs = ["mypowersd"] if kind == "server" else ["mypowers"]
             for name in programs:
                 execute([str(target / "bin" / name), "--help"], directory)
             missing = "mypowers" if kind == "server" else "mypowersd"

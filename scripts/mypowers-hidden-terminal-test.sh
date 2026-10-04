@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Run from any directory. Press Enter after inspecting the screenshot to finish.
-# Usage: ./skrypty/mypowers-hidden-terminal-test.sh [output.png]
+# Usage: ./scripts/mypowers-hidden-terminal-test.sh [output.png]
 set -euo pipefail
 
 for command in Xvfb xdpyinfo alacritty xdotool import cargo pgrep; do
@@ -11,7 +11,8 @@ for command in Xvfb xdpyinfo alacritty xdotool import cargo pgrep; do
 done
 
 output=${1:-/tmp/terminal-screenshot.png}
-project_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../prototypes/ratatui-ui" && pwd)
+repo_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
+project_dir="$repo_dir/frontends/tui"
 terminal_pid=''
 xvfb_pid=''
 app_pid=''
@@ -66,7 +67,7 @@ fi
 env -u NO_COLOR -u WAYLAND_DISPLAY WINIT_UNIX_BACKEND=x11 DISPLAY=:99 \
   alacritty --class codex-terminal-screenshot --title codex-terminal-screenshot --hold \
   -o 'window.dynamic_title=false' 'window.dimensions.columns=94' 'window.dimensions.lines=24' 'font.size=14' \
-  --working-directory "$project_dir" -e bash -c 'cargo run' >/tmp/terminal-screenshot-alacritty.log 2>&1 &
+  --working-directory "$repo_dir" -e cargo run --locked --manifest-path "$project_dir/Cargo.toml" >/tmp/terminal-screenshot-alacritty.log 2>&1 &
 terminal_pid=$!
 printf '%s\n' "$terminal_pid" >/tmp/terminal-screenshot-alacritty.pid
 for ((i = 0; i < 100; i++)); do
@@ -88,7 +89,7 @@ printf '%s\n' "$win" >/tmp/terminal-screenshot-window.id
 
 # Wait up to 60 seconds for cargo to replace itself with the actual application.
 for ((i = 0; i < 300; i++)); do
-  app_pid=$(pgrep -P "$terminal_pid" -f '(^|/)mypowers-ratatui$' || true)
+  app_pid=$(pgrep -P "$terminal_pid" -f '(^|/)mypowers-tui( |$)' || true)
   [[ -n "$app_pid" ]] && break
   kill -0 "$terminal_pid" 2>/dev/null || break
   sleep 0.2

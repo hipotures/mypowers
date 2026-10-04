@@ -1,199 +1,366 @@
-import asyncio
+"""Exercise the native Rust TUI against an isolated simulated daemon in real PTYs."""
+
+import codecs
 import fcntl
+import json
 import os
 import pty
 import select
+import shlex
 import signal
+import socket
 import struct
 import subprocess
-import sys
 import termios
 import time
 from pathlib import Path
 
 import httpx
+import pyte
 import pytest
-from mypowers_tui.dashboard import Dashboard
-from mypowers_tui.input import Decoder, InputEvent
-from mypowers_tui.main import Application
-from rich.console import Console
 
-from mypowers.contracts import Status
+ROOT = Path(__file__).resolve().parents[2]
+BINARY = ROOT / "frontends/tui/target/debug/mypowers-tui"
+CADDY_BINARY = os.environ.get("MYPOWERS_CADDY_TEST_BINARY")
+
+
+@pytest.fixture(scope="session")
+def tui_binary():
+    assert BINARY.is_file(), (
+        "Build first: cargo build --locked --manifest-path frontends/tui/Cargo.toml"
+    )
+    return BINARY
 
 
 def size(fd, width, height):
     fcntl.ioctl(fd, termios.TIOCSWINSZ, struct.pack("HHHH", height, width, 0, 0))
 
 
-def read_until(fd, needle, budget=5):
+def read_until(fd, needle, budget=8, session=None):
     deadline = time.monotonic() + budget
     captured = bytearray()
     while time.monotonic() < deadline:
         if select.select([fd], [], [], 0.1)[0]:
             try:
                 raw = os.read(fd, 65536)
+                captured.extend(raw)
+                if session is not None:
+                    height, width, _, _ = struct.unpack(
+                        "HHHH", fcntl.ioctl(session.slave, termios.TIOCGWINSZ, b"\0" * 8)
+                    )
+                    session.screen.resize(lines=height, columns=width)
+                    session.stream.feed(session.decoder.decode(raw))
             except OSError:
                 break
-            captured.extend(raw)
-            if needle in captured:
-                break
-    assert needle in captured, bytes(captured)[-3000:]
-    return bytes(captured)
+            if needle in captured or (
+                session is not None
+                and needle.decode(errors="ignore") in "\n".join(session.screen.display)
+            ):
+                return bytes(captured)
+    pytest.fail(f"Missing {needle!r}: {bytes(captured)[-3000:]!r}")
 
 
-def test_fragmented_paste_mouse_escape_bounds():
-    decoder = Decoder()
-    assert decoder.feed(b"\x1b[<0;10;") == []
-    assert decoder.feed(b"12M") == [InputEvent("press", x=10, y=12, button=0)]
-    assert decoder.feed(b"\x1b[<0;10;12m") == [InputEvent("release", x=10, y=12, button=0)]
-    assert decoder.feed(b"\x1b[200~ac on\nq") == []
-    assert decoder.feed(b"\x1b[20") == []
-    assert decoder.feed(b"1~d") == [InputEvent("key", "d")]
-    assert decoder.feed(b"\x1b[Z\t\r ") == [
-        InputEvent("key", "backtab"),
-        InputEvent("key", "tab"),
-        InputEvent("key", "enter"),
-        InputEvent("key", "space"),
-    ]
-    assert decoder.feed(b"\x1b[999~") == []
-    assert decoder.feed(b"\x1b[<0;1;1" + b"9" * 5000) == []
-    assert not decoder.buffer
+class Session:
+    def __init__(self, binary, tmp_path, env, *arguments):
+        self.master, self.slave = pty.openpty()
+        self.original = termios.tcgetattr(self.slave)
+        size(self.slave, 94, 24)
+        self.screen = pyte.Screen(94, 24)
+        self.stream = pyte.Stream(self.screen)
+        self.decoder = codecs.getincrementaldecoder("utf-8")("replace")
+
+        def controlling_terminal():
+            os.setsid()
+            fcntl.ioctl(self.slave, termios.TIOCSCTTY, 0)
+
+        self.process = subprocess.Popen(
+            [str(binary), *arguments],
+            cwd=tmp_path,
+            stdin=self.slave,
+            stdout=self.slave,
+            stderr=self.slave,
+            env={**env, "TERM": "xterm-256color"},
+            preexec_fn=controlling_terminal,
+        )
+
+    def write(self, data):
+        os.write(self.master, data)
+
+    def read(self, needle, budget=8):
+        return read_until(self.master, needle, budget, self)
+
+    def close(self):
+        if self.process.poll() is None:
+            self.write(b"q")
+            try:
+                self.process.wait(timeout=3)
+            except subprocess.TimeoutExpired:
+                self.process.terminate()
+                self.process.wait(timeout=3)
+        assert termios.tcgetattr(self.slave) == self.original
+        os.close(self.master)
+        os.close(self.slave)
 
 
-@pytest.mark.parametrize("width,height", [(100, 28), (80, 24), (60, 18), (40, 12), (30, 10)])
-def test_adaptive_rendering_and_no_color(core, width, height):
-    dashboard = Dashboard()
-    dashboard.update(core[0].snapshot())
-    console = Console(width=width, height=height, record=True, no_color=True)
-    console.print(dashboard.render(width, height))
-    captured = console.export_text()
-    if width >= 40:
-        assert "BATTERY" in captured and "INPUT" in captured and "OUTPUT" in captured
-        assert all(hit.x2 <= width and hit.y <= height for hit in dashboard.hits)
-    else:
-        assert "Resize terminal" in captured
-    assert "\x1b" not in captured
+def wait_state(client, output, enabled):
+    deadline = time.monotonic() + 8
+    while time.monotonic() < deadline:
+        status = client.get("/api/v1/status").json()
+        if (
+            status["telemetry"]["sample"][output + "_enabled"] == enabled
+            and status["controls"]["allowed"]
+        ):
+            return status
+        time.sleep(0.1)
+    pytest.fail(f"No observed {output}={enabled}")
 
 
-async def test_mouse_release_once_layout_guard_pending_stale_and_keyboard(core):
-    dashboard = Dashboard()
-    dashboard.update(core[0].snapshot())
-    dashboard.render(100, 28)
-
-    class FakeClient:
-        def __init__(self):
-            self.calls = []
-
-        async def admit(self, output, enabled, snapshot):
-            self.calls.append((output, enabled))
-            raise __import__("mypowers.contracts", fromlist=["AppError"]).AppError("test", "denied")
-
-    client = FakeClient()
-    app = Application(client, dashboard, asyncio.Event())
-    hit = dashboard.hits[0]
-    app.event(InputEvent("press", x=hit.x1, y=hit.y))
-    app.event(InputEvent("release", x=hit.x1, y=hit.y))
-    app.event(InputEvent("release", x=hit.x1, y=hit.y))
-    assert dashboard.pending
-    app.activate("ac")
-    await asyncio.sleep(0)
-    assert len(client.calls) == 1
-    assert not dashboard.pending
-    app.event(InputEvent("press", x=hit.x1, y=hit.y))
-    dashboard.render(80, 24)
-    app.event(InputEvent("release", x=hit.x1, y=hit.y))
-    assert len(client.calls) == 1
-    dashboard.server_connected = False
-    app.activate("dc")
-    assert len(client.calls) == 1
-    app.event(InputEvent("key", "tab"))
-    app.event(InputEvent("key", "backtab"))
-    app.event(InputEvent("key", "l"))
-    assert dashboard.view == "logs"
-    app.event(InputEvent("scroll", button=64))
-    assert dashboard.scroll == 3
-    app.event(InputEvent("key", "q"))
-    assert app.stop.is_set()
-    await app.close()
-
-
-@pytest.mark.parametrize("ending", ["q", "sigterm", "ctrlc", "ctrlz"])
-def test_real_pty_mouse_keyboard_resize_and_shell_restoration(daemon_process, ending, tmp_path):
+@pytest.mark.parametrize("ending", ["q", "sigterm", "ctrlc", "ctrlz", "esc"])
+def test_native_controls_logs_paste_resize_and_restoration(
+    daemon_process, tui_binary, tmp_path, ending
+):
     _, url, env = daemon_process
-    env = {**env, "TERM": "xterm-256color", "NO_COLOR": "1"}
-    master, slave = pty.openpty()
-    original = termios.tcgetattr(slave)
-    size(slave, 100, 28)
-    exe = Path(sys.executable).parent / "mypowers-tui"
     (tmp_path / ".env").write_text(f"MYPOWERS_SERVER_URL={url}\n")
-    # exec remains followed by a real shell read, checking that echo/input work after restoration.
-    script = '"$1"; IFS= read -r line; printf "\\nSHELL_ECHO:%s\\n" "$line"'
-
-    def controlling_terminal():
-        os.setsid()
-        fcntl.ioctl(slave, termios.TIOCSCTTY, 0)
-
-    process = subprocess.Popen(
-        ["bash", "-c", script, "bash", str(exe)],
-        cwd=tmp_path,
-        stdin=slave,
-        stdout=slave,
-        stderr=slave,
-        env=env,
-        preexec_fn=controlling_terminal,
-    )
+    session = Session(tui_binary, tmp_path, env, "--no-color")
     try:
-        captured = read_until(master, b"DATA LIVE")
+        session.read(b"LIVE")
+        assert "INPUT" in "\n".join(session.screen.display) and "OUTPUT" in "\n".join(
+            session.screen.display
+        )
         with httpx.Client(base_url=url, trust_env=False) as client:
-            snapshot = Status.model_validate(client.get("/api/v1/status").json())
-            dashboard = Dashboard()
-            dashboard.update(snapshot)
-            dashboard.render(100, 28)
-            ac = dashboard.hits[0]
-            mouse = f"\x1b[<0;{ac.x1};{ac.y}M\x1b[<0;{ac.x1};{ac.y}m".encode()
-            os.write(master, mouse[:5])
+            # At 94x24 the two-row AC hit area is columns 2..31, rows 16..17.
+            mouse = b"\x1b[<0;10;17M\x1b[<0;10;17m"
+            session.write(mouse[:5])
             time.sleep(0.05)
-            os.write(master, mouse[5:])
-            deadline = time.monotonic() + 4
+            session.write(mouse[5:])
+            wait_state(client, "ac", True)
+            session.read(b"confirmed")
+            session.write(b"\t\r")
+            wait_state(client, "dc", True)
+            session.read(b"confirmed")
+            # Paste is ignored, including quit and control shortcuts.
+            session.write(b"\x1b[200~qadl\x1b[201~")
+            time.sleep(0.3)
+            assert session.process.poll() is None
+            assert not client.get("/api/v1/status").json()["telemetry"]["sample"]["light_enabled"]
+            size(session.slave, 50, 15)
+            os.kill(session.process.pid, signal.SIGWINCH)
+            session.read(b"Terminal too small")
+            size(session.slave, 60, 18)
+            os.kill(session.process.pid, signal.SIGWINCH)
+            session.read(b"INPUT")
+            session.write(b"\x1bOR")  # F3
+            session.read(b"LOGS")
+            session.write(b"f\x1b[A\x1b[Fb")
+            session.read(b"Runtime log level updated")
+            session.write(b"\x1bOQ")  # F2
+            session.read(b"INPUT")
+        if ending == "sigterm":
+            session.process.terminate()
+        else:
+            session.write({"q": b"q", "ctrlc": b"\x03", "ctrlz": b"\x1a", "esc": b"\x1b"}[ending])
+        restored = session.read(b"\x1b[?2004l")
+        assert b"\x1b[?1006l" in restored
+        assert session.process.wait(timeout=3) == 0
+    finally:
+        session.close()
+
+
+def test_three_clients_share_state_and_do_not_stop_daemon(daemon_process, tui_binary, tmp_path):
+    daemon, url, env = daemon_process
+    sessions = [Session(tui_binary, tmp_path, env, "--server", url, "--no-mouse") for _ in range(3)]
+    try:
+        for session in sessions:
+            session.read(b"LIVE")
+        with httpx.Client(base_url=url, trust_env=False) as client:
+            before = client.get("/api/v1/status").json()
+            sessions[0].write(b"a")
+            after = wait_state(client, "ac", True)
+            for session in sessions:
+                session.read(b"confirmed")
+            assert before["server_instance_id"] == after["server_instance_id"]
+            assert before["connection"]["session_id"] == after["connection"]["session_id"]
+        sessions[0].close()
+        sessions = sessions[1:]
+        assert daemon.poll() is None
+        with httpx.Client(base_url=url, trust_env=False) as client:
+            assert client.get("/api/v1/status").json()["telemetry"]["sample"]["ac_enabled"]
+    finally:
+        for session in sessions:
+            session.close()
+
+
+def test_unreachable_unknown_values_exit_and_non_tty(tui_binary, tmp_path):
+    env = {key: value for key, value in os.environ.items() if not key.startswith("MYPOWERS_")}
+    session = Session(tui_binary, tmp_path, env, "--server", "http://127.0.0.1:1", "--no-mouse")
+    try:
+        session.read(b"DAEMON OFFLINE")
+        session.read(b"--h --m")
+        text = "\n".join(session.screen.display)
+        assert "--%" in text and "--h --m" in text
+        session.write(b"a")
+        session.read(b"Controls unavailable")
+    finally:
+        session.close()
+    result = subprocess.run(
+        [str(tui_binary)], cwd=tmp_path, env=env, capture_output=True, text=True
+    )
+    assert result.returncode == 2 and "requires a terminal" in result.stderr
+
+
+@pytest.mark.parametrize("daemon_process", [True], indirect=True)
+def test_native_authentication_and_private_relative_token_file(
+    daemon_process, tui_binary, tmp_path
+):
+    _, url, env = daemon_process
+    token = env["MYPOWERS_API_TOKEN"]
+    env = {key: value for key, value in env.items() if key != "MYPOWERS_API_TOKEN"}
+    selected = tmp_path / "settings"
+    selected.mkdir()
+    token_file = selected / "token"
+    token_file.write_text(token)
+    token_file.chmod(0o600)
+    dotenv = selected / "client.env"
+    dotenv.write_text(f"MYPOWERS_SERVER_URL={url}\nMYPOWERS_API_TOKEN_FILE=./token\n")
+    session = Session(tui_binary, tmp_path, env, "--env-file", str(dotenv))
+    try:
+        session.read(b"LIVE")
+        session.write(b"a")
+        session.read(b"confirmed")
+        assert token not in "\n".join(session.screen.display)
+    finally:
+        session.close()
+    unauthorized = Session(tui_binary, tmp_path, env, "--server", url)
+    try:
+        unauthorized.read(b"authentication")
+        assert "DAEMON OFFLINE" in "\n".join(unauthorized.screen.display)
+    finally:
+        unauthorized.close()
+    token_file.chmod(0o644)
+    result = subprocess.run(
+        [str(tui_binary), "--env-file", str(dotenv)],
+        cwd=tmp_path,
+        env=env,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 2 and "private permissions" in result.stderr
+    assert token not in result.stderr
+
+
+def test_closing_native_client_during_command_does_not_cancel_or_restore_outputs(
+    daemon_process, tui_binary, tmp_path
+):
+    _, url, env = daemon_process
+    session = Session(tui_binary, tmp_path, env, "--server", url)
+    try:
+        session.read(b"LIVE")
+        session.write(b"a")
+        with httpx.Client(base_url=url, trust_env=False) as client:
+            deadline = time.monotonic() + 5
             while time.monotonic() < deadline:
-                if client.get("/api/v1/status").json()["telemetry"]["sample"]["ac_enabled"]:
+                snapshot = client.get("/api/v1/status").json()
+                if snapshot["controls"]["pending_command_id"]:
+                    break
+                time.sleep(0.02)
+            else:
+                pytest.fail("Command was not admitted")
+            session.close()
+            session = None
+            wait_state(client, "ac", True)
+    finally:
+        if session is not None:
+            session.close()
+
+
+def test_native_https_wss_and_untrusted_ca(daemon_process, tui_binary, tmp_path):
+    if CADDY_BINARY is None:
+        pytest.skip("Set MYPOWERS_CADDY_TEST_BINARY for native HTTPS/WSS verification.")
+    _, url, env = daemon_process
+    with socket.socket() as sock:
+        sock.bind(("127.0.0.1", 0))
+        port = sock.getsockname()[1]
+    config = tmp_path / "Caddyfile"
+    config.write_text(
+        "{\n auto_https disable_redirects\n skip_install_trust\n}\n"
+        f"https://localhost:{port} {{\n tls internal\n reverse_proxy {url}\n}}\n"
+    )
+    ca = tmp_path / "caddy-data/caddy/pki/authorities/local/root.crt"
+    caddy_env = {
+        **env,
+        "XDG_DATA_HOME": str(tmp_path / "caddy-data"),
+        "XDG_CONFIG_HOME": str(tmp_path / "caddy-config"),
+    }
+    with (tmp_path / "caddy.log").open("w") as log:
+        process = subprocess.Popen(
+            [CADDY_BINARY, "run", "--config", str(config), "--adapter", "caddyfile"],
+            env=caddy_env,
+            stdout=log,
+            stderr=log,
+        )
+        try:
+            deadline = time.monotonic() + 10
+            while time.monotonic() < deadline:
+                assert process.poll() is None, (tmp_path / "caddy.log").read_text()
+                if ca.exists():
                     break
                 time.sleep(0.05)
             else:
-                pytest.fail("Mouse did not submit AC intention through HTTP.")
-            captured += read_until(master, b"AC confirmed |")
-            os.write(master, b"\t\r")
-            captured += read_until(master, b"DC confirmed")
-            assert client.get("/api/v1/status").json()["telemetry"]["sample"]["dc_enabled"]
-            # Paste must never execute q or further output changes.
-            os.write(master, b"\x1b[200~q\nac off\x1b[201~")
-            size(slave, 80, 24)
-            os.killpg(process.pid, signal.SIGWINCH)
-            time.sleep(0.3)
-            os.write(master, b"l")
-            captured += read_until(master, b"LOGS")
-            os.write(master, b"d")
-            captured += read_until(master, b"BATTERY")
-        if ending == "sigterm":
-            # Find only this shell's child, without signaling the shell that must read afterward.
-            child = int(
-                Path(f"/proc/{process.pid}/task/{process.pid}/children").read_text().split()[0]
+                pytest.fail("Test CA not generated")
+            trusted = Session(
+                tui_binary,
+                tmp_path,
+                env,
+                "--server",
+                f"https://localhost:{port}",
+                "--ca-file",
+                str(ca),
             )
-            os.kill(child, signal.SIGTERM)
-        else:
-            os.write(master, {"q": b"q", "ctrlc": b"\x03", "ctrlz": b"\x1a"}[ending])
-        captured += read_until(master, b"\x1b[?2004l")
-        time.sleep(0.1)
-        assert termios.tcgetattr(slave) == original
-        os.write(master, b"normal-echo\n")
-        captured += read_until(master, b"SHELL_ECHO:normal-echo")
-        assert b"\x1b[?1000l" in captured and b"\x1b[?1006l" in captured
-        assert b"\x1b[?25h" in captured and b"\x1b[?1049l" in captured
-        assert process.wait(timeout=3) == 0
-        assert b"Traceback" not in captured
+            try:
+                trusted.read(b"LIVE")  # Verified WSS snapshot.
+                trusted.write(b"a")
+                trusted.read(b"confirmed")  # Verified HTTPS admission and result polling.
+            finally:
+                trusted.close()
+            untrusted = Session(tui_binary, tmp_path, env, "--server", f"https://localhost:{port}")
+            try:
+                untrusted.read(b"TLS")
+                assert "DAEMON OFFLINE" in "\n".join(untrusted.screen.display)
+            finally:
+                untrusted.close()
+        finally:
+            process.terminate()
+            process.wait(timeout=5)
+
+
+def test_title_double_click_copies_actual_snapshot_without_touching_desktop_clipboard(
+    daemon_process, tui_binary, tmp_path
+):
+    _, url, env = daemon_process
+    helpers = tmp_path / "helpers"
+    helpers.mkdir()
+    captured = tmp_path / "clipboard.json"
+    helper = helpers / "wl-copy"
+    helper.write_text("#!/bin/sh\ncat > " + shlex.quote(str(captured)) + "\n")
+    helper.chmod(0o755)
+    env = {**env, "PATH": str(helpers) + os.pathsep + env["PATH"]}
+    session = Session(tui_binary, tmp_path, env, "--server", url)
+    try:
+        session.read(b"LIVE")
+        click = b"\x1b[<0;46;2M\x1b[<0;46;2m"
+        session.write(click)
+        time.sleep(0.15)
+        assert not captured.exists()
+        session.write(click)
+        session.read(b"JSON copied")
+        snapshot = json.loads(captured.read_text())
+        with httpx.Client(base_url=url, trust_env=False) as client:
+            observed = client.get("/api/v1/status").json()
+        assert snapshot["server_instance_id"] == observed["server_instance_id"]
+        assert (
+            snapshot["telemetry"]["sample"]["battery_percent"]
+            == observed["telemetry"]["sample"]["battery_percent"]
+        )
+        assert "mock" not in snapshot
     finally:
-        if process.poll() is None:
-            os.killpg(process.pid, signal.SIGTERM)
-            process.wait(timeout=3)
-        os.close(master)
-        os.close(slave)
+        session.close()

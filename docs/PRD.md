@@ -13,7 +13,7 @@
 
 ## Implementation directive
 
-Implement this document end to end in the existing repository. Deliver a working server, a one-shot Rich CLI, an interactive Rich TUI, automated tests, installation artifacts, and an evidence-based validation report. Do not stop after scaffolding, a design proposal, a read-only demo, or the backend alone. AC, DC-group, and common-lamp control are required in the first release, not deferred features.
+Implement this document end to end in the existing repository. Deliver a working server, a one-shot Rich CLI, an interactive Rust/Ratatui TUI, automated tests, installation artifacts, and an evidence-based validation report. Do not stop after scaffolding, a design proposal, a read-only demo, or the backend alone. AC, DC-group, and common-lamp control are required in the first release, not deferred features.
 
 The implementation environment is expected to have the station powered on with Bluetooth enabled. Use the available hardware for read validation and the authorized, reversible output tests described in Section 16. Do not assume that the presence of Bluetooth alone establishes that connected loads are safe to interrupt. Do not disable host services, change radio blocks, or alter Proxmox infrastructure to manufacture failures; simulate those failures at the transport boundary instead.
 
@@ -38,7 +38,7 @@ This document is the application specification. The research bundle is hardware 
 11. Structured logs and remote diagnostics
 12. HTTP and WebSocket contract
 13. CLI requirements
-14. Rich TUI requirements
+14. Ratatui TUI requirements
 15. Deployment and security
 16. Implementation sequence and validation
 17. Acceptance checklist and handover
@@ -64,7 +64,7 @@ The server must continue to serve status, history, and available application log
 | SQLite periodic telemetry storage and bounded raw-history queries | Retention, hourly/daily rollups, table partitioning, or energy-yield analytics |
 | YAML configuration plus explicit `.env`/environment overrides | Configuration editors or a remote shell |
 | JSONL application logs, rotation, remote tail/filter/follow, runtime log level | Logs in SQLite, system-wide journal access, or arbitrary file downloads |
-| Rich one-shot CLI and full-screen, mouse/keyboard Rich TUI | Textual, a browser frontend, or a working GNOME extension |
+| Rich one-shot CLI and full-screen, mouse/keyboard Rust/Ratatui TUI | Textual, a browser frontend, or a working GNOME extension |
 | Small live power trends and basic diagnostics in TUI | An extensive charting/analysis application |
 | Deployment examples, verification commands, and tests | Automatic installation of OS packages, SSH, DNS changes, or certificate-provider selection |
 | `frontends/gnome/` and `frontends/web/` reserved with explanatory READMEs | Placeholder controls advertised as working capabilities |
@@ -83,8 +83,8 @@ The server must continue to serve status, history, and available application log
 | WebSocket transport | `websockets`, with versions resolved and locked during implementation |
 | Database | Standard Python SQLite support plus `aiosqlite`; explicit SQL, no ORM |
 | Config | PyYAML safe loading, Pydantic validation, python-dotenv for explicitly selected env files |
-| Rendering | Rich for CLI and TUI; no Textual |
-| TUI input | Small Linux terminal-input adapter, separate from Rich rendering |
+| Rendering | Rich for CLI; Rust/Ratatui for TUI |
+| TUI input | Crossterm keyboard, mouse, resize and bracketed-paste events |
 | Logging | Standard `logging`, structured JSONL formatter, bounded queued file writer |
 | Packaging | One Python distribution, explicit frontend package mappings, optional extras, Hatchling |
 | Development | `uv`, committed `uv.lock`, local `.venv` |
@@ -150,7 +150,7 @@ mypowers/
 ├── src/mypowers/
 │   ├── __init__.py
 │   ├── contracts/          # Transport DTOs and stable enums; no BLE imports
-│   ├── client/             # Shared HTTP/WS client used by both frontends
+│   ├── client/             # HTTP/WS client for the Python CLI
 │   ├── core/               # Immutable state, freshness, commands, events
 │   ├── protocol/           # Pure frame decoding/encoding and qualified profile
 │   ├── bluetooth/          # Bleak/BlueZ adapter and session boundary
@@ -161,7 +161,7 @@ mypowers/
 │   └── daemon/             # Entrypoint, composition, ownership, shutdown
 ├── frontends/
 │   ├── cli/src/mypowers_cli/
-│   ├── tui/src/mypowers_tui/
+│   ├── tui/src/  # Rust crate with Cargo.toml and Cargo.lock
 │   ├── gnome/README.md
 │   └── web/README.md
 ├── config/
@@ -190,9 +190,9 @@ mypowers/
 └── .github/workflows/ci.yml
 ```
 
-### 3.2 One distribution, independent dependency sets
+### 3.2 Python distribution and native TUI
 
-Use one distribution named `mypowers`, not separately deployed frontend repositories. Physically separated frontend code must be installed correctly; no `sys.path` mutation or dependency on launching from the repository root.
+Use one repository containing the `mypowers` Python distribution and the native `mypowers-tui` Rust crate. Physically separated frontend code must be installed correctly; no `sys.path` mutation or dependency on launching installed programs from the repository root.
 
 Hatchling supports explicit package source mappings [E5]. Configure and verify a wheel containing the Python packages, for example:
 
@@ -201,11 +201,10 @@ Hatchling supports explicit package source mappings [E5]. Configure and verify a
 packages = [
   "src/mypowers",
   "frontends/cli/src/mypowers_cli",
-  "frontends/tui/src/mypowers_tui",
 ]
 ```
 
-Provide extras `server`, `cli`, and `tui`. The base package contains only shared configuration/contract support and lightweight imports. The `server` extra includes BLE, FastAPI/Uvicorn, SQLite adapter, YAML, and WebSocket server dependencies. `cli` includes Rich and HTTP client dependencies. `tui` includes Rich, HTTP/WS client dependencies, and named-timezone support as needed. It must also satisfy the dependencies needed for `mypowers tui`.
+Provide Python extras `server` and `cli`, and install the Rust TUI with `cargo install --locked --path frontends/tui`. The base package contains only shared configuration/contract support and lightweight imports. The `server` extra includes BLE, FastAPI/Uvicorn, SQLite adapter, YAML, and WebSocket server dependencies. `cli` includes Rich and HTTP client dependencies. The native TUI owns its HTTP/WS and TLS client; `mypowers tui` executes the installed native binary.
 
 A server-only installation must not require Rich. A client-only installation must not require Bleak, BlueZ, FastAPI, or the SQLite adapter. Shared `contracts` and `client` modules must not import server infrastructure. Entrypoints for absent extras return a short installation hint, not an import traceback.
 
@@ -216,7 +215,7 @@ The research bundle, test captures, local databases, credentials, logs, and `.en
 ### 4.1 Dependency direction
 
 ```text
-CLI / Rich TUI / later GNOME and Web
+CLI / Ratatui TUI / later GNOME and Web
                  |
           HTTP JSON + WS
                  |
@@ -763,7 +762,7 @@ A record contains `schema_version`, UTC `timestamp`, `server_instance_id`, proce
 {"schema_version":1,"timestamp":"2026-10-04T16:20:00.100Z","server_instance_id":"88767477-2a2a-481f-843b-30d56a5e3f10","sequence":12,"level":"INFO","logger":"mypowers.bluetooth","event":"ble_connected","message":"Bluetooth connection established.","context":{"device_id":"s300","adapter_id":"hci2"}}
 ```
 
-JSONL is the persistence format, not the required human display. CLI/TUI render timestamps, levels, and messages through Rich. Explicit `--json` returns structured data.
+JSONL is the persistence format, not the required human display. The CLI renders timestamps, levels, and messages through Rich; the native TUI uses Ratatui. Explicit `--json` returns structured data.
 
 ### 11.2 Logging behavior
 
@@ -962,13 +961,13 @@ Log `--follow` is the deliberate streaming exception to one-shot behavior; it do
 
 A successful `status` request returns 0 even if its body says the station is disconnected; `--require-live` provides script-friendly stricter behavior. Human-readable and JSON modes must use the same exit-code semantics.
 
-## 14. Rich TUI requirements
+## 14. Ratatui TUI requirements
 
 ### 14.1 Full application, not a repeating CLI print
 
-The TUI is a persistent, remote-capable terminal application with live state, keyboard focus, mouse clicks, control outcomes, power trends, and logs. Implement with Rich directly. Textual is explicitly prohibited.
+The TUI is a persistent, remote-capable terminal application with live state, keyboard focus, mouse clicks, control outcomes, power trends, and logs. Implement with Rust, Ratatui, and Crossterm using the approved standalone prototype as the visual reference.
 
-Rich is the renderer; implement the terminal-input/mouse layer separately rather than attributing input handling to Rich itself. Rich Live supports explicit refreshing and alternate-screen rendering [E14]. Use `Live(screen=True, auto_refresh=False)` or an equivalent explicitly owned rendering loop at no more than four frames per second. Avoid an additional auto-refresh thread racing with application state/input updates.
+Ratatui is the renderer; use its Terminal, Frame, Layout, Block, Paragraph, Sparkline and Buffer primitives with Crossterm input. Use an explicitly owned rendering loop at no more than four frames per second. Avoid an additional auto-refresh thread racing with application state/input updates.
 
 ### 14.2 Visual design
 
@@ -995,9 +994,9 @@ At 100 columns by 28 rows or larger, provide a clear full dashboard:
 +------------------------------------------------------------------------+
 ```
 
-This is a layout guide with illustrative values, not a requirement to copy ASCII borders or display those readings. Use Rich panels/layout/text/bars, consistent spacing, and an uncluttered palette. Battery is the strongest visual value; input and output have equal weight. State is expressed by text as well as color. Honor `NO_COLOR`/terminal capabilities. No emoji or Nerd Font dependency.
+This is a layout guide with illustrative values, not a requirement to copy ASCII borders or display those readings. Use Ratatui widgets and layout constraints, consistent spacing, and an uncluttered palette. Battery is the strongest visual value; input and output have equal weight. State is expressed by text as well as color. Honor `NO_COLOR`/terminal capabilities. No emoji or Nerd Font dependency.
 
-At 80×24, stack/condense secondary details. Below that, hide secondary content first but retain state, battery, input/output, time estimate, controls, and age when space permits. Below 40×12, show a readable resize message with a working exit key. Resizing must not cause exceptions, stale hitboxes, or accidental commands.
+Retain the approved prototype layout with inline INPUT/OUTPUT readings above two-row graphs. At 60×18 retain primary data and controls. Below 60×18 show a readable resize message with a working exit key. Resizing must not cause exceptions, stale hitboxes, or accidental commands.
 
 ### 14.3 Data and controls
 
@@ -1132,9 +1131,9 @@ Keep the API responsive during connection attempts and storage/log work. Exercis
 
 Milestone exit requires a working remote status request, saved real telemetry, a state stream, an authenticated log tail, and verified control behavior in offline integration tests. Then run authorized real output acceptance through the API.
 
-### 16.5 Milestone D — Complete CLI and Rich TUI
+### 16.5 Milestone D — Complete CLI and Ratatui TUI
 
-Implement every required CLI command/mode and exit code. Implement the full interactive TUI, including mouse/keyboard operation, update streams, pending/outcome rendering, log view, and terminal restoration. Shared HTTP/WS behavior belongs in the client module; do not copy network/auth logic separately into two frontends.
+Implement every required CLI command/mode and exit code. Implement the full interactive TUI, including mouse/keyboard operation, update streams, pending/outcome rendering, log view, and terminal restoration. The Python CLI and native Rust TUI implement the same documented HTTP/WS contracts; test both against the daemon.
 
 Test the UI with a fake API and a pseudoterminal before using real controls. Then connect CLI and TUI to the same real daemon and confirm that frontend lifecycle does not create extra BLE connections or stop collection.
 
@@ -1217,7 +1216,7 @@ Deliver a CI workflow using `uv`, the lockfile, Python 3.12 and 3.14, and no har
 Make these development commands work from the repository root after implementation:
 
 ```bash
-uv sync --locked --extra server --extra cli --extra tui --group dev
+uv sync --locked --extra server --extra cli --group dev
 uv run ruff check src frontends tests
 uv run ruff format --check src frontends tests
 uv run mypy src frontends
@@ -1226,6 +1225,8 @@ uv build
 uv run mypowersd check-config --env-file .env
 uv run mypowersd --env-file .env
 uv run mypowers --env-file .env status --json
+cargo build --release --locked --manifest-path frontends/tui/Cargo.toml
+install -m 755 frontends/tui/target/release/mypowers-tui .venv/bin/mypowers-tui
 uv run mypowers-tui --env-file .env
 ```
 

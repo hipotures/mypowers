@@ -13,7 +13,6 @@ from mypowers.daemon import main as daemon
     [
         ("daemon", "mypowers.daemon.main", "server"),
         ("cli", "mypowers_cli.main", "cli"),
-        ("tui", "mypowers_tui.main", "tui"),
     ],
 )
 def test_lazy_entrypoints_and_missing_extra(monkeypatch, capsys, name, module, extra):

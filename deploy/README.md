@@ -29,7 +29,8 @@ If the OS marks Python externally managed, provision an appropriate interpreter 
 operator-managed environment. Do not bypass that policy with automatic `--break-system-packages`.
 For an operator-selected venv, `uv venv /chosen/path` and `uv pip install --python /chosen/path/bin/python`
 are equivalent build/install-time options, never runtime behavior. Extras are one distribution:
-`mypowers[server]`, `mypowers[cli]`, `mypowers[tui]`. Requirements exports allow locked deployment
+`mypowers[server]` and `mypowers[cli]`. Install the native Rust TUI separately with `cargo install --locked --path frontends/tui`.
+Requirements exports allow locked deployment
 rather than resolving unspecified new dependencies at the destination.
 
 The deployer creates `/etc/mypowers/config.yaml`, `/etc/mypowers/server.env`, private API token,

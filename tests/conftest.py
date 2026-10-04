@@ -109,7 +109,7 @@ def config(tmp_path):
 
 
 @pytest.fixture
-def daemon_process(tmp_path):
+def daemon_process(tmp_path, request):
     """Real Uvicorn process, always simulated and environment-isolated."""
     import socket
 
@@ -119,21 +119,25 @@ def daemon_process(tmp_path):
     env = {key: value for key, value in os.environ.items() if not key.startswith("MYPOWERS_")}
     selected = tmp_path / "offline.yaml"
     selected.write_text("api:\n  auth_required: false\nhistory:\n  interval_seconds: 0.2\n")
+    authenticated = getattr(request, "param", False)
     env.update(
         MYPOWERS_CONFIG=str(selected),
-        MYPOWERS_AUTH_REQUIRED="false",
+        MYPOWERS_AUTH_REQUIRED="true" if authenticated else "false",
         MYPOWERS_BACKEND="simulated",
         MYPOWERS_DATA_DIR=str(tmp_path / "data"),
         MYPOWERS_LOG_DIR=str(tmp_path / "logs"),
         MYPOWERS_RUNTIME_DIR=str(tmp_path / "run"),
         MYPOWERS_PORT=str(port),
     )
+    if authenticated:
+        env["MYPOWERS_API_TOKEN"] = "a" * 40
     stderr = (tmp_path / "daemon.stderr").open("w")
     executable = Path(sys.executable).parent / "mypowersd"
     process = subprocess.Popen([str(executable)], env=env, stdout=subprocess.DEVNULL, stderr=stderr)
     url = f"http://127.0.0.1:{port}"
     try:
-        with httpx.Client(trust_env=False) as client:
+        headers = {"Authorization": "Bearer " + env["MYPOWERS_API_TOKEN"]} if authenticated else {}
+        with httpx.Client(trust_env=False, headers=headers) as client:
             deadline = time.monotonic() + 10
             while time.monotonic() < deadline:
                 if process.poll() is not None:

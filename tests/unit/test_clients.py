@@ -204,3 +204,63 @@ def test_times_zero_outcome_exit_codes():
             duration(bad)
     assert command_exit({"status": "rejected"}) == 5
     assert command_exit({"status": "failed"}) == 1
+
+
+def test_cli_dispatches_native_tui_with_flags_and_no_python_renderer(monkeypatch):
+    import sys
+
+    from mypowers_cli import main as cli
+
+    captured = []
+    monkeypatch.setattr(cli.shutil, "which", lambda _: "/native/mypowers-tui")
+    monkeypatch.setattr(cli, "settings", lambda _: pytest.fail("Native TUI owns its configuration"))
+
+    def execute(binary, arguments):
+        captured.append((binary, arguments))
+        raise SystemExit(0)
+
+    monkeypatch.setattr(cli.os, "execv", execute)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "mypowers",
+            "--env-file",
+            "selected.env",
+            "tui",
+            "--server",
+            "https://localhost",
+            "--no-mouse",
+            "--utc",
+        ],
+    )
+    with pytest.raises(SystemExit) as caught:
+        cli.main()
+    assert caught.value.code == 0
+    assert captured == [
+        (
+            "/native/mypowers-tui",
+            [
+                "/native/mypowers-tui",
+                "--env-file",
+                "selected.env",
+                "--server",
+                "https://localhost",
+                "--utc",
+                "--no-mouse",
+            ],
+        )
+    ]
+
+
+def test_cli_missing_native_tui_has_install_hint(monkeypatch, capsys):
+    import sys
+
+    from mypowers_cli import main as cli
+
+    monkeypatch.setattr(cli.shutil, "which", lambda _: None)
+    monkeypatch.setattr(sys, "argv", ["mypowers", "tui"])
+    with pytest.raises(SystemExit) as caught:
+        cli.main()
+    assert caught.value.code == 2
+    assert "cargo install" in capsys.readouterr().err

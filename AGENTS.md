@@ -1,11 +1,11 @@
 # Terminal UI visual checks
 
-Use `skrypty/mypowers-hidden-terminal-test.sh` to inspect the Ratatui prototype in a real terminal. It runs `cargo run` in `prototypes/ratatui-ui` using Alacritty on a hidden Xvfb display `:99`.
+Use `scripts/mypowers-hidden-terminal-test.sh` to inspect the Rust/Ratatui TUI in a real terminal. It runs `cargo run --locked --manifest-path frontends/tui/Cargo.toml` from the repository root using Alacritty on a hidden Xvfb display `:99`. This preserves the current-directory `.env` behavior.
 
 ```bash
-./skrypty/mypowers-hidden-terminal-test.sh
+./scripts/mypowers-hidden-terminal-test.sh
 # Optional screenshot destination:
-./skrypty/mypowers-hidden-terminal-test.sh /tmp/mypowers-preview.png
+./scripts/mypowers-hidden-terminal-test.sh /tmp/mypowers-preview.png
 ```
 
 - Requires Bash, Cargo, Xvfb, xdpyinfo, Alacritty, xdotool, ImageMagick `import`, and pgrep. Do not install missing dependencies without authorization.
@@ -13,4 +13,4 @@ Use `skrypty/mypowers-hidden-terminal-test.sh` to inspect the Ratatui prototype 
 - Keep the script's terminal session running during inspection. Press Enter to quit the application and clean up its terminal and Xvfb server.
 - If `:99` is occupied, the script stops. Do not remove existing locks or terminate unrelated servers.
 - Never switch the user's workspace, focus windows on their desktop, or launch a browser to generate a terminal preview.
-- Follow the `terminal-screenshot` skill when available. This prototype uses mock data only; visual checks must not connect to the production daemon or hardware.
+- Follow the `terminal-screenshot` skill when available. Use an isolated simulated daemon for control tests. Read-only visual checks may use the existing daemon; never send output changes to real hardware as a screenshot action.

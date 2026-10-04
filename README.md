@@ -2,7 +2,7 @@
 
 MyPowers monitors one qualified ALLPOWERS S300 and explicitly controls its AC group, DC group
 and common lamps. A foreground daemon owns BLE, records periodic SQLite history and serves an
-HTTP/WebSocket API. The Rich CLI and interactive Rich TUI use that same API locally or remotely.
+HTTP/WebSocket API. The Rich CLI and Rust/Ratatui TUI use that same API locally or remotely.
 Closing a frontend never stops collection or changes station outputs.
 
 The qualified unit is `2A:02:01:48:6B:D0`, readable name `AP S300 V2.0`, using the Actions adapter
@@ -12,11 +12,11 @@ temperature, per-port data and lamp/SOS modes are not presented as supported cap
 
 ## Development
 
-Requires Linux, Python 3.12+, SQLite 3.37+, and `uv`. Real hardware additionally needs system
+Requires Linux, Python 3.12+, SQLite 3.37+, `uv`, and Rust/Cargo for the TUI. Real hardware additionally needs system
 D-Bus/BlueZ and permission to use the intended controller. MyPowers installs no OS packages.
 
 ```bash
-uv sync --locked --extra server --extra cli --extra tui --group dev
+uv sync --locked --extra server --extra cli --group dev
 # Copy the example once; keep local secrets/runtime files out of Git.
 cp .env.example .env
 uv run mypowersd check-config
@@ -28,6 +28,8 @@ In another terminal:
 ```bash
 uv run mypowers status
 uv run mypowers status --json
+cargo build --release --locked --manifest-path frontends/tui/Cargo.toml
+install -m 755 frontends/tui/target/release/mypowers-tui .venv/bin/mypowers-tui
 uv run mypowers-tui
 uv run mypowers tui
 ```
@@ -53,7 +55,8 @@ uv run mypowers debug on --duration 15m
 uv run mypowers debug off
 ```
 
-Use Tab/Shift-Tab and Enter/Space in the TUI, mouse clicks for controls, `d`/`l` for views,
+Use `a`/`d`/`l` for AC/DC/lamps, Tab/Shift-Tab and Enter/Space, mouse clicks for controls,
+F2/F3 for dashboard/logs, `r` for retry, `p` for pause/resume, `b` for runtime DEBUG,
 `f` to filter logs, `?` for help, and `q`/Ctrl+C/Ctrl+Z to exit cleanly. Ctrl+Z is mapped to exit
 in this release. `--no-mouse`, `--no-color`, `NO_COLOR`, `--timezone Europe/Warsaw`, and `--utc`
 are supported. Paste cannot trigger controls. Stale/pending states disable output intentions.
@@ -65,6 +68,7 @@ Unknown/unconfirmed outcomes show a command ID and are never automatically repla
 uv run ruff check src frontends tests
 uv run ruff format --check src frontends tests
 uv run mypy src frontends
+cargo build --locked --manifest-path frontends/tui/Cargo.toml
 uv run pytest -m 'not hardware'
 uv run pytest -m 'not hardware' --cov --cov-report=json:coverage.json
 uv run python tests/check_coverage.py coverage.json
@@ -77,7 +81,9 @@ use fakes and temporary storage. Real hardware acceptance requires a separate ex
 see [hardware preparation](tests/hardware/README.md). Output-test opt-in requires operator-established
 safe loads and ordinary common-lamp mode. A 0 W reading is not a safe-load declaration.
 
-Install one wheel with independent extras: `mypowers[server]`, `mypowers[cli]`, or `mypowers[tui]`.
+Install the Python wheel with `mypowers[server]` or `mypowers[cli]`.
+Install the native TUI separately with `cargo install --locked --path frontends/tui`.
+See [TUI usage and verification](frontends/tui/README.md).
 The server needs no Rich; clients need no BLE/server/storage libraries. See [deployment](deploy/README.md)
 for locked exports, installation, supervisors and Caddy. No process creates a venv at runtime.
 
