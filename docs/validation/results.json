@@ -1,0 +1,4115 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-10-04T18:46:39.192684+00:00",
+  "application_implementation": "PASS",
+  "local_validation": "PASS",
+  "hardware_validation": "PARTIAL",
+  "production_deployment": "NOT RUN",
+  "source_commit": "7a2c814c9395a76da3b00fa58cbf840c03a6b7fb",
+  "baseline_commit": "52dc2033d9975b15598b36402691c2a92aafdfc8",
+  "platform": "Linux-7.2.8-1-cachyos-x86_64-with-glibc2.44",
+  "machine": "QEMU Standard PC (Q35 + ICH9, 2009)",
+  "python_tested": [
+    "3.12.14",
+    "3.14.7"
+  ],
+  "sqlite_tested": [
+    "3.53.1",
+    "3.53.4"
+  ],
+  "versions": {
+    "mypowers": "0.1.0",
+    "bleak": "3.0.2",
+    "dbus-fast": "3.1.2",
+    "fastapi": "0.142.2",
+    "starlette": "1.7.0",
+    "uvicorn": "0.54.0",
+    "aiosqlite": "0.22.1",
+    "websockets": "17.2",
+    "rich": "14.3.4",
+    "httpx": "0.28.1",
+    "pydantic": "2.13.5",
+    "python-dotenv": "1.2.4",
+    "PyYAML": "6.0.3",
+    "ruff": "0.16.10",
+    "mypy": "2.4.0",
+    "pytest": "9.1.1",
+    "coverage": "7.16.2",
+    "pip-audit": "2.10.1"
+  },
+  "tests": {
+    "312": {
+      "result": "PASS",
+      "python": "3.12.14",
+      "tests": 280,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "duration_seconds": 89.839,
+      "timestamp_as_recorded": "2026-10-04T20:44:05.837958+02:00",
+      "groups": {
+        "tests.integration.test_api": 22,
+        "tests.integration.test_cli": 12,
+        "tests.integration.test_responsiveness": 1,
+        "tests.integration.test_tls": 1,
+        "tests.terminal.test_failure_cleanup": 4,
+        "tests.terminal.test_terminal": 11,
+        "tests.unit.test_bluetooth": 24,
+        "tests.unit.test_clients": 42,
+        "tests.unit.test_config": 29,
+        "tests.unit.test_core": 51,
+        "tests.unit.test_diagnostics": 6,
+        "tests.unit.test_entrypoints": 4,
+        "tests.unit.test_protocol": 63,
+        "tests.unit.test_storage": 10
+      }
+    },
+    "314": {
+      "result": "PASS",
+      "python": "3.14.7",
+      "tests": 280,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "duration_seconds": 92.86,
+      "timestamp_as_recorded": "2026-10-04T20:44:06.697763+02:00",
+      "groups": {
+        "tests.integration.test_api": 22,
+        "tests.integration.test_cli": 12,
+        "tests.integration.test_responsiveness": 1,
+        "tests.integration.test_tls": 1,
+        "tests.terminal.test_failure_cleanup": 4,
+        "tests.terminal.test_terminal": 11,
+        "tests.unit.test_bluetooth": 24,
+        "tests.unit.test_clients": 42,
+        "tests.unit.test_config": 29,
+        "tests.unit.test_core": 51,
+        "tests.unit.test_diagnostics": 6,
+        "tests.unit.test_entrypoints": 4,
+        "tests.unit.test_protocol": 63,
+        "tests.unit.test_storage": 10
+      }
+    }
+  },
+  "research_baseline": {
+    "result": "PASS",
+    "tests_per_runtime": 35,
+    "runtimes": [
+      "3.12.14",
+      "3.14.7"
+    ],
+    "files_unchanged": true
+  },
+  "quality": {
+    "ruff": "PASS",
+    "format": "PASS",
+    "strict_mypy": "PASS",
+    "typed_production_files": 26,
+    "formatted_files": 47,
+    "uv_lock_check": "PASS",
+    "production_lines": {
+      "covered": 2405,
+      "total": 2628,
+      "percent": 91.5144596651446,
+      "target": 85
+    },
+    "protocol_core_branches": {
+      "covered": 124,
+      "total": 130,
+      "percent": 95.38461538461539,
+      "target": 90
+    },
+    "coverage_exclusions": {
+      "src/mypowers/bluetooth/transport.py": [
+        28,
+        29,
+        30,
+        31,
+        32,
+        33,
+        34,
+        35
+      ],
+      "src/mypowers/core/__init__.py": [
+        40,
+        41,
+        42,
+        43,
+        50,
+        51,
+        52
+      ]
+    },
+    "coverage_exclusion_reason": "Default coverage exclusion of type-only Protocol ellipsis declarations and neighboring blank lines; no runtime/platform exclusions."
+  },
+  "warnings": [
+    "One Starlette TestClient deprecation warning per suite concerning httpx; all tests passed."
+  ],
+  "corrected_validation_findings": [
+    "Real reacquisition exposed obsolete retry_in_seconds after connection; phase transitions now clear it and regression tests cover waiting/live status.",
+    "One Python 3.14 PTY regression run failed because a late WS command event replaced the HTTP outcome with a different format lacking the command ID; both paths now share the same notice and an event-order regression test covers it.",
+    "Four Python 3.12 PTY cases then exposed early WS confirmation display while local HTTP command polling was still pending; the local operation now owns its result notice until it finishes, and early/late WS ordering is tested."
+  ],
+  "wheel": {
+    "sha256": "62142d21e70a763728567668176f3e83229e25d23e4e9aa563c40feb48648eff",
+    "python312": {
+      "server": {
+        "result": "PASS",
+        "absent_dependencies": [
+          "rich",
+          "httpx"
+        ],
+        "outside_checkout": true,
+        "missing_extra_hint": "PASS"
+      },
+      "client": {
+        "result": "PASS",
+        "absent_dependencies": [
+          "bleak",
+          "dbus_fast",
+          "fastapi",
+          "uvicorn",
+          "aiosqlite",
+          "yaml"
+        ],
+        "outside_checkout": true,
+        "missing_extra_hint": "PASS"
+      }
+    },
+    "python314": {
+      "server": {
+        "result": "PASS",
+        "absent_dependencies": [
+          "rich",
+          "httpx"
+        ],
+        "outside_checkout": true,
+        "missing_extra_hint": "PASS"
+      },
+      "client": {
+        "result": "PASS",
+        "absent_dependencies": [
+          "bleak",
+          "dbus_fast",
+          "fastapi",
+          "uvicorn",
+          "aiosqlite",
+          "yaml"
+        ],
+        "outside_checkout": true,
+        "missing_extra_hint": "PASS"
+      }
+    }
+  },
+  "lock_sha256": "b5f319cca8b4a9dcacaa5fb427d3e19c0ed31185a60bb68aa0f5f8271f7e034b",
+  "prd_sha256": "d65f1f8b5458d3a3f5926a75cfb1dfd1653c4c9e4c2110acf6efcb5065efaf0a",
+  "audit": {
+    "result": "PASS",
+    "tool": "pip-audit",
+    "version": "2.10.1",
+    "date": "2026-10-04",
+    "scope": "Locked all-extras plus dev packages applicable to this Linux interpreter; platform marker exclusions honored.",
+    "dependencies": [
+      {
+        "name": "aiosqlite",
+        "version": "0.22.1",
+        "vulns": []
+      },
+      {
+        "name": "annotated-doc",
+        "version": "0.0.5",
+        "vulns": []
+      },
+      {
+        "name": "annotated-types",
+        "version": "0.8.0",
+        "vulns": []
+      },
+      {
+        "name": "anyio",
+        "version": "4.15.1",
+        "vulns": []
+      },
+      {
+        "name": "ast-serialize",
+        "version": "0.12.1",
+        "vulns": []
+      },
+      {
+        "name": "bleak",
+        "version": "3.0.2",
+        "vulns": []
+      },
+      {
+        "name": "boolean-py",
+        "version": "5.0",
+        "vulns": []
+      },
+      {
+        "name": "build",
+        "version": "1.6.1",
+        "vulns": []
+      },
+      {
+        "name": "cachecontrol",
+        "version": "0.14.4",
+        "vulns": []
+      },
+      {
+        "name": "certifi",
+        "version": "2026.7.22",
+        "vulns": []
+      },
+      {
+        "name": "charset-normalizer",
+        "version": "3.5.2",
+        "vulns": []
+      },
+      {
+        "name": "click",
+        "version": "8.5.0",
+        "vulns": []
+      },
+      {
+        "name": "coverage",
+        "version": "7.16.2",
+        "vulns": []
+      },
+      {
+        "name": "cyclonedx-python-lib",
+        "version": "11.12.0",
+        "vulns": []
+      },
+      {
+        "name": "dbus-fast",
+        "version": "3.1.2",
+        "vulns": []
+      },
+      {
+        "name": "defusedxml",
+        "version": "0.7.1",
+        "vulns": []
+      },
+      {
+        "name": "fastapi",
+        "version": "0.142.2",
+        "vulns": []
+      },
+      {
+        "name": "filelock",
+        "version": "4.0.10",
+        "vulns": []
+      },
+      {
+        "name": "h11",
+        "version": "0.16.0",
+        "vulns": []
+      },
+      {
+        "name": "httpcore",
+        "version": "1.0.9",
+        "vulns": []
+      },
+      {
+        "name": "httpx",
+        "version": "0.28.1",
+        "vulns": []
+      },
+      {
+        "name": "idna",
+        "version": "3.20",
+        "vulns": []
+      },
+      {
+        "name": "iniconfig",
+        "version": "2.3.0",
+        "vulns": []
+      },
+      {
+        "name": "librt",
+        "version": "0.16.0",
+        "vulns": []
+      },
+      {
+        "name": "license-expression",
+        "version": "30.4.4",
+        "vulns": []
+      },
+      {
+        "name": "markdown-it-py",
+        "version": "4.2.0",
+        "vulns": []
+      },
+      {
+        "name": "mdurl",
+        "version": "0.1.2",
+        "vulns": []
+      },
+      {
+        "name": "msgpack",
+        "version": "1.2.3",
+        "vulns": []
+      },
+      {
+        "name": "mypy",
+        "version": "2.4.0",
+        "vulns": []
+      },
+      {
+        "name": "mypy-extensions",
+        "version": "1.1.0",
+        "vulns": []
+      },
+      {
+        "name": "opentelemetry-api",
+        "version": "1.45.0",
+        "vulns": []
+      },
+      {
+        "name": "packageurl-python",
+        "version": "0.17.6",
+        "vulns": []
+      },
+      {
+        "name": "packaging",
+        "version": "26.3",
+        "vulns": []
+      },
+      {
+        "name": "pathspec",
+        "version": "1.1.1",
+        "vulns": []
+      },
+      {
+        "name": "pip",
+        "version": "26.2.1",
+        "vulns": []
+      },
+      {
+        "name": "pip-api",
+        "version": "0.0.35",
+        "vulns": []
+      },
+      {
+        "name": "pip-audit",
+        "version": "2.10.1",
+        "vulns": []
+      },
+      {
+        "name": "pip-requirements-parser",
+        "version": "32.0.1",
+        "vulns": []
+      },
+      {
+        "name": "platformdirs",
+        "version": "4.12.3",
+        "vulns": []
+      },
+      {
+        "name": "pluggy",
+        "version": "1.6.0",
+        "vulns": []
+      },
+      {
+        "name": "py-serializable",
+        "version": "2.1.0",
+        "vulns": []
+      },
+      {
+        "name": "pydantic",
+        "version": "2.13.5",
+        "vulns": []
+      },
+      {
+        "name": "pydantic-core",
+        "version": "2.46.5",
+        "vulns": []
+      },
+      {
+        "name": "pygments",
+        "version": "2.21.0",
+        "vulns": []
+      },
+      {
+        "name": "pyparsing",
+        "version": "3.3.3",
+        "vulns": []
+      },
+      {
+        "name": "pyproject-hooks",
+        "version": "1.3.3",
+        "vulns": []
+      },
+      {
+        "name": "pytest",
+        "version": "9.1.1",
+        "vulns": []
+      },
+      {
+        "name": "pytest-asyncio",
+        "version": "1.4.0",
+        "vulns": []
+      },
+      {
+        "name": "pytest-cov",
+        "version": "7.1.0",
+        "vulns": []
+      },
+      {
+        "name": "python-dotenv",
+        "version": "1.2.4",
+        "vulns": []
+      },
+      {
+        "name": "pyyaml",
+        "version": "6.0.3",
+        "vulns": []
+      },
+      {
+        "name": "requests",
+        "version": "2.34.2",
+        "vulns": []
+      },
+      {
+        "name": "rich",
+        "version": "14.3.4",
+        "vulns": []
+      },
+      {
+        "name": "ruff",
+        "version": "0.16.10",
+        "vulns": []
+      },
+      {
+        "name": "sortedcontainers",
+        "version": "2.4.0",
+        "vulns": []
+      },
+      {
+        "name": "starlette",
+        "version": "1.7.0",
+        "vulns": []
+      },
+      {
+        "name": "tomli",
+        "version": "2.4.1",
+        "vulns": []
+      },
+      {
+        "name": "tomli-w",
+        "version": "1.2.0",
+        "vulns": []
+      },
+      {
+        "name": "types-pyyaml",
+        "version": "6.0.12.20260906",
+        "vulns": []
+      },
+      {
+        "name": "typing-extensions",
+        "version": "4.16.0",
+        "vulns": []
+      },
+      {
+        "name": "typing-inspection",
+        "version": "0.4.4",
+        "vulns": []
+      },
+      {
+        "name": "tzdata",
+        "version": "2026.5",
+        "vulns": []
+      },
+      {
+        "name": "urllib3",
+        "version": "2.8.0",
+        "vulns": []
+      },
+      {
+        "name": "uvicorn",
+        "version": "0.54.0",
+        "vulns": []
+      },
+      {
+        "name": "websockets",
+        "version": "17.2",
+        "vulns": []
+      }
+    ],
+    "findings": 0,
+    "runtime_only_dependencies": 28
+  },
+  "tls": {
+    "version": "v2.11.7 h1:yj0Y4fYZGPkSvibBJ1sTWE33xC0fxztVyXEW5iIdUT4=",
+    "https": "PASS",
+    "wss": "PASS",
+    "untrusted_ca_rejected": "PASS",
+    "system_trust_modified": false
+  },
+  "scan_responsiveness": {
+    "result": "PASS",
+    "transport": "fake twenty-second scan then station_not_found",
+    "elapsed_seconds": 20.36474437499419,
+    "requests": 40,
+    "status_p95_ms": 4.036442027427256,
+    "target_p95_ms": 500
+  },
+  "live_tui": {
+    "read_only": true,
+    "elapsed_seconds": 6.12929712299956,
+    "live_display": true,
+    "battery_display": true,
+    "exit_code": 0,
+    "termios_restored": true,
+    "mouse_cleanup": true,
+    "paste_cleanup": true,
+    "traceback": false
+  },
+  "hardware": {
+    "read": "PASS",
+    "controls": "NOT RUN: operator safe-load and ordinary-lamp authorization not supplied",
+    "physical_observations": "NOT RUN",
+    "station": {
+      "id": "s300",
+      "address": "2A:02:01:48:6B:D0",
+      "name": "AP S300 V2.0",
+      "profile": "s300-v2-qualified-2026-10-04",
+      "hardware_version": null,
+      "firmware_version": null,
+      "nominal_user_metadata": {
+        "capacity_wh": 288,
+        "continuous_w": 300,
+        "peak_w": 500
+      }
+    },
+    "adapter": {
+      "address": "F4:4E:FC:A1:CB:FF",
+      "name": "Actions",
+      "resolved_id": "hci2"
+    },
+    "initial": {
+      "sequence": 1,
+      "received_at": "2026-10-04T17:27:20.888Z",
+      "segment_id": "9144d061-2969-4c07-b38c-07d388a50edc",
+      "battery_percent": 85,
+      "input_power_w": 0,
+      "output_power_w": 5,
+      "remaining_minutes": 1388,
+      "ac_enabled": false,
+      "dc_enabled": false,
+      "light_enabled": false,
+      "status_flags": 12
+    },
+    "hour_final": {
+      "sequence": 2719,
+      "received_at": "2026-10-04T18:27:31.206Z",
+      "segment_id": "9144d061-2969-4c07-b38c-07d388a50edc",
+      "battery_percent": 78,
+      "input_power_w": 0,
+      "output_power_w": 3,
+      "remaining_minutes": 1802,
+      "ac_enabled": false,
+      "dc_enabled": false,
+      "light_enabled": false,
+      "status_flags": 12
+    },
+    "final": {
+      "sequence": 13,
+      "received_at": "2026-10-04T18:34:25.762Z",
+      "segment_id": "2119cc88-ac6b-43ab-aac2-4a8c3cd3843c",
+      "battery_percent": 78,
+      "input_power_w": 0,
+      "output_power_w": 3,
+      "remaining_minutes": 1796,
+      "ac_enabled": false,
+      "dc_enabled": false,
+      "light_enabled": false,
+      "status_flags": 12
+    },
+    "soak": {
+      "result": "PASS",
+      "started_at": "2026-10-04T17:27:16.366+00:00",
+      "ended_at": "2026-10-04T18:27:34.816+00:00",
+      "elapsed_seconds": 3618.4500874140067,
+      "warmup_seconds": 300,
+      "valid_samples": 2719,
+      "rejected_frames": 0,
+      "acquisition_attempts": 1,
+      "websocket_messages": 2722,
+      "samples_recorded": 361,
+      "status_p95_ms_after_warmup": 5.792092008050531,
+      "rss_warmup_mib": 65.59375,
+      "rss_max_after_warmup_mib": 66.6953125,
+      "rss_growth_after_warmup_mib": 1.1015625,
+      "cpu_percent_of_one_core_after_warmup": 0.5184404956818242,
+      "startup_transient": "One ConnectError before the HTTP listener became ready; subsequent captured status samples all connected/live.",
+      "source_scope": "Hour daemon was started before final diagnostic/freshness/retry-display corrections and was not hot-reloaded; final corrected source separately passed reacquisition/read and all automated tests.",
+      "daemon_exit_code": -15,
+      "shutdown": "Graceful application shutdown completed; Uvicorn re-raised SIGTERM (-15)."
+    },
+    "final_corrected_read": {
+      "started_at": "2026-10-04T18:34:00.341Z",
+      "finished_at": "2026-10-04T18:34:28.857Z",
+      "read": "PASS",
+      "reacquisition": "PASS",
+      "retry_in_seconds": null,
+      "commands": [],
+      "cli": [
+        {
+          "args": [
+            "status"
+          ],
+          "exit_code": 0
+        },
+        {
+          "args": [
+            "status",
+            "--json"
+          ],
+          "exit_code": 0
+        },
+        {
+          "args": [
+            "history",
+            "--json"
+          ],
+          "exit_code": 0
+        },
+        {
+          "args": [
+            "logs",
+            "--tail",
+            "10",
+            "--json"
+          ],
+          "exit_code": 0
+        },
+        {
+          "args": [
+            "debug",
+            "on",
+            "--json"
+          ],
+          "exit_code": 0
+        },
+        {
+          "args": [
+            "debug",
+            "off",
+            "--json"
+          ],
+          "exit_code": 0
+        }
+      ],
+      "websocket_snapshot": "PASS",
+      "daemon_exit_code": -15
+    },
+    "databases": [
+      {
+        "session": "soak",
+        "method": "SQLite Online Backup API",
+        "integrity_check": "ok",
+        "user_version": 1,
+        "tables": [
+          "devices",
+          "telemetry"
+        ],
+        "telemetry_rows": 359,
+        "segments": 1,
+        "time_range_ms": [
+          1791134840888,
+          1791138443255
+        ]
+      },
+      {
+        "session": "final_read",
+        "method": "SQLite Online Backup API",
+        "integrity_check": "ok",
+        "user_version": 1,
+        "tables": [
+          "devices",
+          "telemetry"
+        ],
+        "telemetry_rows": 3,
+        "segments": 2,
+        "time_range_ms": [
+          1791138488296,
+          1791138505515
+        ]
+      },
+      {
+        "session": "final_corrected_read",
+        "method": "SQLite Online Backup API",
+        "integrity_check": "ok",
+        "user_version": 1,
+        "tables": [
+          "devices",
+          "telemetry"
+        ],
+        "telemetry_rows": 3,
+        "segments": 2
+      }
+    ],
+    "resource_samples": [
+      {
+        "elapsed_seconds": 10.198,
+        "server_time": "2026-10-04T17:27:26.562Z",
+        "rss_kib": 67168,
+        "cpu_ticks": 94,
+        "status_latency_ms": 7.388,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 20.206,
+        "server_time": "2026-10-04T17:27:36.570Z",
+        "rss_kib": 67168,
+        "cpu_ticks": 100,
+        "status_latency_ms": 5.516,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 30.213,
+        "server_time": "2026-10-04T17:27:46.577Z",
+        "rss_kib": 67168,
+        "cpu_ticks": 107,
+        "status_latency_ms": 5.198,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 40.22,
+        "server_time": "2026-10-04T17:27:56.584Z",
+        "rss_kib": 67168,
+        "cpu_ticks": 113,
+        "status_latency_ms": 4.405,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 50.227,
+        "server_time": "2026-10-04T17:28:06.592Z",
+        "rss_kib": 67168,
+        "cpu_ticks": 119,
+        "status_latency_ms": 3.85,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 60.233,
+        "server_time": "2026-10-04T17:28:16.597Z",
+        "rss_kib": 67168,
+        "cpu_ticks": 126,
+        "status_latency_ms": 4.551,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 70.239,
+        "server_time": "2026-10-04T17:28:26.604Z",
+        "rss_kib": 67168,
+        "cpu_ticks": 132,
+        "status_latency_ms": 4.902,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 80.246,
+        "server_time": "2026-10-04T17:28:36.611Z",
+        "rss_kib": 67168,
+        "cpu_ticks": 138,
+        "status_latency_ms": 4.89,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 90.254,
+        "server_time": "2026-10-04T17:28:46.617Z",
+        "rss_kib": 67168,
+        "cpu_ticks": 144,
+        "status_latency_ms": 5.455,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 100.263,
+        "server_time": "2026-10-04T17:28:56.629Z",
+        "rss_kib": 67168,
+        "cpu_ticks": 149,
+        "status_latency_ms": 8.255,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 110.269,
+        "server_time": "2026-10-04T17:29:06.634Z",
+        "rss_kib": 67168,
+        "cpu_ticks": 152,
+        "status_latency_ms": 2.855,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 120.275,
+        "server_time": "2026-10-04T17:29:16.640Z",
+        "rss_kib": 67168,
+        "cpu_ticks": 157,
+        "status_latency_ms": 3.501,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 130.282,
+        "server_time": "2026-10-04T17:29:26.647Z",
+        "rss_kib": 67168,
+        "cpu_ticks": 162,
+        "status_latency_ms": 4.245,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 140.288,
+        "server_time": "2026-10-04T17:29:36.653Z",
+        "rss_kib": 67168,
+        "cpu_ticks": 169,
+        "status_latency_ms": 4.265,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 150.295,
+        "server_time": "2026-10-04T17:29:46.660Z",
+        "rss_kib": 67168,
+        "cpu_ticks": 174,
+        "status_latency_ms": 5.33,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 160.304,
+        "server_time": "2026-10-04T17:29:56.668Z",
+        "rss_kib": 67168,
+        "cpu_ticks": 181,
+        "status_latency_ms": 5.173,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 170.311,
+        "server_time": "2026-10-04T17:30:06.675Z",
+        "rss_kib": 67168,
+        "cpu_ticks": 187,
+        "status_latency_ms": 5.359,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 180.319,
+        "server_time": "2026-10-04T17:30:16.684Z",
+        "rss_kib": 67168,
+        "cpu_ticks": 192,
+        "status_latency_ms": 4.85,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 190.327,
+        "server_time": "2026-10-04T17:30:26.691Z",
+        "rss_kib": 67168,
+        "cpu_ticks": 199,
+        "status_latency_ms": 4.931,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 200.334,
+        "server_time": "2026-10-04T17:30:36.699Z",
+        "rss_kib": 67168,
+        "cpu_ticks": 203,
+        "status_latency_ms": 4.39,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 210.342,
+        "server_time": "2026-10-04T17:30:46.707Z",
+        "rss_kib": 67168,
+        "cpu_ticks": 208,
+        "status_latency_ms": 4.501,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 220.348,
+        "server_time": "2026-10-04T17:30:56.713Z",
+        "rss_kib": 67168,
+        "cpu_ticks": 215,
+        "status_latency_ms": 4.421,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 230.355,
+        "server_time": "2026-10-04T17:31:06.719Z",
+        "rss_kib": 67168,
+        "cpu_ticks": 221,
+        "status_latency_ms": 4.645,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 240.363,
+        "server_time": "2026-10-04T17:31:16.727Z",
+        "rss_kib": 67168,
+        "cpu_ticks": 228,
+        "status_latency_ms": 5.046,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 250.373,
+        "server_time": "2026-10-04T17:31:26.737Z",
+        "rss_kib": 67168,
+        "cpu_ticks": 234,
+        "status_latency_ms": 5.307,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 260.379,
+        "server_time": "2026-10-04T17:31:36.744Z",
+        "rss_kib": 67168,
+        "cpu_ticks": 240,
+        "status_latency_ms": 3.955,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 270.385,
+        "server_time": "2026-10-04T17:31:46.750Z",
+        "rss_kib": 67168,
+        "cpu_ticks": 245,
+        "status_latency_ms": 4.079,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 280.392,
+        "server_time": "2026-10-04T17:31:56.756Z",
+        "rss_kib": 67168,
+        "cpu_ticks": 252,
+        "status_latency_ms": 4.3,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 290.4,
+        "server_time": "2026-10-04T17:32:06.764Z",
+        "rss_kib": 67168,
+        "cpu_ticks": 257,
+        "status_latency_ms": 4.37,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 300.405,
+        "server_time": "2026-10-04T17:32:16.770Z",
+        "rss_kib": 67168,
+        "cpu_ticks": 263,
+        "status_latency_ms": 2.934,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 310.41,
+        "server_time": "2026-10-04T17:32:26.775Z",
+        "rss_kib": 67168,
+        "cpu_ticks": 268,
+        "status_latency_ms": 3.185,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 320.416,
+        "server_time": "2026-10-04T17:32:36.780Z",
+        "rss_kib": 67168,
+        "cpu_ticks": 273,
+        "status_latency_ms": 3.422,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 330.423,
+        "server_time": "2026-10-04T17:32:46.787Z",
+        "rss_kib": 67168,
+        "cpu_ticks": 277,
+        "status_latency_ms": 4.345,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 340.431,
+        "server_time": "2026-10-04T17:32:56.796Z",
+        "rss_kib": 67168,
+        "cpu_ticks": 284,
+        "status_latency_ms": 5.267,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 350.439,
+        "server_time": "2026-10-04T17:33:06.804Z",
+        "rss_kib": 67168,
+        "cpu_ticks": 291,
+        "status_latency_ms": 4.822,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 360.448,
+        "server_time": "2026-10-04T17:33:16.813Z",
+        "rss_kib": 67168,
+        "cpu_ticks": 295,
+        "status_latency_ms": 5.299,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 370.454,
+        "server_time": "2026-10-04T17:33:26.819Z",
+        "rss_kib": 67168,
+        "cpu_ticks": 299,
+        "status_latency_ms": 3.753,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 380.461,
+        "server_time": "2026-10-04T17:33:36.825Z",
+        "rss_kib": 67168,
+        "cpu_ticks": 305,
+        "status_latency_ms": 4.667,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 390.47,
+        "server_time": "2026-10-04T17:33:46.834Z",
+        "rss_kib": 67168,
+        "cpu_ticks": 311,
+        "status_latency_ms": 5.099,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 400.478,
+        "server_time": "2026-10-04T17:33:56.843Z",
+        "rss_kib": 67168,
+        "cpu_ticks": 317,
+        "status_latency_ms": 5.139,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 410.485,
+        "server_time": "2026-10-04T17:34:06.849Z",
+        "rss_kib": 67168,
+        "cpu_ticks": 323,
+        "status_latency_ms": 3.957,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 420.492,
+        "server_time": "2026-10-04T17:34:16.857Z",
+        "rss_kib": 67168,
+        "cpu_ticks": 329,
+        "status_latency_ms": 4.942,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 430.498,
+        "server_time": "2026-10-04T17:34:26.863Z",
+        "rss_kib": 67168,
+        "cpu_ticks": 335,
+        "status_latency_ms": 2.924,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 440.504,
+        "server_time": "2026-10-04T17:34:36.869Z",
+        "rss_kib": 67168,
+        "cpu_ticks": 339,
+        "status_latency_ms": 3.277,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 450.511,
+        "server_time": "2026-10-04T17:34:46.876Z",
+        "rss_kib": 67172,
+        "cpu_ticks": 342,
+        "status_latency_ms": 3.044,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 460.518,
+        "server_time": "2026-10-04T17:34:56.883Z",
+        "rss_kib": 67172,
+        "cpu_ticks": 347,
+        "status_latency_ms": 3.755,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 470.526,
+        "server_time": "2026-10-04T17:35:06.891Z",
+        "rss_kib": 67172,
+        "cpu_ticks": 352,
+        "status_latency_ms": 4.143,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 480.535,
+        "server_time": "2026-10-04T17:35:16.900Z",
+        "rss_kib": 67172,
+        "cpu_ticks": 357,
+        "status_latency_ms": 4.612,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 490.542,
+        "server_time": "2026-10-04T17:35:26.907Z",
+        "rss_kib": 67176,
+        "cpu_ticks": 362,
+        "status_latency_ms": 4.388,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 500.551,
+        "server_time": "2026-10-04T17:35:36.916Z",
+        "rss_kib": 67176,
+        "cpu_ticks": 367,
+        "status_latency_ms": 4.801,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 510.56,
+        "server_time": "2026-10-04T17:35:46.924Z",
+        "rss_kib": 67180,
+        "cpu_ticks": 372,
+        "status_latency_ms": 5.202,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 520.567,
+        "server_time": "2026-10-04T17:35:56.932Z",
+        "rss_kib": 67184,
+        "cpu_ticks": 377,
+        "status_latency_ms": 3.979,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 530.574,
+        "server_time": "2026-10-04T17:36:06.939Z",
+        "rss_kib": 67184,
+        "cpu_ticks": 381,
+        "status_latency_ms": 4.229,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 540.581,
+        "server_time": "2026-10-04T17:36:16.946Z",
+        "rss_kib": 67184,
+        "cpu_ticks": 387,
+        "status_latency_ms": 4.635,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 550.589,
+        "server_time": "2026-10-04T17:36:26.953Z",
+        "rss_kib": 67188,
+        "cpu_ticks": 392,
+        "status_latency_ms": 4.666,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 560.596,
+        "server_time": "2026-10-04T17:36:36.961Z",
+        "rss_kib": 67196,
+        "cpu_ticks": 397,
+        "status_latency_ms": 4.089,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 570.605,
+        "server_time": "2026-10-04T17:36:46.969Z",
+        "rss_kib": 67196,
+        "cpu_ticks": 400,
+        "status_latency_ms": 4.325,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 580.612,
+        "server_time": "2026-10-04T17:36:56.976Z",
+        "rss_kib": 67200,
+        "cpu_ticks": 405,
+        "status_latency_ms": 4.434,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 590.621,
+        "server_time": "2026-10-04T17:37:06.986Z",
+        "rss_kib": 67200,
+        "cpu_ticks": 411,
+        "status_latency_ms": 5.073,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 600.629,
+        "server_time": "2026-10-04T17:37:16.994Z",
+        "rss_kib": 67204,
+        "cpu_ticks": 416,
+        "status_latency_ms": 4.435,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 610.639,
+        "server_time": "2026-10-04T17:37:27.003Z",
+        "rss_kib": 67204,
+        "cpu_ticks": 422,
+        "status_latency_ms": 5.518,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 620.647,
+        "server_time": "2026-10-04T17:37:37.012Z",
+        "rss_kib": 67208,
+        "cpu_ticks": 427,
+        "status_latency_ms": 3.643,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 630.654,
+        "server_time": "2026-10-04T17:37:47.019Z",
+        "rss_kib": 67208,
+        "cpu_ticks": 433,
+        "status_latency_ms": 3.971,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 640.666,
+        "server_time": "2026-10-04T17:37:57.030Z",
+        "rss_kib": 67212,
+        "cpu_ticks": 438,
+        "status_latency_ms": 7.353,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 650.673,
+        "server_time": "2026-10-04T17:38:07.038Z",
+        "rss_kib": 67216,
+        "cpu_ticks": 444,
+        "status_latency_ms": 2.73,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 660.679,
+        "server_time": "2026-10-04T17:38:17.044Z",
+        "rss_kib": 67220,
+        "cpu_ticks": 447,
+        "status_latency_ms": 2.947,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 670.685,
+        "server_time": "2026-10-04T17:38:27.050Z",
+        "rss_kib": 67220,
+        "cpu_ticks": 451,
+        "status_latency_ms": 3.134,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 680.691,
+        "server_time": "2026-10-04T17:38:37.056Z",
+        "rss_kib": 67228,
+        "cpu_ticks": 455,
+        "status_latency_ms": 2.805,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 690.696,
+        "server_time": "2026-10-04T17:38:47.062Z",
+        "rss_kib": 67232,
+        "cpu_ticks": 460,
+        "status_latency_ms": 2.967,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 700.702,
+        "server_time": "2026-10-04T17:38:57.067Z",
+        "rss_kib": 67232,
+        "cpu_ticks": 464,
+        "status_latency_ms": 2.929,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 710.71,
+        "server_time": "2026-10-04T17:39:07.074Z",
+        "rss_kib": 67240,
+        "cpu_ticks": 468,
+        "status_latency_ms": 4.025,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 720.719,
+        "server_time": "2026-10-04T17:39:17.084Z",
+        "rss_kib": 67240,
+        "cpu_ticks": 474,
+        "status_latency_ms": 5.31,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 730.728,
+        "server_time": "2026-10-04T17:39:27.092Z",
+        "rss_kib": 67248,
+        "cpu_ticks": 480,
+        "status_latency_ms": 4.783,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 740.736,
+        "server_time": "2026-10-04T17:39:37.100Z",
+        "rss_kib": 67252,
+        "cpu_ticks": 486,
+        "status_latency_ms": 4.958,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 750.743,
+        "server_time": "2026-10-04T17:39:47.108Z",
+        "rss_kib": 67252,
+        "cpu_ticks": 491,
+        "status_latency_ms": 4.125,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 760.751,
+        "server_time": "2026-10-04T17:39:57.115Z",
+        "rss_kib": 67256,
+        "cpu_ticks": 496,
+        "status_latency_ms": 4.786,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 770.759,
+        "server_time": "2026-10-04T17:40:07.123Z",
+        "rss_kib": 67264,
+        "cpu_ticks": 503,
+        "status_latency_ms": 5.017,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 780.768,
+        "server_time": "2026-10-04T17:40:17.132Z",
+        "rss_kib": 67268,
+        "cpu_ticks": 508,
+        "status_latency_ms": 4.448,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 790.779,
+        "server_time": "2026-10-04T17:40:27.143Z",
+        "rss_kib": 67268,
+        "cpu_ticks": 514,
+        "status_latency_ms": 5.335,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 800.788,
+        "server_time": "2026-10-04T17:40:37.152Z",
+        "rss_kib": 67268,
+        "cpu_ticks": 519,
+        "status_latency_ms": 4.965,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 810.797,
+        "server_time": "2026-10-04T17:40:47.162Z",
+        "rss_kib": 67280,
+        "cpu_ticks": 525,
+        "status_latency_ms": 4.984,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 820.807,
+        "server_time": "2026-10-04T17:40:57.171Z",
+        "rss_kib": 67280,
+        "cpu_ticks": 530,
+        "status_latency_ms": 4.402,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 830.815,
+        "server_time": "2026-10-04T17:41:07.179Z",
+        "rss_kib": 67284,
+        "cpu_ticks": 536,
+        "status_latency_ms": 5.367,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 840.825,
+        "server_time": "2026-10-04T17:41:17.190Z",
+        "rss_kib": 67288,
+        "cpu_ticks": 541,
+        "status_latency_ms": 4.967,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 850.836,
+        "server_time": "2026-10-04T17:41:27.201Z",
+        "rss_kib": 67292,
+        "cpu_ticks": 547,
+        "status_latency_ms": 4.289,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 860.844,
+        "server_time": "2026-10-04T17:41:37.209Z",
+        "rss_kib": 67292,
+        "cpu_ticks": 553,
+        "status_latency_ms": 3.992,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 870.853,
+        "server_time": "2026-10-04T17:41:47.218Z",
+        "rss_kib": 67300,
+        "cpu_ticks": 558,
+        "status_latency_ms": 5.19,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 880.862,
+        "server_time": "2026-10-04T17:41:57.227Z",
+        "rss_kib": 67300,
+        "cpu_ticks": 564,
+        "status_latency_ms": 4.249,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 890.871,
+        "server_time": "2026-10-04T17:42:07.235Z",
+        "rss_kib": 67304,
+        "cpu_ticks": 570,
+        "status_latency_ms": 5.191,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 900.88,
+        "server_time": "2026-10-04T17:42:17.244Z",
+        "rss_kib": 67312,
+        "cpu_ticks": 576,
+        "status_latency_ms": 4.957,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 910.889,
+        "server_time": "2026-10-04T17:42:27.254Z",
+        "rss_kib": 67316,
+        "cpu_ticks": 580,
+        "status_latency_ms": 3.348,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 920.895,
+        "server_time": "2026-10-04T17:42:37.260Z",
+        "rss_kib": 67316,
+        "cpu_ticks": 585,
+        "status_latency_ms": 2.909,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 930.904,
+        "server_time": "2026-10-04T17:42:47.269Z",
+        "rss_kib": 67320,
+        "cpu_ticks": 589,
+        "status_latency_ms": 3.661,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 940.91,
+        "server_time": "2026-10-04T17:42:57.275Z",
+        "rss_kib": 67328,
+        "cpu_ticks": 593,
+        "status_latency_ms": 3.314,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 950.918,
+        "server_time": "2026-10-04T17:43:07.282Z",
+        "rss_kib": 67328,
+        "cpu_ticks": 597,
+        "status_latency_ms": 3.646,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 960.924,
+        "server_time": "2026-10-04T17:43:17.289Z",
+        "rss_kib": 67332,
+        "cpu_ticks": 601,
+        "status_latency_ms": 2.753,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 970.932,
+        "server_time": "2026-10-04T17:43:27.296Z",
+        "rss_kib": 67332,
+        "cpu_ticks": 605,
+        "status_latency_ms": 4.123,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 980.944,
+        "server_time": "2026-10-04T17:43:37.308Z",
+        "rss_kib": 67336,
+        "cpu_ticks": 611,
+        "status_latency_ms": 6.46,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 990.955,
+        "server_time": "2026-10-04T17:43:47.319Z",
+        "rss_kib": 67348,
+        "cpu_ticks": 616,
+        "status_latency_ms": 3.982,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 1000.964,
+        "server_time": "2026-10-04T17:43:57.329Z",
+        "rss_kib": 67348,
+        "cpu_ticks": 622,
+        "status_latency_ms": 4.705,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 1010.972,
+        "server_time": "2026-10-04T17:44:07.336Z",
+        "rss_kib": 67348,
+        "cpu_ticks": 628,
+        "status_latency_ms": 4.387,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 1020.981,
+        "server_time": "2026-10-04T17:44:17.346Z",
+        "rss_kib": 67356,
+        "cpu_ticks": 633,
+        "status_latency_ms": 4.572,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 1030.992,
+        "server_time": "2026-10-04T17:44:27.357Z",
+        "rss_kib": 67364,
+        "cpu_ticks": 638,
+        "status_latency_ms": 5.197,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 1041.002,
+        "server_time": "2026-10-04T17:44:37.366Z",
+        "rss_kib": 67372,
+        "cpu_ticks": 644,
+        "status_latency_ms": 4.345,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 1051.011,
+        "server_time": "2026-10-04T17:44:47.376Z",
+        "rss_kib": 67372,
+        "cpu_ticks": 649,
+        "status_latency_ms": 5.549,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 1061.02,
+        "server_time": "2026-10-04T17:44:57.384Z",
+        "rss_kib": 67380,
+        "cpu_ticks": 655,
+        "status_latency_ms": 4.331,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 1071.031,
+        "server_time": "2026-10-04T17:45:07.395Z",
+        "rss_kib": 67388,
+        "cpu_ticks": 659,
+        "status_latency_ms": 5.527,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 1081.04,
+        "server_time": "2026-10-04T17:45:17.404Z",
+        "rss_kib": 67388,
+        "cpu_ticks": 665,
+        "status_latency_ms": 5.665,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 1091.052,
+        "server_time": "2026-10-04T17:45:27.416Z",
+        "rss_kib": 67396,
+        "cpu_ticks": 670,
+        "status_latency_ms": 4.683,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 1101.061,
+        "server_time": "2026-10-04T17:45:37.426Z",
+        "rss_kib": 67400,
+        "cpu_ticks": 676,
+        "status_latency_ms": 5.363,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 1111.071,
+        "server_time": "2026-10-04T17:45:47.435Z",
+        "rss_kib": 67404,
+        "cpu_ticks": 681,
+        "status_latency_ms": 4.865,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 1121.079,
+        "server_time": "2026-10-04T17:45:57.444Z",
+        "rss_kib": 67412,
+        "cpu_ticks": 687,
+        "status_latency_ms": 4.052,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 1131.09,
+        "server_time": "2026-10-04T17:46:07.455Z",
+        "rss_kib": 67412,
+        "cpu_ticks": 692,
+        "status_latency_ms": 4.715,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 1141.099,
+        "server_time": "2026-10-04T17:46:17.464Z",
+        "rss_kib": 67420,
+        "cpu_ticks": 699,
+        "status_latency_ms": 4.263,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 1151.109,
+        "server_time": "2026-10-04T17:46:27.473Z",
+        "rss_kib": 67428,
+        "cpu_ticks": 704,
+        "status_latency_ms": 5.203,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 1161.118,
+        "server_time": "2026-10-04T17:46:37.483Z",
+        "rss_kib": 67428,
+        "cpu_ticks": 709,
+        "status_latency_ms": 3.281,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 1171.124,
+        "server_time": "2026-10-04T17:46:47.489Z",
+        "rss_kib": 67432,
+        "cpu_ticks": 713,
+        "status_latency_ms": 2.657,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 1181.13,
+        "server_time": "2026-10-04T17:46:57.495Z",
+        "rss_kib": 67436,
+        "cpu_ticks": 717,
+        "status_latency_ms": 2.825,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 1191.138,
+        "server_time": "2026-10-04T17:47:07.503Z",
+        "rss_kib": 67444,
+        "cpu_ticks": 721,
+        "status_latency_ms": 2.975,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 1201.144,
+        "server_time": "2026-10-04T17:47:17.510Z",
+        "rss_kib": 67448,
+        "cpu_ticks": 725,
+        "status_latency_ms": 2.92,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 1211.152,
+        "server_time": "2026-10-04T17:47:27.517Z",
+        "rss_kib": 67448,
+        "cpu_ticks": 729,
+        "status_latency_ms": 3.789,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 1221.161,
+        "server_time": "2026-10-04T17:47:37.525Z",
+        "rss_kib": 67460,
+        "cpu_ticks": 733,
+        "status_latency_ms": 5.085,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 1231.172,
+        "server_time": "2026-10-04T17:47:47.536Z",
+        "rss_kib": 67464,
+        "cpu_ticks": 739,
+        "status_latency_ms": 4.428,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 1241.182,
+        "server_time": "2026-10-04T17:47:57.546Z",
+        "rss_kib": 67464,
+        "cpu_ticks": 745,
+        "status_latency_ms": 4.866,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 1251.194,
+        "server_time": "2026-10-04T17:48:07.559Z",
+        "rss_kib": 67472,
+        "cpu_ticks": 751,
+        "status_latency_ms": 4.692,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 1261.206,
+        "server_time": "2026-10-04T17:48:17.570Z",
+        "rss_kib": 67472,
+        "cpu_ticks": 757,
+        "status_latency_ms": 5.021,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 1271.217,
+        "server_time": "2026-10-04T17:48:27.581Z",
+        "rss_kib": 67476,
+        "cpu_ticks": 763,
+        "status_latency_ms": 5.348,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 1281.227,
+        "server_time": "2026-10-04T17:48:37.592Z",
+        "rss_kib": 67488,
+        "cpu_ticks": 768,
+        "status_latency_ms": 5.002,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 1291.239,
+        "server_time": "2026-10-04T17:48:47.603Z",
+        "rss_kib": 67488,
+        "cpu_ticks": 773,
+        "status_latency_ms": 4.684,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 1301.25,
+        "server_time": "2026-10-04T17:48:57.615Z",
+        "rss_kib": 67496,
+        "cpu_ticks": 779,
+        "status_latency_ms": 5.063,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 1311.263,
+        "server_time": "2026-10-04T17:49:07.627Z",
+        "rss_kib": 67504,
+        "cpu_ticks": 785,
+        "status_latency_ms": 6.705,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 1321.274,
+        "server_time": "2026-10-04T17:49:17.639Z",
+        "rss_kib": 67504,
+        "cpu_ticks": 790,
+        "status_latency_ms": 4.781,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 1331.281,
+        "server_time": "2026-10-04T17:49:27.646Z",
+        "rss_kib": 67512,
+        "cpu_ticks": 794,
+        "status_latency_ms": 2.642,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 1341.289,
+        "server_time": "2026-10-04T17:49:37.654Z",
+        "rss_kib": 67512,
+        "cpu_ticks": 798,
+        "status_latency_ms": 3.503,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 1351.297,
+        "server_time": "2026-10-04T17:49:47.662Z",
+        "rss_kib": 67512,
+        "cpu_ticks": 802,
+        "status_latency_ms": 3.1,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 1361.306,
+        "server_time": "2026-10-04T17:49:57.671Z",
+        "rss_kib": 67516,
+        "cpu_ticks": 807,
+        "status_latency_ms": 4.305,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 1371.318,
+        "server_time": "2026-10-04T17:50:07.682Z",
+        "rss_kib": 67520,
+        "cpu_ticks": 814,
+        "status_latency_ms": 5.733,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 1381.328,
+        "server_time": "2026-10-04T17:50:17.693Z",
+        "rss_kib": 67520,
+        "cpu_ticks": 819,
+        "status_latency_ms": 4.524,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 1391.34,
+        "server_time": "2026-10-04T17:50:27.704Z",
+        "rss_kib": 67520,
+        "cpu_ticks": 825,
+        "status_latency_ms": 5.657,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 1401.351,
+        "server_time": "2026-10-04T17:50:37.716Z",
+        "rss_kib": 67524,
+        "cpu_ticks": 831,
+        "status_latency_ms": 5.632,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 1411.362,
+        "server_time": "2026-10-04T17:50:47.727Z",
+        "rss_kib": 67524,
+        "cpu_ticks": 837,
+        "status_latency_ms": 4.868,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 1421.372,
+        "server_time": "2026-10-04T17:50:57.737Z",
+        "rss_kib": 67524,
+        "cpu_ticks": 842,
+        "status_latency_ms": 4.703,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 1431.383,
+        "server_time": "2026-10-04T17:51:07.748Z",
+        "rss_kib": 67524,
+        "cpu_ticks": 845,
+        "status_latency_ms": 4.545,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 1441.809,
+        "server_time": "2026-10-04T17:51:18.173Z",
+        "rss_kib": 67524,
+        "cpu_ticks": 850,
+        "status_latency_ms": 4.191,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 1452.962,
+        "server_time": "2026-10-04T17:51:29.326Z",
+        "rss_kib": 67524,
+        "cpu_ticks": 854,
+        "status_latency_ms": 4.871,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 1462.971,
+        "server_time": "2026-10-04T17:51:39.336Z",
+        "rss_kib": 67524,
+        "cpu_ticks": 860,
+        "status_latency_ms": 4.649,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 1472.981,
+        "server_time": "2026-10-04T17:51:49.346Z",
+        "rss_kib": 67524,
+        "cpu_ticks": 864,
+        "status_latency_ms": 4.232,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 1482.992,
+        "server_time": "2026-10-04T17:51:59.357Z",
+        "rss_kib": 67524,
+        "cpu_ticks": 869,
+        "status_latency_ms": 5.038,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 1493.002,
+        "server_time": "2026-10-04T17:52:09.367Z",
+        "rss_kib": 67524,
+        "cpu_ticks": 874,
+        "status_latency_ms": 5.007,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 1503.013,
+        "server_time": "2026-10-04T17:52:19.378Z",
+        "rss_kib": 67528,
+        "cpu_ticks": 881,
+        "status_latency_ms": 5.71,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 1513.024,
+        "server_time": "2026-10-04T17:52:29.388Z",
+        "rss_kib": 67528,
+        "cpu_ticks": 886,
+        "status_latency_ms": 4.868,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 1523.035,
+        "server_time": "2026-10-04T17:52:39.399Z",
+        "rss_kib": 67528,
+        "cpu_ticks": 892,
+        "status_latency_ms": 4.581,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 1533.048,
+        "server_time": "2026-10-04T17:52:49.411Z",
+        "rss_kib": 67528,
+        "cpu_ticks": 897,
+        "status_latency_ms": 6.35,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 1543.058,
+        "server_time": "2026-10-04T17:52:59.423Z",
+        "rss_kib": 67528,
+        "cpu_ticks": 903,
+        "status_latency_ms": 3.202,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 1553.064,
+        "server_time": "2026-10-04T17:53:09.429Z",
+        "rss_kib": 67528,
+        "cpu_ticks": 907,
+        "status_latency_ms": 2.818,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 1563.072,
+        "server_time": "2026-10-04T17:53:19.437Z",
+        "rss_kib": 67528,
+        "cpu_ticks": 910,
+        "status_latency_ms": 3.317,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 1573.084,
+        "server_time": "2026-10-04T17:53:29.448Z",
+        "rss_kib": 67528,
+        "cpu_ticks": 915,
+        "status_latency_ms": 4.847,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 1583.093,
+        "server_time": "2026-10-04T17:53:39.458Z",
+        "rss_kib": 67528,
+        "cpu_ticks": 921,
+        "status_latency_ms": 3.908,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 1593.103,
+        "server_time": "2026-10-04T17:53:49.467Z",
+        "rss_kib": 67528,
+        "cpu_ticks": 926,
+        "status_latency_ms": 4.695,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 1603.114,
+        "server_time": "2026-10-04T17:53:59.478Z",
+        "rss_kib": 67528,
+        "cpu_ticks": 932,
+        "status_latency_ms": 4.354,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 1613.125,
+        "server_time": "2026-10-04T17:54:09.489Z",
+        "rss_kib": 67528,
+        "cpu_ticks": 938,
+        "status_latency_ms": 5.222,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 1623.137,
+        "server_time": "2026-10-04T17:54:19.501Z",
+        "rss_kib": 67528,
+        "cpu_ticks": 944,
+        "status_latency_ms": 5.999,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 1633.147,
+        "server_time": "2026-10-04T17:54:29.512Z",
+        "rss_kib": 67528,
+        "cpu_ticks": 949,
+        "status_latency_ms": 4.692,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 1643.157,
+        "server_time": "2026-10-04T17:54:39.521Z",
+        "rss_kib": 67528,
+        "cpu_ticks": 955,
+        "status_latency_ms": 4.118,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 1653.168,
+        "server_time": "2026-10-04T17:54:49.533Z",
+        "rss_kib": 67528,
+        "cpu_ticks": 960,
+        "status_latency_ms": 4.712,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 1663.178,
+        "server_time": "2026-10-04T17:54:59.542Z",
+        "rss_kib": 67532,
+        "cpu_ticks": 966,
+        "status_latency_ms": 4.683,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 1673.19,
+        "server_time": "2026-10-04T17:55:09.555Z",
+        "rss_kib": 67532,
+        "cpu_ticks": 972,
+        "status_latency_ms": 4.488,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 1683.2,
+        "server_time": "2026-10-04T17:55:19.565Z",
+        "rss_kib": 67532,
+        "cpu_ticks": 977,
+        "status_latency_ms": 5.282,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 1693.212,
+        "server_time": "2026-10-04T17:55:29.576Z",
+        "rss_kib": 67532,
+        "cpu_ticks": 983,
+        "status_latency_ms": 5.28,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 1703.222,
+        "server_time": "2026-10-04T17:55:39.587Z",
+        "rss_kib": 67532,
+        "cpu_ticks": 989,
+        "status_latency_ms": 4.057,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 1713.235,
+        "server_time": "2026-10-04T17:55:49.599Z",
+        "rss_kib": 67532,
+        "cpu_ticks": 995,
+        "status_latency_ms": 4.611,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 1723.245,
+        "server_time": "2026-10-04T17:55:59.609Z",
+        "rss_kib": 67532,
+        "cpu_ticks": 1000,
+        "status_latency_ms": 4.371,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 1733.257,
+        "server_time": "2026-10-04T17:56:09.621Z",
+        "rss_kib": 67532,
+        "cpu_ticks": 1006,
+        "status_latency_ms": 4.438,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 1743.269,
+        "server_time": "2026-10-04T17:56:19.634Z",
+        "rss_kib": 67532,
+        "cpu_ticks": 1012,
+        "status_latency_ms": 4.312,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 1753.279,
+        "server_time": "2026-10-04T17:56:29.644Z",
+        "rss_kib": 67532,
+        "cpu_ticks": 1018,
+        "status_latency_ms": 4.181,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 1763.289,
+        "server_time": "2026-10-04T17:56:39.654Z",
+        "rss_kib": 67532,
+        "cpu_ticks": 1023,
+        "status_latency_ms": 2.96,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 1773.297,
+        "server_time": "2026-10-04T17:56:49.662Z",
+        "rss_kib": 67532,
+        "cpu_ticks": 1028,
+        "status_latency_ms": 3.7,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 1783.306,
+        "server_time": "2026-10-04T17:56:59.671Z",
+        "rss_kib": 67532,
+        "cpu_ticks": 1032,
+        "status_latency_ms": 3.637,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 1793.314,
+        "server_time": "2026-10-04T17:57:09.679Z",
+        "rss_kib": 67532,
+        "cpu_ticks": 1036,
+        "status_latency_ms": 3.253,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 1803.323,
+        "server_time": "2026-10-04T17:57:19.688Z",
+        "rss_kib": 67532,
+        "cpu_ticks": 1040,
+        "status_latency_ms": 3.34,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 1813.332,
+        "server_time": "2026-10-04T17:57:29.697Z",
+        "rss_kib": 67532,
+        "cpu_ticks": 1044,
+        "status_latency_ms": 2.869,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 1823.34,
+        "server_time": "2026-10-04T17:57:39.705Z",
+        "rss_kib": 67532,
+        "cpu_ticks": 1048,
+        "status_latency_ms": 3.093,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 1833.35,
+        "server_time": "2026-10-04T17:57:49.715Z",
+        "rss_kib": 67532,
+        "cpu_ticks": 1053,
+        "status_latency_ms": 3.919,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 1843.364,
+        "server_time": "2026-10-04T17:57:59.728Z",
+        "rss_kib": 67532,
+        "cpu_ticks": 1059,
+        "status_latency_ms": 6.38,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 1853.377,
+        "server_time": "2026-10-04T17:58:09.742Z",
+        "rss_kib": 67532,
+        "cpu_ticks": 1065,
+        "status_latency_ms": 5.083,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 1863.39,
+        "server_time": "2026-10-04T17:58:19.755Z",
+        "rss_kib": 67532,
+        "cpu_ticks": 1070,
+        "status_latency_ms": 4.598,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 1873.406,
+        "server_time": "2026-10-04T17:58:29.770Z",
+        "rss_kib": 67532,
+        "cpu_ticks": 1076,
+        "status_latency_ms": 4.421,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 1883.418,
+        "server_time": "2026-10-04T17:58:39.782Z",
+        "rss_kib": 67532,
+        "cpu_ticks": 1082,
+        "status_latency_ms": 5.71,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 1893.431,
+        "server_time": "2026-10-04T17:58:49.796Z",
+        "rss_kib": 67932,
+        "cpu_ticks": 1092,
+        "status_latency_ms": 4.554,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 1903.443,
+        "server_time": "2026-10-04T17:58:59.808Z",
+        "rss_kib": 67932,
+        "cpu_ticks": 1097,
+        "status_latency_ms": 5.518,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 1913.456,
+        "server_time": "2026-10-04T17:59:09.821Z",
+        "rss_kib": 67932,
+        "cpu_ticks": 1103,
+        "status_latency_ms": 4.487,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 1923.469,
+        "server_time": "2026-10-04T17:59:19.834Z",
+        "rss_kib": 67932,
+        "cpu_ticks": 1109,
+        "status_latency_ms": 4.318,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 1933.481,
+        "server_time": "2026-10-04T17:59:29.846Z",
+        "rss_kib": 67932,
+        "cpu_ticks": 1115,
+        "status_latency_ms": 4.344,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 1943.493,
+        "server_time": "2026-10-04T17:59:39.857Z",
+        "rss_kib": 67932,
+        "cpu_ticks": 1120,
+        "status_latency_ms": 4.707,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 1953.506,
+        "server_time": "2026-10-04T17:59:49.870Z",
+        "rss_kib": 67932,
+        "cpu_ticks": 1127,
+        "status_latency_ms": 4.347,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 1963.52,
+        "server_time": "2026-10-04T17:59:59.883Z",
+        "rss_kib": 67932,
+        "cpu_ticks": 1132,
+        "status_latency_ms": 5.089,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 1973.534,
+        "server_time": "2026-10-04T18:00:09.899Z",
+        "rss_kib": 67932,
+        "cpu_ticks": 1138,
+        "status_latency_ms": 5.032,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 1983.547,
+        "server_time": "2026-10-04T18:00:19.912Z",
+        "rss_kib": 67932,
+        "cpu_ticks": 1144,
+        "status_latency_ms": 5.161,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 1993.561,
+        "server_time": "2026-10-04T18:00:29.925Z",
+        "rss_kib": 67932,
+        "cpu_ticks": 1150,
+        "status_latency_ms": 4.391,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 2003.574,
+        "server_time": "2026-10-04T18:00:39.939Z",
+        "rss_kib": 67932,
+        "cpu_ticks": 1156,
+        "status_latency_ms": 4.797,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 2013.587,
+        "server_time": "2026-10-04T18:00:49.951Z",
+        "rss_kib": 67932,
+        "cpu_ticks": 1162,
+        "status_latency_ms": 4.323,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 2023.599,
+        "server_time": "2026-10-04T18:00:59.964Z",
+        "rss_kib": 67932,
+        "cpu_ticks": 1168,
+        "status_latency_ms": 4.194,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 2033.615,
+        "server_time": "2026-10-04T18:01:09.980Z",
+        "rss_kib": 67932,
+        "cpu_ticks": 1173,
+        "status_latency_ms": 2.789,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 2043.623,
+        "server_time": "2026-10-04T18:01:19.988Z",
+        "rss_kib": 67932,
+        "cpu_ticks": 1175,
+        "status_latency_ms": 2.506,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 2053.631,
+        "server_time": "2026-10-04T18:01:29.997Z",
+        "rss_kib": 67932,
+        "cpu_ticks": 1179,
+        "status_latency_ms": 2.525,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 2063.64,
+        "server_time": "2026-10-04T18:01:40.005Z",
+        "rss_kib": 67932,
+        "cpu_ticks": 1181,
+        "status_latency_ms": 3.384,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 2073.648,
+        "server_time": "2026-10-04T18:01:50.014Z",
+        "rss_kib": 67932,
+        "cpu_ticks": 1184,
+        "status_latency_ms": 3.238,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 2083.657,
+        "server_time": "2026-10-04T18:02:00.022Z",
+        "rss_kib": 67932,
+        "cpu_ticks": 1186,
+        "status_latency_ms": 3.073,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 2093.665,
+        "server_time": "2026-10-04T18:02:10.030Z",
+        "rss_kib": 67932,
+        "cpu_ticks": 1189,
+        "status_latency_ms": 3.707,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 2103.676,
+        "server_time": "2026-10-04T18:02:20.040Z",
+        "rss_kib": 67932,
+        "cpu_ticks": 1194,
+        "status_latency_ms": 3.874,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 2113.686,
+        "server_time": "2026-10-04T18:02:30.051Z",
+        "rss_kib": 67932,
+        "cpu_ticks": 1198,
+        "status_latency_ms": 3.921,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 2123.698,
+        "server_time": "2026-10-04T18:02:40.062Z",
+        "rss_kib": 67932,
+        "cpu_ticks": 1202,
+        "status_latency_ms": 4.376,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 2133.71,
+        "server_time": "2026-10-04T18:02:50.074Z",
+        "rss_kib": 67932,
+        "cpu_ticks": 1206,
+        "status_latency_ms": 4.871,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 2143.721,
+        "server_time": "2026-10-04T18:03:00.085Z",
+        "rss_kib": 67932,
+        "cpu_ticks": 1211,
+        "status_latency_ms": 4.366,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 2153.733,
+        "server_time": "2026-10-04T18:03:10.097Z",
+        "rss_kib": 67932,
+        "cpu_ticks": 1214,
+        "status_latency_ms": 4.35,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 2163.743,
+        "server_time": "2026-10-04T18:03:20.108Z",
+        "rss_kib": 67932,
+        "cpu_ticks": 1218,
+        "status_latency_ms": 4.291,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 2173.757,
+        "server_time": "2026-10-04T18:03:30.122Z",
+        "rss_kib": 67932,
+        "cpu_ticks": 1223,
+        "status_latency_ms": 5.354,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 2183.768,
+        "server_time": "2026-10-04T18:03:40.133Z",
+        "rss_kib": 67932,
+        "cpu_ticks": 1226,
+        "status_latency_ms": 2.602,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 2193.776,
+        "server_time": "2026-10-04T18:03:50.141Z",
+        "rss_kib": 67932,
+        "cpu_ticks": 1229,
+        "status_latency_ms": 2.863,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 2203.784,
+        "server_time": "2026-10-04T18:04:00.149Z",
+        "rss_kib": 67932,
+        "cpu_ticks": 1232,
+        "status_latency_ms": 2.616,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 2213.794,
+        "server_time": "2026-10-04T18:04:10.158Z",
+        "rss_kib": 67932,
+        "cpu_ticks": 1236,
+        "status_latency_ms": 3.97,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 2223.807,
+        "server_time": "2026-10-04T18:04:20.172Z",
+        "rss_kib": 67932,
+        "cpu_ticks": 1240,
+        "status_latency_ms": 4.65,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 2233.82,
+        "server_time": "2026-10-04T18:04:30.184Z",
+        "rss_kib": 67932,
+        "cpu_ticks": 1245,
+        "status_latency_ms": 5.74,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 2243.834,
+        "server_time": "2026-10-04T18:04:40.198Z",
+        "rss_kib": 67932,
+        "cpu_ticks": 1251,
+        "status_latency_ms": 4.362,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 2253.854,
+        "server_time": "2026-10-04T18:04:50.218Z",
+        "rss_kib": 67932,
+        "cpu_ticks": 1257,
+        "status_latency_ms": 4.703,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 2263.867,
+        "server_time": "2026-10-04T18:05:00.231Z",
+        "rss_kib": 67932,
+        "cpu_ticks": 1262,
+        "status_latency_ms": 4.512,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 2273.879,
+        "server_time": "2026-10-04T18:05:10.244Z",
+        "rss_kib": 67932,
+        "cpu_ticks": 1269,
+        "status_latency_ms": 4.316,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 2283.898,
+        "server_time": "2026-10-04T18:05:20.263Z",
+        "rss_kib": 67932,
+        "cpu_ticks": 1274,
+        "status_latency_ms": 4.567,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 2293.91,
+        "server_time": "2026-10-04T18:05:30.275Z",
+        "rss_kib": 67932,
+        "cpu_ticks": 1280,
+        "status_latency_ms": 4.999,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 2303.923,
+        "server_time": "2026-10-04T18:05:40.287Z",
+        "rss_kib": 67932,
+        "cpu_ticks": 1285,
+        "status_latency_ms": 4.362,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 2313.939,
+        "server_time": "2026-10-04T18:05:50.304Z",
+        "rss_kib": 67932,
+        "cpu_ticks": 1290,
+        "status_latency_ms": 4.946,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 2323.953,
+        "server_time": "2026-10-04T18:06:00.317Z",
+        "rss_kib": 67932,
+        "cpu_ticks": 1296,
+        "status_latency_ms": 4.994,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 2333.969,
+        "server_time": "2026-10-04T18:06:10.334Z",
+        "rss_kib": 67932,
+        "cpu_ticks": 1302,
+        "status_latency_ms": 7.093,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 2343.983,
+        "server_time": "2026-10-04T18:06:20.348Z",
+        "rss_kib": 67932,
+        "cpu_ticks": 1308,
+        "status_latency_ms": 4.539,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 2354.001,
+        "server_time": "2026-10-04T18:06:30.365Z",
+        "rss_kib": 67932,
+        "cpu_ticks": 1314,
+        "status_latency_ms": 7.268,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 2364.015,
+        "server_time": "2026-10-04T18:06:40.380Z",
+        "rss_kib": 67932,
+        "cpu_ticks": 1320,
+        "status_latency_ms": 4.184,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 2374.029,
+        "server_time": "2026-10-04T18:06:50.393Z",
+        "rss_kib": 67932,
+        "cpu_ticks": 1325,
+        "status_latency_ms": 4.498,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 2384.041,
+        "server_time": "2026-10-04T18:07:00.406Z",
+        "rss_kib": 67932,
+        "cpu_ticks": 1329,
+        "status_latency_ms": 3.41,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 2394.052,
+        "server_time": "2026-10-04T18:07:10.418Z",
+        "rss_kib": 67932,
+        "cpu_ticks": 1334,
+        "status_latency_ms": 2.677,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 2404.061,
+        "server_time": "2026-10-04T18:07:20.426Z",
+        "rss_kib": 67932,
+        "cpu_ticks": 1337,
+        "status_latency_ms": 2.796,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 2414.073,
+        "server_time": "2026-10-04T18:07:30.437Z",
+        "rss_kib": 67932,
+        "cpu_ticks": 1343,
+        "status_latency_ms": 5.506,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 2424.088,
+        "server_time": "2026-10-04T18:07:40.452Z",
+        "rss_kib": 67932,
+        "cpu_ticks": 1348,
+        "status_latency_ms": 4.752,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 2434.103,
+        "server_time": "2026-10-04T18:07:50.468Z",
+        "rss_kib": 67940,
+        "cpu_ticks": 1354,
+        "status_latency_ms": 4.548,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 2444.119,
+        "server_time": "2026-10-04T18:08:00.483Z",
+        "rss_kib": 67940,
+        "cpu_ticks": 1360,
+        "status_latency_ms": 5.792,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 2454.133,
+        "server_time": "2026-10-04T18:08:10.497Z",
+        "rss_kib": 67940,
+        "cpu_ticks": 1368,
+        "status_latency_ms": 4.897,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 2464.152,
+        "server_time": "2026-10-04T18:08:20.517Z",
+        "rss_kib": 67940,
+        "cpu_ticks": 1374,
+        "status_latency_ms": 5.607,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 2474.173,
+        "server_time": "2026-10-04T18:08:30.537Z",
+        "rss_kib": 67940,
+        "cpu_ticks": 1381,
+        "status_latency_ms": 5.49,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 2484.187,
+        "server_time": "2026-10-04T18:08:40.551Z",
+        "rss_kib": 67940,
+        "cpu_ticks": 1389,
+        "status_latency_ms": 4.726,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 2494.205,
+        "server_time": "2026-10-04T18:08:50.570Z",
+        "rss_kib": 67940,
+        "cpu_ticks": 1395,
+        "status_latency_ms": 6.99,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 2504.221,
+        "server_time": "2026-10-04T18:09:00.585Z",
+        "rss_kib": 67940,
+        "cpu_ticks": 1401,
+        "status_latency_ms": 5.452,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 2514.238,
+        "server_time": "2026-10-04T18:09:10.602Z",
+        "rss_kib": 67940,
+        "cpu_ticks": 1408,
+        "status_latency_ms": 5.667,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 2524.255,
+        "server_time": "2026-10-04T18:09:20.620Z",
+        "rss_kib": 67940,
+        "cpu_ticks": 1413,
+        "status_latency_ms": 5.05,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 2534.27,
+        "server_time": "2026-10-04T18:09:30.635Z",
+        "rss_kib": 67940,
+        "cpu_ticks": 1419,
+        "status_latency_ms": 4.999,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 2544.285,
+        "server_time": "2026-10-04T18:09:40.649Z",
+        "rss_kib": 67940,
+        "cpu_ticks": 1424,
+        "status_latency_ms": 5.511,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 2554.298,
+        "server_time": "2026-10-04T18:09:50.663Z",
+        "rss_kib": 67940,
+        "cpu_ticks": 1429,
+        "status_latency_ms": 4.575,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 2564.311,
+        "server_time": "2026-10-04T18:10:00.676Z",
+        "rss_kib": 67940,
+        "cpu_ticks": 1435,
+        "status_latency_ms": 4.153,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 2574.325,
+        "server_time": "2026-10-04T18:10:10.690Z",
+        "rss_kib": 67940,
+        "cpu_ticks": 1440,
+        "status_latency_ms": 4.965,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 2584.338,
+        "server_time": "2026-10-04T18:10:20.703Z",
+        "rss_kib": 67940,
+        "cpu_ticks": 1446,
+        "status_latency_ms": 4.855,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 2594.354,
+        "server_time": "2026-10-04T18:10:30.718Z",
+        "rss_kib": 67940,
+        "cpu_ticks": 1453,
+        "status_latency_ms": 6.919,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 2604.366,
+        "server_time": "2026-10-04T18:10:40.731Z",
+        "rss_kib": 67940,
+        "cpu_ticks": 1458,
+        "status_latency_ms": 4.118,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 2614.383,
+        "server_time": "2026-10-04T18:10:50.748Z",
+        "rss_kib": 67940,
+        "cpu_ticks": 1464,
+        "status_latency_ms": 5.155,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 2624.397,
+        "server_time": "2026-10-04T18:11:00.761Z",
+        "rss_kib": 67940,
+        "cpu_ticks": 1470,
+        "status_latency_ms": 4.568,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 2634.41,
+        "server_time": "2026-10-04T18:11:10.775Z",
+        "rss_kib": 67940,
+        "cpu_ticks": 1475,
+        "status_latency_ms": 3.16,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 2644.421,
+        "server_time": "2026-10-04T18:11:20.786Z",
+        "rss_kib": 67940,
+        "cpu_ticks": 1480,
+        "status_latency_ms": 3.478,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 2654.432,
+        "server_time": "2026-10-04T18:11:30.797Z",
+        "rss_kib": 67940,
+        "cpu_ticks": 1484,
+        "status_latency_ms": 4.087,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 2664.441,
+        "server_time": "2026-10-04T18:11:40.806Z",
+        "rss_kib": 67940,
+        "cpu_ticks": 1488,
+        "status_latency_ms": 2.772,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 2674.454,
+        "server_time": "2026-10-04T18:11:50.818Z",
+        "rss_kib": 67940,
+        "cpu_ticks": 1494,
+        "status_latency_ms": 5.377,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 2684.467,
+        "server_time": "2026-10-04T18:12:00.831Z",
+        "rss_kib": 67940,
+        "cpu_ticks": 1500,
+        "status_latency_ms": 4.793,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 2694.482,
+        "server_time": "2026-10-04T18:12:10.846Z",
+        "rss_kib": 67940,
+        "cpu_ticks": 1505,
+        "status_latency_ms": 5.049,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 2704.496,
+        "server_time": "2026-10-04T18:12:20.860Z",
+        "rss_kib": 67940,
+        "cpu_ticks": 1511,
+        "status_latency_ms": 4.357,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 2714.509,
+        "server_time": "2026-10-04T18:12:30.874Z",
+        "rss_kib": 67940,
+        "cpu_ticks": 1516,
+        "status_latency_ms": 5.774,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 2724.524,
+        "server_time": "2026-10-04T18:12:40.889Z",
+        "rss_kib": 67940,
+        "cpu_ticks": 1522,
+        "status_latency_ms": 4.989,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 2734.538,
+        "server_time": "2026-10-04T18:12:50.902Z",
+        "rss_kib": 67940,
+        "cpu_ticks": 1527,
+        "status_latency_ms": 4.877,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 2744.552,
+        "server_time": "2026-10-04T18:13:00.916Z",
+        "rss_kib": 67940,
+        "cpu_ticks": 1533,
+        "status_latency_ms": 4.701,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 2754.569,
+        "server_time": "2026-10-04T18:13:10.933Z",
+        "rss_kib": 67940,
+        "cpu_ticks": 1538,
+        "status_latency_ms": 5.362,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 2764.581,
+        "server_time": "2026-10-04T18:13:20.946Z",
+        "rss_kib": 67940,
+        "cpu_ticks": 1544,
+        "status_latency_ms": 4.218,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 2774.596,
+        "server_time": "2026-10-04T18:13:30.961Z",
+        "rss_kib": 67940,
+        "cpu_ticks": 1549,
+        "status_latency_ms": 6.032,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 2784.612,
+        "server_time": "2026-10-04T18:13:40.977Z",
+        "rss_kib": 67940,
+        "cpu_ticks": 1554,
+        "status_latency_ms": 4.191,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 2794.627,
+        "server_time": "2026-10-04T18:13:50.991Z",
+        "rss_kib": 67940,
+        "cpu_ticks": 1561,
+        "status_latency_ms": 4.904,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 2804.643,
+        "server_time": "2026-10-04T18:14:01.007Z",
+        "rss_kib": 67940,
+        "cpu_ticks": 1567,
+        "status_latency_ms": 5.51,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 2814.662,
+        "server_time": "2026-10-04T18:14:11.027Z",
+        "rss_kib": 67940,
+        "cpu_ticks": 1572,
+        "status_latency_ms": 4.008,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 2824.678,
+        "server_time": "2026-10-04T18:14:21.042Z",
+        "rss_kib": 67940,
+        "cpu_ticks": 1578,
+        "status_latency_ms": 6.424,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 2834.693,
+        "server_time": "2026-10-04T18:14:31.058Z",
+        "rss_kib": 67940,
+        "cpu_ticks": 1584,
+        "status_latency_ms": 4.051,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 2844.71,
+        "server_time": "2026-10-04T18:14:41.074Z",
+        "rss_kib": 67940,
+        "cpu_ticks": 1590,
+        "status_latency_ms": 4.42,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 2854.727,
+        "server_time": "2026-10-04T18:14:51.092Z",
+        "rss_kib": 67940,
+        "cpu_ticks": 1596,
+        "status_latency_ms": 4.097,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 2864.743,
+        "server_time": "2026-10-04T18:15:01.107Z",
+        "rss_kib": 67940,
+        "cpu_ticks": 1601,
+        "status_latency_ms": 4.747,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 2874.76,
+        "server_time": "2026-10-04T18:15:11.125Z",
+        "rss_kib": 67940,
+        "cpu_ticks": 1608,
+        "status_latency_ms": 4.52,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 2884.774,
+        "server_time": "2026-10-04T18:15:21.139Z",
+        "rss_kib": 67940,
+        "cpu_ticks": 1613,
+        "status_latency_ms": 2.833,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 2894.784,
+        "server_time": "2026-10-04T18:15:31.149Z",
+        "rss_kib": 67940,
+        "cpu_ticks": 1616,
+        "status_latency_ms": 2.892,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 2904.796,
+        "server_time": "2026-10-04T18:15:41.161Z",
+        "rss_kib": 67940,
+        "cpu_ticks": 1619,
+        "status_latency_ms": 3.32,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 2914.806,
+        "server_time": "2026-10-04T18:15:51.171Z",
+        "rss_kib": 67940,
+        "cpu_ticks": 1623,
+        "status_latency_ms": 3.121,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 2924.819,
+        "server_time": "2026-10-04T18:16:01.184Z",
+        "rss_kib": 67940,
+        "cpu_ticks": 1627,
+        "status_latency_ms": 3.445,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 2934.828,
+        "server_time": "2026-10-04T18:16:11.193Z",
+        "rss_kib": 67940,
+        "cpu_ticks": 1632,
+        "status_latency_ms": 2.956,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 2944.841,
+        "server_time": "2026-10-04T18:16:21.205Z",
+        "rss_kib": 67940,
+        "cpu_ticks": 1636,
+        "status_latency_ms": 4.508,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 2954.856,
+        "server_time": "2026-10-04T18:16:31.220Z",
+        "rss_kib": 67940,
+        "cpu_ticks": 1643,
+        "status_latency_ms": 4.302,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 2964.869,
+        "server_time": "2026-10-04T18:16:41.234Z",
+        "rss_kib": 67940,
+        "cpu_ticks": 1648,
+        "status_latency_ms": 4.601,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 2974.885,
+        "server_time": "2026-10-04T18:16:51.250Z",
+        "rss_kib": 67940,
+        "cpu_ticks": 1653,
+        "status_latency_ms": 5.944,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 2984.901,
+        "server_time": "2026-10-04T18:17:01.265Z",
+        "rss_kib": 67940,
+        "cpu_ticks": 1659,
+        "status_latency_ms": 5.168,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 2994.92,
+        "server_time": "2026-10-04T18:17:11.284Z",
+        "rss_kib": 67940,
+        "cpu_ticks": 1665,
+        "status_latency_ms": 5.436,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 3004.934,
+        "server_time": "2026-10-04T18:17:21.299Z",
+        "rss_kib": 67940,
+        "cpu_ticks": 1671,
+        "status_latency_ms": 4.315,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 3014.951,
+        "server_time": "2026-10-04T18:17:31.315Z",
+        "rss_kib": 67940,
+        "cpu_ticks": 1676,
+        "status_latency_ms": 4.531,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 3024.968,
+        "server_time": "2026-10-04T18:17:41.332Z",
+        "rss_kib": 67940,
+        "cpu_ticks": 1683,
+        "status_latency_ms": 5.622,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 3034.988,
+        "server_time": "2026-10-04T18:17:51.352Z",
+        "rss_kib": 67940,
+        "cpu_ticks": 1687,
+        "status_latency_ms": 6.075,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 3045.002,
+        "server_time": "2026-10-04T18:18:01.367Z",
+        "rss_kib": 68292,
+        "cpu_ticks": 1699,
+        "status_latency_ms": 4.995,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 3055.018,
+        "server_time": "2026-10-04T18:18:11.382Z",
+        "rss_kib": 68292,
+        "cpu_ticks": 1704,
+        "status_latency_ms": 4.257,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 3065.033,
+        "server_time": "2026-10-04T18:18:21.397Z",
+        "rss_kib": 68292,
+        "cpu_ticks": 1710,
+        "status_latency_ms": 4.883,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 3075.051,
+        "server_time": "2026-10-04T18:18:31.415Z",
+        "rss_kib": 68292,
+        "cpu_ticks": 1715,
+        "status_latency_ms": 4.597,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 3085.068,
+        "server_time": "2026-10-04T18:18:41.433Z",
+        "rss_kib": 68292,
+        "cpu_ticks": 1720,
+        "status_latency_ms": 5.212,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 3095.085,
+        "server_time": "2026-10-04T18:18:51.449Z",
+        "rss_kib": 68292,
+        "cpu_ticks": 1727,
+        "status_latency_ms": 4.94,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 3105.099,
+        "server_time": "2026-10-04T18:19:01.463Z",
+        "rss_kib": 68292,
+        "cpu_ticks": 1733,
+        "status_latency_ms": 3.887,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 3115.113,
+        "server_time": "2026-10-04T18:19:11.477Z",
+        "rss_kib": 68292,
+        "cpu_ticks": 1738,
+        "status_latency_ms": 4.372,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 3125.129,
+        "server_time": "2026-10-04T18:19:21.493Z",
+        "rss_kib": 68292,
+        "cpu_ticks": 1743,
+        "status_latency_ms": 4.765,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 3135.149,
+        "server_time": "2026-10-04T18:19:31.513Z",
+        "rss_kib": 68292,
+        "cpu_ticks": 1749,
+        "status_latency_ms": 4.643,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 3145.163,
+        "server_time": "2026-10-04T18:19:41.528Z",
+        "rss_kib": 68292,
+        "cpu_ticks": 1754,
+        "status_latency_ms": 2.793,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 3155.176,
+        "server_time": "2026-10-04T18:19:51.541Z",
+        "rss_kib": 68292,
+        "cpu_ticks": 1758,
+        "status_latency_ms": 3.996,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 3165.187,
+        "server_time": "2026-10-04T18:20:01.552Z",
+        "rss_kib": 68292,
+        "cpu_ticks": 1762,
+        "status_latency_ms": 3.01,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 3175.2,
+        "server_time": "2026-10-04T18:20:11.565Z",
+        "rss_kib": 68292,
+        "cpu_ticks": 1767,
+        "status_latency_ms": 3.094,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 3185.213,
+        "server_time": "2026-10-04T18:20:21.577Z",
+        "rss_kib": 68292,
+        "cpu_ticks": 1771,
+        "status_latency_ms": 3.776,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 3195.223,
+        "server_time": "2026-10-04T18:20:31.588Z",
+        "rss_kib": 68292,
+        "cpu_ticks": 1774,
+        "status_latency_ms": 3.084,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 3205.236,
+        "server_time": "2026-10-04T18:20:41.601Z",
+        "rss_kib": 68292,
+        "cpu_ticks": 1778,
+        "status_latency_ms": 2.934,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 3215.247,
+        "server_time": "2026-10-04T18:20:51.612Z",
+        "rss_kib": 68292,
+        "cpu_ticks": 1782,
+        "status_latency_ms": 3.672,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 3225.26,
+        "server_time": "2026-10-04T18:21:01.625Z",
+        "rss_kib": 68292,
+        "cpu_ticks": 1786,
+        "status_latency_ms": 2.731,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 3235.27,
+        "server_time": "2026-10-04T18:21:11.635Z",
+        "rss_kib": 68292,
+        "cpu_ticks": 1790,
+        "status_latency_ms": 2.787,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 3245.281,
+        "server_time": "2026-10-04T18:21:21.646Z",
+        "rss_kib": 68292,
+        "cpu_ticks": 1795,
+        "status_latency_ms": 3.113,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 3255.293,
+        "server_time": "2026-10-04T18:21:31.658Z",
+        "rss_kib": 68292,
+        "cpu_ticks": 1799,
+        "status_latency_ms": 4.065,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 3265.305,
+        "server_time": "2026-10-04T18:21:41.670Z",
+        "rss_kib": 68292,
+        "cpu_ticks": 1803,
+        "status_latency_ms": 2.762,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 3275.32,
+        "server_time": "2026-10-04T18:21:51.685Z",
+        "rss_kib": 68292,
+        "cpu_ticks": 1809,
+        "status_latency_ms": 4.59,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 3285.336,
+        "server_time": "2026-10-04T18:22:01.700Z",
+        "rss_kib": 68292,
+        "cpu_ticks": 1814,
+        "status_latency_ms": 4.615,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 3295.352,
+        "server_time": "2026-10-04T18:22:11.716Z",
+        "rss_kib": 68292,
+        "cpu_ticks": 1818,
+        "status_latency_ms": 4.733,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 3305.366,
+        "server_time": "2026-10-04T18:22:21.731Z",
+        "rss_kib": 68292,
+        "cpu_ticks": 1822,
+        "status_latency_ms": 4.442,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 3315.381,
+        "server_time": "2026-10-04T18:22:31.746Z",
+        "rss_kib": 68292,
+        "cpu_ticks": 1826,
+        "status_latency_ms": 4.677,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 3325.497,
+        "server_time": "2026-10-04T18:22:41.861Z",
+        "rss_kib": 68292,
+        "cpu_ticks": 1831,
+        "status_latency_ms": 4.488,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 3335.656,
+        "server_time": "2026-10-04T18:22:52.021Z",
+        "rss_kib": 68292,
+        "cpu_ticks": 1835,
+        "status_latency_ms": 4.052,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 3345.67,
+        "server_time": "2026-10-04T18:23:02.034Z",
+        "rss_kib": 68292,
+        "cpu_ticks": 1840,
+        "status_latency_ms": 4.57,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 3355.687,
+        "server_time": "2026-10-04T18:23:12.051Z",
+        "rss_kib": 68292,
+        "cpu_ticks": 1846,
+        "status_latency_ms": 4.809,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 3365.709,
+        "server_time": "2026-10-04T18:23:22.073Z",
+        "rss_kib": 68292,
+        "cpu_ticks": 1851,
+        "status_latency_ms": 6.704,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 3375.725,
+        "server_time": "2026-10-04T18:23:32.089Z",
+        "rss_kib": 68292,
+        "cpu_ticks": 1856,
+        "status_latency_ms": 4.737,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 3385.744,
+        "server_time": "2026-10-04T18:23:42.108Z",
+        "rss_kib": 68292,
+        "cpu_ticks": 1861,
+        "status_latency_ms": 4.367,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 3395.759,
+        "server_time": "2026-10-04T18:23:52.124Z",
+        "rss_kib": 68292,
+        "cpu_ticks": 1867,
+        "status_latency_ms": 4.166,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 3405.774,
+        "server_time": "2026-10-04T18:24:02.139Z",
+        "rss_kib": 68292,
+        "cpu_ticks": 1872,
+        "status_latency_ms": 4.635,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 3415.794,
+        "server_time": "2026-10-04T18:24:12.159Z",
+        "rss_kib": 68292,
+        "cpu_ticks": 1878,
+        "status_latency_ms": 4.14,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 3425.81,
+        "server_time": "2026-10-04T18:24:22.175Z",
+        "rss_kib": 68292,
+        "cpu_ticks": 1883,
+        "status_latency_ms": 3.876,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 3435.826,
+        "server_time": "2026-10-04T18:24:32.191Z",
+        "rss_kib": 68292,
+        "cpu_ticks": 1889,
+        "status_latency_ms": 4.992,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 3445.845,
+        "server_time": "2026-10-04T18:24:42.209Z",
+        "rss_kib": 68292,
+        "cpu_ticks": 1895,
+        "status_latency_ms": 4.898,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 3455.864,
+        "server_time": "2026-10-04T18:24:52.229Z",
+        "rss_kib": 68292,
+        "cpu_ticks": 1900,
+        "status_latency_ms": 3.372,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 3465.876,
+        "server_time": "2026-10-04T18:25:02.241Z",
+        "rss_kib": 68292,
+        "cpu_ticks": 1904,
+        "status_latency_ms": 3.088,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 3475.886,
+        "server_time": "2026-10-04T18:25:12.251Z",
+        "rss_kib": 68292,
+        "cpu_ticks": 1909,
+        "status_latency_ms": 2.86,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 3485.899,
+        "server_time": "2026-10-04T18:25:22.264Z",
+        "rss_kib": 68292,
+        "cpu_ticks": 1913,
+        "status_latency_ms": 3.954,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 3495.912,
+        "server_time": "2026-10-04T18:25:32.277Z",
+        "rss_kib": 68292,
+        "cpu_ticks": 1917,
+        "status_latency_ms": 5.544,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 3505.922,
+        "server_time": "2026-10-04T18:25:42.287Z",
+        "rss_kib": 68292,
+        "cpu_ticks": 1921,
+        "status_latency_ms": 2.718,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 3515.936,
+        "server_time": "2026-10-04T18:25:52.300Z",
+        "rss_kib": 68292,
+        "cpu_ticks": 1926,
+        "status_latency_ms": 4.533,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 3525.953,
+        "server_time": "2026-10-04T18:26:02.318Z",
+        "rss_kib": 68292,
+        "cpu_ticks": 1931,
+        "status_latency_ms": 4.478,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 3535.971,
+        "server_time": "2026-10-04T18:26:12.336Z",
+        "rss_kib": 68292,
+        "cpu_ticks": 1936,
+        "status_latency_ms": 6.664,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 3545.991,
+        "server_time": "2026-10-04T18:26:22.355Z",
+        "rss_kib": 68292,
+        "cpu_ticks": 1942,
+        "status_latency_ms": 5.445,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 3556.009,
+        "server_time": "2026-10-04T18:26:32.373Z",
+        "rss_kib": 68292,
+        "cpu_ticks": 1948,
+        "status_latency_ms": 4.572,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 3566.028,
+        "server_time": "2026-10-04T18:26:42.392Z",
+        "rss_kib": 68292,
+        "cpu_ticks": 1954,
+        "status_latency_ms": 5.391,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 3576.045,
+        "server_time": "2026-10-04T18:26:52.410Z",
+        "rss_kib": 68292,
+        "cpu_ticks": 1959,
+        "status_latency_ms": 4.764,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 3586.063,
+        "server_time": "2026-10-04T18:27:02.427Z",
+        "rss_kib": 68292,
+        "cpu_ticks": 1965,
+        "status_latency_ms": 5.491,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 3596.085,
+        "server_time": "2026-10-04T18:27:12.450Z",
+        "rss_kib": 68296,
+        "cpu_ticks": 1970,
+        "status_latency_ms": 4.637,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 3606.101,
+        "server_time": "2026-10-04T18:27:22.465Z",
+        "rss_kib": 68296,
+        "cpu_ticks": 1976,
+        "status_latency_ms": 4.54,
+        "telemetry_state": "live",
+        "phase": "connected"
+      },
+      {
+        "elapsed_seconds": 3616.118,
+        "server_time": "2026-10-04T18:27:32.483Z",
+        "rss_kib": 68296,
+        "cpu_ticks": 1982,
+        "status_latency_ms": 3.974,
+        "telemetry_state": "live",
+        "phase": "connected"
+      }
+    ],
+    "hardware_writes_sent": 0,
+    "confirmation_samples": []
+  },
+  "not_run": [
+    "Physical output acceptance and electrical/lamp observations",
+    "Final corrected revision 60-minute soak (earlier loaded application hour and final corrected short read/reacquisition are separate evidence)",
+    "Production DNS-01 issuance/renewal and LAN clients",
+    "Target Proxmox/LXC Bluetooth, permissions, supervisor activation and backups",
+    "Cross-platform behavior outside supported Linux"
+  ],
+  "external_inputs": [
+    "DNS provider and provider-specific Caddy module/credential",
+    "Target LXC, BlueZ/controller exposure and service account permissions",
+    "Production config/private API token, LAN DNS/network reachability and persistent backup/certificate stores"
+  ],
+  "acceptance": [
+    {
+      "id": "A01",
+      "status": "PASS",
+      "evidence": "Daemon, CLI and interactive Rich TUI; wheel installation on both runtimes."
+    },
+    {
+      "id": "A02",
+      "status": "PASS",
+      "evidence": "Only daemon owns BLE; client wheels exclude all hardware/server dependencies."
+    },
+    {
+      "id": "A03",
+      "status": "PASS",
+      "evidence": "All eight exact encodings and 24 directed single-output edges tested offline."
+    },
+    {
+      "id": "A04",
+      "status": "PASS",
+      "evidence": "Post-admission read, serialized single send and two full-state confirmations tested offline."
+    },
+    {
+      "id": "A05",
+      "status": "PASS",
+      "evidence": "Structured BlueZ/adapter/station failure observations; no automatic host mutations."
+    },
+    {
+      "id": "A06",
+      "status": "PASS",
+      "evidence": "Monotonic freshness, invalid data, session isolation, revision and qualification tests."
+    },
+    {
+      "id": "A07",
+      "status": "PASS",
+      "evidence": "Auth/Host/Origin/body/WS boundaries and actual private-CA Caddy HTTPS/WSS test."
+    },
+    {
+      "id": "A08",
+      "status": "PASS",
+      "evidence": "Strict YAML, explicit dotenv/env precedence, private tokens and production fail-closed checks."
+    },
+    {
+      "id": "A09",
+      "status": "PASS",
+      "evidence": "Actual receive-time recording, new samples, gaps, stable cursors and live SQLite snapshots."
+    },
+    {
+      "id": "A10",
+      "status": "PASS",
+      "evidence": "Only devices/telemetry tables; no raw BLE/log tables or aggregation/retention subsystem."
+    },
+    {
+      "id": "A11",
+      "status": "PASS",
+      "evidence": "Installed Rich/JSON CLI commands, NDJSON stream contract and documented exit codes."
+    },
+    {
+      "id": "A12",
+      "status": "PASS",
+      "evidence": "PTY mouse/keyboard/resize/paste/exit/failure tests plus passive real-unit live TUI."
+    },
+    {
+      "id": "A13",
+      "status": "PASS",
+      "evidence": "Remote log queries/follow, bounded failure fallback, rotation and runtime DEBUG tests."
+    },
+    {
+      "id": "A14",
+      "status": "PASS",
+      "evidence": "Busy/dedup/client loss/restart/overflow/send timeout/uncertainty tests; no automatic replay."
+    },
+    {
+      "id": "A15",
+      "status": "PASS",
+      "evidence": "280 isolated automated cases on each runtime; faults injected without altering host services/devices."
+    },
+    {
+      "id": "A16",
+      "status": "PARTIAL",
+      "evidence": "Real reads, 60-minute passive soak and reacquisition passed; real output writes/physical observations NOT RUN."
+    },
+    {
+      "id": "A17",
+      "status": "PASS",
+      "evidence": "Lock, packaging, CI, config, supervisors, Caddy, OpenAPI and validation artifacts delivered; production deployment NOT RUN."
+    },
+    {
+      "id": "A18",
+      "status": "PASS",
+      "evidence": "Research/license unchanged; original untracked input preserved; no private/runtime files in commits."
+    }
+  ],
+  "private_artifacts": [
+    "docs/validation/work/",
+    ".local/validation/"
+  ]
+}
