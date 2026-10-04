@@ -113,7 +113,7 @@ fn layouts_preserve_inline_values_two_row_graphs_and_unknown_values() {
         let mut app = app();
         let buffer = render(&mut app, width, height);
         let screen = text(&buffer);
-        assert!(screen.contains("INPUT 63W") && screen.contains("OUTPUT 181W"));
+        assert!(screen.contains("INPUT 63 W") && screen.contains("OUTPUT 181 W"));
         assert!(screen.contains("78%") && screen.contains("48h 57m"));
         assert_eq!(screen.matches("INPUT").count(), 1);
         assert!(app.controls.iter().all(|rect| rect.height == 2));

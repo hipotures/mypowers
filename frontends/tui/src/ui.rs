@@ -222,7 +222,7 @@ fn dashboard(frame: &mut Frame, content: Rect, app: &mut App) {
                     value.map(|v| v.to_string()).unwrap_or_else(|| "--".into()),
                     Style::default().fg(TEXT).add_modifier(Modifier::BOLD),
                 ),
-                Span::styled("W", Style::default().fg(MUTED)),
+                Span::styled(" W", Style::default().fg(MUTED)),
             ]))
             .alignment(Alignment::Center),
             parts[0],
