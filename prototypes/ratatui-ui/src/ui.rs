@@ -7,7 +7,7 @@ use ratatui::{
     widgets::{Block, BorderType, Borders, Paragraph, Sparkline, SparklineBar, Widget},
 };
 
-use crate::app::{App, SPINNER};
+use crate::app::{App, LIVE_PULSE};
 
 pub const MIN_WIDTH: u16 = 60;
 pub const MIN_HEIGHT: u16 = 18;
@@ -97,8 +97,8 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
         Line::from(vec![
             Span::styled("SIMULATED  ", Style::default().fg(DIM)),
             Span::styled(
-                SPINNER[app.tick % SPINNER.len()],
-                Style::default().fg(GREEN).add_modifier(Modifier::BOLD),
+                LIVE_PULSE[(app.tick / 24) % LIVE_PULSE.len()],
+                Style::default().fg(GREEN),
             ),
         ])
     } else {
@@ -431,12 +431,22 @@ mod tests {
     }
 
     #[test]
-    fn offline_indicator_is_static_red_and_live_spinner_animates() {
+    fn offline_indicator_is_static_red_and_live_circle_pulses_slowly() {
         let mut app = App::default();
         let first = lines(&render(80, 24, &mut app)).join("\n");
-        app.tick = 1;
+        app.tick = 23;
         let second = lines(&render(80, 24, &mut app)).join("\n");
-        assert!(first.contains(SPINNER[0]) && second.contains(SPINNER[1]));
+        assert_eq!(first, second);
+        for (tick, symbol) in [(0, "∙"), (24, "•"), (48, "●"), (72, "•"), (96, "∙")] {
+            app.tick = tick;
+            let buffer = render(80, 24, &mut app);
+            assert!(
+                buffer
+                    .content
+                    .iter()
+                    .any(|cell| cell.symbol() == symbol && cell.fg == GREEN)
+            );
+        }
         app.live = false;
         let offline = render(80, 24, &mut app);
         assert!(lines(&offline).join("\n").contains("OFFLINE"));

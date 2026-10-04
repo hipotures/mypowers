@@ -29,7 +29,9 @@ The most recently toggled output retains a subtle selection background.
 All toggles affect local fake state only. Both input and output readings remain
 visible regardless of those states.
 
-The Braille spinner updates at 8 FPS. Independent fake power readings and their
+The green live circle gently grows and shrinks through three glyph sizes. Each
+size is held for three seconds; a full pulse takes twelve seconds. Rendering
+updates at 8 FPS. Independent fake power readings and their
 128-sample histories update once per second. Battery stays at 78%, remaining time
 at 48h 57m. Initial readings are 63 W input and 181 W output; AC starts on, DC and
 lamps off.
@@ -47,7 +49,7 @@ screen or raw ANSI rendering:
 - `Layout`, `Constraint`, `Flex`, and `Rect` position each region during resize.
 - One `Block` uses `Borders::ALL` and `BorderType::Rounded`, with centered top and
   bottom border titles. Controls have no individual boxes.
-- `Paragraph`, `Line`, and `Span` render the station name, spinner, percentage,
+- `Paragraph`, `Line`, and `Span` render the station name, live circle, percentage,
   time, independent power readings, states, scale labels, and key hints.
 - Two built-in `Sparkline` widgets use explicit `.max(100)` and `.max(300)`.
   The newest sample stays at the right edge. `SparklineBar::style` colors each
@@ -125,6 +127,7 @@ MYPOWERS_PREVIEW_DIR=target/preview cargo test layouts_keep_controls
 - The battery gradient is continuous in RGB interpolation but still quantized
   to cells; fill precision is half a cell. Terminals without true color reduce
   the smoothness.
-- Border curvature, Braille dots, and block heights depend on the terminal font.
+- Border curvature, circle sizes, and block heights depend on the terminal font.
+  The live pulse uses three discrete glyph sizes rather than continuous scaling.
 - Mouse motion requires support from the terminal; keyboard controls always
   remain available. Verification here covers Linux, not other operating systems.

@@ -2,7 +2,7 @@ use crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent,
 use ratatui::layout::{Position, Rect};
 
 const HISTORY: usize = 128;
-pub const SPINNER: [&str; 10] = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
+pub const LIVE_PULSE: [&str; 4] = ["∙", "•", "●", "•"];
 
 pub struct App {
     pub live: bool,
