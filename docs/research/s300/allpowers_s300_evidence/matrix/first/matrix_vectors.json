@@ -1,0 +1,1118 @@
+{
+  "identity": {
+    "station": "AP S300 V2.0",
+    "address": "2A:02:01:48:6B:D0",
+    "adapter_mac": "F4:4E:FC:A1:CB:FF"
+  },
+  "initial_status": {
+    "seq": 4,
+    "event": "rx",
+    "utc": "2026-10-04T16:13:34.371184+00:00",
+    "monotonic": 446574.644555515,
+    "frame": "a565b1000108010c58000000001ed2e1",
+    "status": {
+      "flags": 12,
+      "dc_enabled": false,
+      "ac_enabled": false,
+      "frequency_flag": true,
+      "unverified_beep_flag": true,
+      "light_enabled": false,
+      "unverified_screen_flag": false,
+      "unverified_voice_flag": false,
+      "battery_percent": 88,
+      "input_power_w": 0,
+      "output_power_w": 0,
+      "remaining_minutes": 7890
+    }
+  },
+  "transitions": [
+    {
+      "tx_seq": 10,
+      "source_state": {
+        "ac": false,
+        "dc": false,
+        "lamps": false
+      },
+      "starting_status": {
+        "seq": 9,
+        "event": "rx",
+        "utc": "2026-10-04T16:13:38.335287+00:00",
+        "monotonic": 446578.608661128,
+        "frame": "a565b1000108010c58000000001ed2e1",
+        "status": {
+          "flags": 12,
+          "dc_enabled": false,
+          "ac_enabled": false,
+          "frequency_flag": true,
+          "unverified_beep_flag": true,
+          "light_enabled": false,
+          "unverified_screen_flag": false,
+          "unverified_voice_flag": false,
+          "battery_percent": 88,
+          "input_power_w": 0,
+          "output_power_w": 0,
+          "remaining_minutes": 7890
+        }
+      },
+      "target_state": {
+        "ac": true,
+        "dc": false,
+        "lamps": false
+      },
+      "expected_rx_flags": 14,
+      "tx_flags": 26,
+      "tx_frame": "a56500b10101001a6b",
+      "checksum": 107,
+      "first_two_post_write_status_frames": [
+        {
+          "seq": 11,
+          "event": "rx",
+          "utc": "2026-10-04T16:13:38.496169+00:00",
+          "monotonic": 446578.769540123,
+          "frame": "a565b1000108010e58000000001ed2e3",
+          "status": {
+            "flags": 14,
+            "dc_enabled": false,
+            "ac_enabled": true,
+            "frequency_flag": true,
+            "unverified_beep_flag": true,
+            "light_enabled": false,
+            "unverified_screen_flag": false,
+            "unverified_voice_flag": false,
+            "battery_percent": 88,
+            "input_power_w": 0,
+            "output_power_w": 0,
+            "remaining_minutes": 7890
+          }
+        },
+        {
+          "seq": 12,
+          "event": "rx",
+          "utc": "2026-10-04T16:13:40.046411+00:00",
+          "monotonic": 446580.319787973,
+          "frame": "a565b1000108010e58000000000a83a6",
+          "status": {
+            "flags": 14,
+            "dc_enabled": false,
+            "ac_enabled": true,
+            "frequency_flag": true,
+            "unverified_beep_flag": true,
+            "light_enabled": false,
+            "unverified_screen_flag": false,
+            "unverified_voice_flag": false,
+            "battery_percent": 88,
+            "input_power_w": 0,
+            "output_power_w": 0,
+            "remaining_minutes": 2691
+          }
+        }
+      ],
+      "first_response_latency_s": 0.16072461399016902,
+      "second_confirmation_latency_s": 1.7109724640031345,
+      "unrelated_switches_preserved": true,
+      "restoration": false,
+      "physical_observation": {
+        "verification": "IMAGE_REVIEW_COMPLETE",
+        "capture": {
+          "seq": 15,
+          "event": "photo",
+          "utc": "2026-10-04T16:13:41.798055+00:00",
+          "monotonic": 446582.071423089,
+          "label": "rx-0e",
+          "path": "/tmp/allpowers-camera/20261004T161340Z-rRjMUK.jpg",
+          "sha256": "04cc7291b986691e56db902fecd9bcad344d8e0b0f469f85332df73955e571de"
+        },
+        "observation": "LCD AC indicator visible, DC indicator absent; lamp reflectors visible without the strong lamp-on flare. External illumination limits lamp-off photo interpretation.",
+        "ac_dc_indicators_verified": true,
+        "electrical_output_measured": false
+      },
+      "final_state_evidence": {
+        "capture": "first/session.jsonl",
+        "restored_seq": 59,
+        "final_status": {
+          "seq": 58,
+          "event": "rx",
+          "utc": "2026-10-04T16:14:03.059359+00:00",
+          "monotonic": 446603.33275212,
+          "frame": "a565b1000108010c58000000001a8eb9",
+          "status": {
+            "flags": 12,
+            "dc_enabled": false,
+            "ac_enabled": false,
+            "frequency_flag": true,
+            "unverified_beep_flag": true,
+            "light_enabled": false,
+            "unverified_screen_flag": false,
+            "unverified_voice_flag": false,
+            "battery_percent": 88,
+            "input_power_w": 0,
+            "output_power_w": 0,
+            "remaining_minutes": 6798
+          }
+        },
+        "disconnected_seq": 60,
+        "disconnected": true
+      }
+    },
+    {
+      "tx_seq": 17,
+      "source_state": {
+        "ac": true,
+        "dc": false,
+        "lamps": false
+      },
+      "starting_status": {
+        "seq": 16,
+        "event": "rx",
+        "utc": "2026-10-04T16:13:42.785259+00:00",
+        "monotonic": 446583.058640556,
+        "frame": "a565b1000108010e58000000000a83a6",
+        "status": {
+          "flags": 14,
+          "dc_enabled": false,
+          "ac_enabled": true,
+          "frequency_flag": true,
+          "unverified_beep_flag": true,
+          "light_enabled": false,
+          "unverified_screen_flag": false,
+          "unverified_voice_flag": false,
+          "battery_percent": 88,
+          "input_power_w": 0,
+          "output_power_w": 0,
+          "remaining_minutes": 2691
+        }
+      },
+      "target_state": {
+        "ac": true,
+        "dc": true,
+        "lamps": false
+      },
+      "expected_rx_flags": 15,
+      "tx_flags": 27,
+      "tx_frame": "a56500b10101001b6a",
+      "checksum": 106,
+      "first_two_post_write_status_frames": [
+        {
+          "seq": 18,
+          "event": "rx",
+          "utc": "2026-10-04T16:13:42.946192+00:00",
+          "monotonic": 446583.219567671,
+          "frame": "a565b1000108010f58000000000a83a7",
+          "status": {
+            "flags": 15,
+            "dc_enabled": true,
+            "ac_enabled": true,
+            "frequency_flag": true,
+            "unverified_beep_flag": true,
+            "light_enabled": false,
+            "unverified_screen_flag": false,
+            "unverified_voice_flag": false,
+            "battery_percent": 88,
+            "input_power_w": 0,
+            "output_power_w": 0,
+            "remaining_minutes": 2691
+          }
+        },
+        {
+          "seq": 19,
+          "event": "rx",
+          "utc": "2026-10-04T16:13:44.296156+00:00",
+          "monotonic": 446584.569528718,
+          "frame": "a565b1000108010f58000000000983a4",
+          "status": {
+            "flags": 15,
+            "dc_enabled": true,
+            "ac_enabled": true,
+            "frequency_flag": true,
+            "unverified_beep_flag": true,
+            "light_enabled": false,
+            "unverified_screen_flag": false,
+            "unverified_voice_flag": false,
+            "battery_percent": 88,
+            "input_power_w": 0,
+            "output_power_w": 0,
+            "remaining_minutes": 2435
+          }
+        }
+      ],
+      "first_response_latency_s": 0.16069281299132854,
+      "second_confirmation_latency_s": 1.5106538599939086,
+      "unrelated_switches_preserved": true,
+      "restoration": false,
+      "physical_observation": {
+        "verification": "IMAGE_REVIEW_COMPLETE",
+        "capture": {
+          "seq": 21,
+          "event": "photo",
+          "utc": "2026-10-04T16:13:45.440365+00:00",
+          "monotonic": 446585.713732903,
+          "label": "rx-0f",
+          "path": "/tmp/allpowers-camera/20261004T161344Z-BOm9d3.jpg",
+          "sha256": "b32e4e5412833214cc744b7ccab3ad8ffbee1535009e3d21013b48430c7b741b"
+        },
+        "observation": "LCD AC, DC and USB indicators visible; lamp reflectors visible. No output voltage measured.",
+        "ac_dc_indicators_verified": true,
+        "electrical_output_measured": false
+      },
+      "final_state_evidence": {
+        "capture": "first/session.jsonl",
+        "restored_seq": 59,
+        "final_status": {
+          "seq": 58,
+          "event": "rx",
+          "utc": "2026-10-04T16:14:03.059359+00:00",
+          "monotonic": 446603.33275212,
+          "frame": "a565b1000108010c58000000001a8eb9",
+          "status": {
+            "flags": 12,
+            "dc_enabled": false,
+            "ac_enabled": false,
+            "frequency_flag": true,
+            "unverified_beep_flag": true,
+            "light_enabled": false,
+            "unverified_screen_flag": false,
+            "unverified_voice_flag": false,
+            "battery_percent": 88,
+            "input_power_w": 0,
+            "output_power_w": 0,
+            "remaining_minutes": 6798
+          }
+        },
+        "disconnected_seq": 60,
+        "disconnected": true
+      }
+    },
+    {
+      "tx_seq": 23,
+      "source_state": {
+        "ac": true,
+        "dc": true,
+        "lamps": false
+      },
+      "starting_status": {
+        "seq": 22,
+        "event": "rx",
+        "utc": "2026-10-04T16:13:45.709189+00:00",
+        "monotonic": 446585.982560946,
+        "frame": "a565b1000108010f58000000000983a4",
+        "status": {
+          "flags": 15,
+          "dc_enabled": true,
+          "ac_enabled": true,
+          "frequency_flag": true,
+          "unverified_beep_flag": true,
+          "light_enabled": false,
+          "unverified_screen_flag": false,
+          "unverified_voice_flag": false,
+          "battery_percent": 88,
+          "input_power_w": 0,
+          "output_power_w": 0,
+          "remaining_minutes": 2435
+        }
+      },
+      "target_state": {
+        "ac": false,
+        "dc": true,
+        "lamps": false
+      },
+      "expected_rx_flags": 13,
+      "tx_flags": 25,
+      "tx_frame": "a56500b10101001968",
+      "checksum": 104,
+      "first_two_post_write_status_frames": [
+        {
+          "seq": 24,
+          "event": "rx",
+          "utc": "2026-10-04T16:13:45.834685+00:00",
+          "monotonic": 446586.10806314,
+          "frame": "a565b1000108010d58000000000983a6",
+          "status": {
+            "flags": 13,
+            "dc_enabled": true,
+            "ac_enabled": false,
+            "frequency_flag": true,
+            "unverified_beep_flag": true,
+            "light_enabled": false,
+            "unverified_screen_flag": false,
+            "unverified_voice_flag": false,
+            "battery_percent": 88,
+            "input_power_w": 0,
+            "output_power_w": 0,
+            "remaining_minutes": 2435
+          }
+        },
+        {
+          "seq": 25,
+          "event": "rx",
+          "utc": "2026-10-04T16:13:47.221250+00:00",
+          "monotonic": 446587.494631548,
+          "frame": "a565b1000108010d580000000014fbc3",
+          "status": {
+            "flags": 13,
+            "dc_enabled": true,
+            "ac_enabled": false,
+            "frequency_flag": true,
+            "unverified_beep_flag": true,
+            "light_enabled": false,
+            "unverified_screen_flag": false,
+            "unverified_voice_flag": false,
+            "battery_percent": 88,
+            "input_power_w": 0,
+            "output_power_w": 0,
+            "remaining_minutes": 5371
+          }
+        }
+      ],
+      "first_response_latency_s": 0.12538841902278364,
+      "second_confirmation_latency_s": 1.5119568270165473,
+      "unrelated_switches_preserved": true,
+      "restoration": false,
+      "physical_observation": {
+        "verification": "IMAGE_REVIEW_COMPLETE",
+        "capture": {
+          "seq": 27,
+          "event": "photo",
+          "utc": "2026-10-04T16:13:48.350197+00:00",
+          "monotonic": 446588.623567945,
+          "label": "rx-0d",
+          "path": "/tmp/allpowers-camera/20261004T161347Z-SmqAiY.jpg",
+          "sha256": "2ce7a32711195a6285273e5774ea54bb2bf9702bc03e384c2773b24f1537812a"
+        },
+        "observation": "LCD DC/USB visible and AC indicator absent. Lamp-off image has external illumination.",
+        "ac_dc_indicators_verified": true,
+        "electrical_output_measured": false
+      },
+      "final_state_evidence": {
+        "capture": "first/session.jsonl",
+        "restored_seq": 59,
+        "final_status": {
+          "seq": 58,
+          "event": "rx",
+          "utc": "2026-10-04T16:14:03.059359+00:00",
+          "monotonic": 446603.33275212,
+          "frame": "a565b1000108010c58000000001a8eb9",
+          "status": {
+            "flags": 12,
+            "dc_enabled": false,
+            "ac_enabled": false,
+            "frequency_flag": true,
+            "unverified_beep_flag": true,
+            "light_enabled": false,
+            "unverified_screen_flag": false,
+            "unverified_voice_flag": false,
+            "battery_percent": 88,
+            "input_power_w": 0,
+            "output_power_w": 0,
+            "remaining_minutes": 6798
+          }
+        },
+        "disconnected_seq": 60,
+        "disconnected": true
+      }
+    },
+    {
+      "tx_seq": 29,
+      "source_state": {
+        "ac": false,
+        "dc": true,
+        "lamps": false
+      },
+      "starting_status": {
+        "seq": 28,
+        "event": "rx",
+        "utc": "2026-10-04T16:13:48.597256+00:00",
+        "monotonic": 446588.870625484,
+        "frame": "a565b1000108010d580000000014fbc3",
+        "status": {
+          "flags": 13,
+          "dc_enabled": true,
+          "ac_enabled": false,
+          "frequency_flag": true,
+          "unverified_beep_flag": true,
+          "light_enabled": false,
+          "unverified_screen_flag": false,
+          "unverified_voice_flag": false,
+          "battery_percent": 88,
+          "input_power_w": 0,
+          "output_power_w": 0,
+          "remaining_minutes": 5371
+        }
+      },
+      "target_state": {
+        "ac": false,
+        "dc": true,
+        "lamps": true
+      },
+      "expected_rx_flags": 29,
+      "tx_flags": 57,
+      "tx_frame": "a56500b10101003948",
+      "checksum": 72,
+      "first_two_post_write_status_frames": [
+        {
+          "seq": 30,
+          "event": "rx",
+          "utc": "2026-10-04T16:13:48.722269+00:00",
+          "monotonic": 446588.995642373,
+          "frame": "a565b1000108011d580000000014fbd3",
+          "status": {
+            "flags": 29,
+            "dc_enabled": true,
+            "ac_enabled": false,
+            "frequency_flag": true,
+            "unverified_beep_flag": true,
+            "light_enabled": true,
+            "unverified_screen_flag": false,
+            "unverified_voice_flag": false,
+            "battery_percent": 88,
+            "input_power_w": 0,
+            "output_power_w": 0,
+            "remaining_minutes": 5371
+          }
+        },
+        {
+          "seq": 31,
+          "event": "rx",
+          "utc": "2026-10-04T16:13:50.109253+00:00",
+          "monotonic": 446590.382626594,
+          "frame": "a565b1000108011d5800000000082713",
+          "status": {
+            "flags": 29,
+            "dc_enabled": true,
+            "ac_enabled": false,
+            "frequency_flag": true,
+            "unverified_beep_flag": true,
+            "light_enabled": true,
+            "unverified_screen_flag": false,
+            "unverified_voice_flag": false,
+            "battery_percent": 88,
+            "input_power_w": 0,
+            "output_power_w": 0,
+            "remaining_minutes": 2087
+          }
+        }
+      ],
+      "first_response_latency_s": 0.1248858220060356,
+      "second_confirmation_latency_s": 1.5118700430030003,
+      "unrelated_switches_preserved": true,
+      "restoration": false,
+      "physical_observation": {
+        "verification": "IMAGE_REVIEW_COMPLETE",
+        "capture": {
+          "seq": 33,
+          "event": "photo",
+          "utc": "2026-10-04T16:13:51.148294+00:00",
+          "monotonic": 446591.421660868,
+          "label": "rx-1d",
+          "path": "/tmp/allpowers-camera/20261004T161350Z-1pVMF7.jpg",
+          "sha256": "0c7010b3aa1f226dcbe273a5e01757f34965fb747244c936ad0a88183b7f1c40"
+        },
+        "observation": "Lamp-on flare confirms light output, but AC/DC are obscured. AC/DC physical observation UNKNOWN in this image.",
+        "ac_dc_indicators_verified": false,
+        "electrical_output_measured": false
+      },
+      "final_state_evidence": {
+        "capture": "first/session.jsonl",
+        "restored_seq": 59,
+        "final_status": {
+          "seq": 58,
+          "event": "rx",
+          "utc": "2026-10-04T16:14:03.059359+00:00",
+          "monotonic": 446603.33275212,
+          "frame": "a565b1000108010c58000000001a8eb9",
+          "status": {
+            "flags": 12,
+            "dc_enabled": false,
+            "ac_enabled": false,
+            "frequency_flag": true,
+            "unverified_beep_flag": true,
+            "light_enabled": false,
+            "unverified_screen_flag": false,
+            "unverified_voice_flag": false,
+            "battery_percent": 88,
+            "input_power_w": 0,
+            "output_power_w": 0,
+            "remaining_minutes": 6798
+          }
+        },
+        "disconnected_seq": 60,
+        "disconnected": true
+      }
+    },
+    {
+      "tx_seq": 35,
+      "source_state": {
+        "ac": false,
+        "dc": true,
+        "lamps": true
+      },
+      "starting_status": {
+        "seq": 34,
+        "event": "rx",
+        "utc": "2026-10-04T16:13:51.459295+00:00",
+        "monotonic": 446591.732667292,
+        "frame": "a565b1000108011d5800000000082713",
+        "status": {
+          "flags": 29,
+          "dc_enabled": true,
+          "ac_enabled": false,
+          "frequency_flag": true,
+          "unverified_beep_flag": true,
+          "light_enabled": true,
+          "unverified_screen_flag": false,
+          "unverified_voice_flag": false,
+          "battery_percent": 88,
+          "input_power_w": 0,
+          "output_power_w": 0,
+          "remaining_minutes": 2087
+        }
+      },
+      "target_state": {
+        "ac": true,
+        "dc": true,
+        "lamps": true
+      },
+      "expected_rx_flags": 31,
+      "tx_flags": 59,
+      "tx_frame": "a56500b10101003b4a",
+      "checksum": 74,
+      "first_two_post_write_status_frames": [
+        {
+          "seq": 36,
+          "event": "rx",
+          "utc": "2026-10-04T16:13:51.610114+00:00",
+          "monotonic": 446591.88348366,
+          "frame": "a565b1000108011f5800000000082711",
+          "status": {
+            "flags": 31,
+            "dc_enabled": true,
+            "ac_enabled": true,
+            "frequency_flag": true,
+            "unverified_beep_flag": true,
+            "light_enabled": true,
+            "unverified_screen_flag": false,
+            "unverified_voice_flag": false,
+            "battery_percent": 88,
+            "input_power_w": 0,
+            "output_power_w": 0,
+            "remaining_minutes": 2087
+          }
+        },
+        {
+          "seq": 37,
+          "event": "rx",
+          "utc": "2026-10-04T16:13:53.046184+00:00",
+          "monotonic": 446593.319560543,
+          "frame": "a565b1000108011f5800000000058db6",
+          "status": {
+            "flags": 31,
+            "dc_enabled": true,
+            "ac_enabled": true,
+            "frequency_flag": true,
+            "unverified_beep_flag": true,
+            "light_enabled": true,
+            "unverified_screen_flag": false,
+            "unverified_voice_flag": false,
+            "battery_percent": 88,
+            "input_power_w": 0,
+            "output_power_w": 0,
+            "remaining_minutes": 1421
+          }
+        }
+      ],
+      "first_response_latency_s": 0.15069659298751503,
+      "second_confirmation_latency_s": 1.5867734759813175,
+      "unrelated_switches_preserved": true,
+      "restoration": false,
+      "physical_observation": {
+        "verification": "IMAGE_REVIEW_COMPLETE",
+        "capture": {
+          "seq": 39,
+          "event": "photo",
+          "utc": "2026-10-04T16:13:54.075688+00:00",
+          "monotonic": 446594.349057381,
+          "label": "rx-1f",
+          "path": "/tmp/allpowers-camera/20261004T161353Z-BhZYmm.jpg",
+          "sha256": "7794cc25aa0947478e96cac985bbe3341e4752850a6302b0b140e3dd524ddef0"
+        },
+        "observation": "Both lamp positions emit strong light; green DC and AC buttons and LCD indicators visible through glare.",
+        "ac_dc_indicators_verified": true,
+        "electrical_output_measured": false
+      },
+      "final_state_evidence": {
+        "capture": "first/session.jsonl",
+        "restored_seq": 59,
+        "final_status": {
+          "seq": 58,
+          "event": "rx",
+          "utc": "2026-10-04T16:14:03.059359+00:00",
+          "monotonic": 446603.33275212,
+          "frame": "a565b1000108010c58000000001a8eb9",
+          "status": {
+            "flags": 12,
+            "dc_enabled": false,
+            "ac_enabled": false,
+            "frequency_flag": true,
+            "unverified_beep_flag": true,
+            "light_enabled": false,
+            "unverified_screen_flag": false,
+            "unverified_voice_flag": false,
+            "battery_percent": 88,
+            "input_power_w": 0,
+            "output_power_w": 0,
+            "remaining_minutes": 6798
+          }
+        },
+        "disconnected_seq": 60,
+        "disconnected": true
+      }
+    },
+    {
+      "tx_seq": 41,
+      "source_state": {
+        "ac": true,
+        "dc": true,
+        "lamps": true
+      },
+      "starting_status": {
+        "seq": 40,
+        "event": "rx",
+        "utc": "2026-10-04T16:13:54.410120+00:00",
+        "monotonic": 446594.683492024,
+        "frame": "a565b1000108011f5800000000058db6",
+        "status": {
+          "flags": 31,
+          "dc_enabled": true,
+          "ac_enabled": true,
+          "frequency_flag": true,
+          "unverified_beep_flag": true,
+          "light_enabled": true,
+          "unverified_screen_flag": false,
+          "unverified_voice_flag": false,
+          "battery_percent": 88,
+          "input_power_w": 0,
+          "output_power_w": 0,
+          "remaining_minutes": 1421
+        }
+      },
+      "target_state": {
+        "ac": true,
+        "dc": false,
+        "lamps": true
+      },
+      "expected_rx_flags": 30,
+      "tx_flags": 58,
+      "tx_frame": "a56500b10101003a4b",
+      "checksum": 75,
+      "first_two_post_write_status_frames": [
+        {
+          "seq": 42,
+          "event": "rx",
+          "utc": "2026-10-04T16:13:54.509134+00:00",
+          "monotonic": 446594.782502725,
+          "frame": "a565b1000108011e5800000000058db7",
+          "status": {
+            "flags": 30,
+            "dc_enabled": false,
+            "ac_enabled": true,
+            "frequency_flag": true,
+            "unverified_beep_flag": true,
+            "light_enabled": true,
+            "unverified_screen_flag": false,
+            "unverified_voice_flag": false,
+            "battery_percent": 88,
+            "input_power_w": 0,
+            "output_power_w": 0,
+            "remaining_minutes": 1421
+          }
+        },
+        {
+          "seq": 43,
+          "event": "rx",
+          "utc": "2026-10-04T16:13:55.897784+00:00",
+          "monotonic": 446596.171165149,
+          "frame": "a565b1000108011e580000000005e0da",
+          "status": {
+            "flags": 30,
+            "dc_enabled": false,
+            "ac_enabled": true,
+            "frequency_flag": true,
+            "unverified_beep_flag": true,
+            "light_enabled": true,
+            "unverified_screen_flag": false,
+            "unverified_voice_flag": false,
+            "battery_percent": 88,
+            "input_power_w": 0,
+            "output_power_w": 0,
+            "remaining_minutes": 1504
+          }
+        }
+      ],
+      "first_response_latency_s": 0.0988874290487729,
+      "second_confirmation_latency_s": 1.4875498530454934,
+      "unrelated_switches_preserved": true,
+      "restoration": false,
+      "physical_observation": {
+        "verification": "IMAGE_REVIEW_COMPLETE",
+        "capture": {
+          "seq": 45,
+          "event": "photo",
+          "utc": "2026-10-04T16:13:56.941129+00:00",
+          "monotonic": 446597.214498677,
+          "label": "rx-1e",
+          "path": "/tmp/allpowers-camera/20261004T161355Z-B7AiYE.jpg",
+          "sha256": "37c9b6426dba160e88b60bea3956148cdc5fd5cf7ecf02c4eafbdd0daabd6068"
+        },
+        "observation": "Both lamp positions emit strong light; AC button and LCD AC visible, DC indicator absent.",
+        "ac_dc_indicators_verified": true,
+        "electrical_output_measured": false
+      },
+      "final_state_evidence": {
+        "capture": "first/session.jsonl",
+        "restored_seq": 59,
+        "final_status": {
+          "seq": 58,
+          "event": "rx",
+          "utc": "2026-10-04T16:14:03.059359+00:00",
+          "monotonic": 446603.33275212,
+          "frame": "a565b1000108010c58000000001a8eb9",
+          "status": {
+            "flags": 12,
+            "dc_enabled": false,
+            "ac_enabled": false,
+            "frequency_flag": true,
+            "unverified_beep_flag": true,
+            "light_enabled": false,
+            "unverified_screen_flag": false,
+            "unverified_voice_flag": false,
+            "battery_percent": 88,
+            "input_power_w": 0,
+            "output_power_w": 0,
+            "remaining_minutes": 6798
+          }
+        },
+        "disconnected_seq": 60,
+        "disconnected": true
+      }
+    },
+    {
+      "tx_seq": 47,
+      "source_state": {
+        "ac": true,
+        "dc": false,
+        "lamps": true
+      },
+      "starting_status": {
+        "seq": 46,
+        "event": "rx",
+        "utc": "2026-10-04T16:13:57.309163+00:00",
+        "monotonic": 446597.582534072,
+        "frame": "a565b1000108011e580000000005e0da",
+        "status": {
+          "flags": 30,
+          "dc_enabled": false,
+          "ac_enabled": true,
+          "frequency_flag": true,
+          "unverified_beep_flag": true,
+          "light_enabled": true,
+          "unverified_screen_flag": false,
+          "unverified_voice_flag": false,
+          "battery_percent": 88,
+          "input_power_w": 0,
+          "output_power_w": 0,
+          "remaining_minutes": 1504
+        }
+      },
+      "target_state": {
+        "ac": false,
+        "dc": false,
+        "lamps": true
+      },
+      "expected_rx_flags": 28,
+      "tx_flags": 56,
+      "tx_frame": "a56500b10101003849",
+      "checksum": 73,
+      "first_two_post_write_status_frames": [
+        {
+          "seq": 48,
+          "event": "rx",
+          "utc": "2026-10-04T16:13:57.397199+00:00",
+          "monotonic": 446597.670575057,
+          "frame": "a565b1000108011c580000000005e0d8",
+          "status": {
+            "flags": 28,
+            "dc_enabled": false,
+            "ac_enabled": false,
+            "frequency_flag": true,
+            "unverified_beep_flag": true,
+            "light_enabled": true,
+            "unverified_screen_flag": false,
+            "unverified_voice_flag": false,
+            "battery_percent": 88,
+            "input_power_w": 0,
+            "output_power_w": 0,
+            "remaining_minutes": 1504
+          }
+        },
+        {
+          "seq": 49,
+          "event": "rx",
+          "utc": "2026-10-04T16:13:58.784368+00:00",
+          "monotonic": 446599.057746151,
+          "frame": "a565b1000108011c580000000008e0d5",
+          "status": {
+            "flags": 28,
+            "dc_enabled": false,
+            "ac_enabled": false,
+            "frequency_flag": true,
+            "unverified_beep_flag": true,
+            "light_enabled": true,
+            "unverified_screen_flag": false,
+            "unverified_voice_flag": false,
+            "battery_percent": 88,
+            "input_power_w": 0,
+            "output_power_w": 0,
+            "remaining_minutes": 2272
+          }
+        }
+      ],
+      "first_response_latency_s": 0.08792030700715259,
+      "second_confirmation_latency_s": 1.4750914010219276,
+      "unrelated_switches_preserved": true,
+      "restoration": false,
+      "physical_observation": {
+        "verification": "IMAGE_REVIEW_COMPLETE",
+        "capture": {
+          "seq": 51,
+          "event": "photo",
+          "utc": "2026-10-04T16:13:59.836821+00:00",
+          "monotonic": 446600.110191193,
+          "label": "rx-1c",
+          "path": "/tmp/allpowers-camera/20261004T161358Z-oZrsCZ.jpg",
+          "sha256": "85354399e2643132f858aba5f5f64912cf1ac0096bad8fca80e994c93497c38e"
+        },
+        "observation": "Both lamp positions emit strong light; AC/DC indicators not illuminated, though labels are obscured by glare.",
+        "ac_dc_indicators_verified": true,
+        "electrical_output_measured": false
+      },
+      "final_state_evidence": {
+        "capture": "first/session.jsonl",
+        "restored_seq": 59,
+        "final_status": {
+          "seq": 58,
+          "event": "rx",
+          "utc": "2026-10-04T16:14:03.059359+00:00",
+          "monotonic": 446603.33275212,
+          "frame": "a565b1000108010c58000000001a8eb9",
+          "status": {
+            "flags": 12,
+            "dc_enabled": false,
+            "ac_enabled": false,
+            "frequency_flag": true,
+            "unverified_beep_flag": true,
+            "light_enabled": false,
+            "unverified_screen_flag": false,
+            "unverified_voice_flag": false,
+            "battery_percent": 88,
+            "input_power_w": 0,
+            "output_power_w": 0,
+            "remaining_minutes": 6798
+          }
+        },
+        "disconnected_seq": 60,
+        "disconnected": true
+      }
+    },
+    {
+      "tx_seq": 53,
+      "source_state": {
+        "ac": false,
+        "dc": false,
+        "lamps": true
+      },
+      "starting_status": {
+        "seq": 52,
+        "event": "rx",
+        "utc": "2026-10-04T16:14:00.172166+00:00",
+        "monotonic": 446600.445537834,
+        "frame": "a565b1000108011c580000000008e0d5",
+        "status": {
+          "flags": 28,
+          "dc_enabled": false,
+          "ac_enabled": false,
+          "frequency_flag": true,
+          "unverified_beep_flag": true,
+          "light_enabled": true,
+          "unverified_screen_flag": false,
+          "unverified_voice_flag": false,
+          "battery_percent": 88,
+          "input_power_w": 0,
+          "output_power_w": 0,
+          "remaining_minutes": 2272
+        }
+      },
+      "target_state": {
+        "ac": false,
+        "dc": false,
+        "lamps": false
+      },
+      "expected_rx_flags": 12,
+      "tx_flags": 24,
+      "tx_frame": "a56500b10101001869",
+      "checksum": 105,
+      "first_two_post_write_status_frames": [
+        {
+          "seq": 54,
+          "event": "rx",
+          "utc": "2026-10-04T16:14:00.296606+00:00",
+          "monotonic": 446600.569984058,
+          "frame": "a565b1000108010c580000000008e0c5",
+          "status": {
+            "flags": 12,
+            "dc_enabled": false,
+            "ac_enabled": false,
+            "frequency_flag": true,
+            "unverified_beep_flag": true,
+            "light_enabled": false,
+            "unverified_screen_flag": false,
+            "unverified_voice_flag": false,
+            "battery_percent": 88,
+            "input_power_w": 0,
+            "output_power_w": 0,
+            "remaining_minutes": 2272
+          }
+        },
+        {
+          "seq": 55,
+          "event": "rx",
+          "utc": "2026-10-04T16:14:01.659382+00:00",
+          "monotonic": 446601.932761152,
+          "frame": "a565b1000108010c58000000001a8cbb",
+          "status": {
+            "flags": 12,
+            "dc_enabled": false,
+            "ac_enabled": false,
+            "frequency_flag": true,
+            "unverified_beep_flag": true,
+            "light_enabled": false,
+            "unverified_screen_flag": false,
+            "unverified_voice_flag": false,
+            "battery_percent": 88,
+            "input_power_w": 0,
+            "output_power_w": 0,
+            "remaining_minutes": 6796
+          }
+        }
+      ],
+      "first_response_latency_s": 0.12432597699807957,
+      "second_confirmation_latency_s": 1.4871030710055493,
+      "unrelated_switches_preserved": true,
+      "restoration": false,
+      "physical_observation": {
+        "verification": "IMAGE_REVIEW_COMPLETE",
+        "capture": {
+          "seq": 57,
+          "event": "photo",
+          "utc": "2026-10-04T16:14:02.814897+00:00",
+          "monotonic": 446603.088269374,
+          "label": "rx-0c",
+          "path": "/tmp/allpowers-camera/20261004T161401Z-517KsK.jpg",
+          "sha256": "78d3040dc689ffeb17fc6e6dd63ed223d277dfc5bd4bdadfac766385c756eb23"
+        },
+        "observation": "Both lamps visibly off; AC/DC buttons and LCD indicators not illuminated. Final original state restored.",
+        "ac_dc_indicators_verified": true,
+        "electrical_output_measured": false
+      },
+      "final_state_evidence": {
+        "capture": "first/session.jsonl",
+        "restored_seq": 59,
+        "final_status": {
+          "seq": 58,
+          "event": "rx",
+          "utc": "2026-10-04T16:14:03.059359+00:00",
+          "monotonic": 446603.33275212,
+          "frame": "a565b1000108010c58000000001a8eb9",
+          "status": {
+            "flags": 12,
+            "dc_enabled": false,
+            "ac_enabled": false,
+            "frequency_flag": true,
+            "unverified_beep_flag": true,
+            "light_enabled": false,
+            "unverified_screen_flag": false,
+            "unverified_voice_flag": false,
+            "battery_percent": 88,
+            "input_power_w": 0,
+            "output_power_w": 0,
+            "remaining_minutes": 6798
+          }
+        },
+        "disconnected_seq": 60,
+        "disconnected": true
+      }
+    }
+  ],
+  "final_status": {
+    "seq": 58,
+    "event": "rx",
+    "utc": "2026-10-04T16:14:03.059359+00:00",
+    "monotonic": 446603.33275212,
+    "frame": "a565b1000108010c58000000001a8eb9",
+    "status": {
+      "flags": 12,
+      "dc_enabled": false,
+      "ac_enabled": false,
+      "frequency_flag": true,
+      "unverified_beep_flag": true,
+      "light_enabled": false,
+      "unverified_screen_flag": false,
+      "unverified_voice_flag": false,
+      "battery_percent": 88,
+      "input_power_w": 0,
+      "output_power_w": 0,
+      "remaining_minutes": 6798
+    }
+  },
+  "success": true,
+  "error": null,
+  "operator_context": "Phone Bluetooth off; safe interruptible loads; no station button changes requested.",
+  "camera_context": "External illumination; automatic exposure.",
+  "restoration_evidence": {
+    "seq": 59,
+    "event": "restored",
+    "utc": "2026-10-04T16:14:03.059582+00:00",
+    "monotonic": 446603.33294334,
+    "status": {
+      "seq": 58,
+      "event": "rx",
+      "utc": "2026-10-04T16:14:03.059359+00:00",
+      "monotonic": 446603.33275212,
+      "frame": "a565b1000108010c58000000001a8eb9",
+      "status": {
+        "flags": 12,
+        "dc_enabled": false,
+        "ac_enabled": false,
+        "frequency_flag": true,
+        "unverified_beep_flag": true,
+        "light_enabled": false,
+        "unverified_screen_flag": false,
+        "unverified_voice_flag": false,
+        "battery_percent": 88,
+        "input_power_w": 0,
+        "output_power_w": 0,
+        "remaining_minutes": 6798
+      }
+    },
+    "state": {
+      "ac": false,
+      "dc": false,
+      "lamps": false
+    }
+  },
+  "disconnect_evidence": {
+    "seq": 60,
+    "event": "disconnected",
+    "utc": "2026-10-04T16:14:05.770351+00:00",
+    "monotonic": 446606.043724674,
+    "connected": false
+  }
+}

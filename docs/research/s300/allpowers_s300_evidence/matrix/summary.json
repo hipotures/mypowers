@@ -1,0 +1,66 @@
+{
+  "schema_version": 1,
+  "scope": "Exact AP S300 V2.0 unit; eight complete states, one eight-edge Gray cycle repeated three times",
+  "tuple_order": [
+    "ac",
+    "dc",
+    "lamps"
+  ],
+  "physical_scope": "Camera indicator/light observations, no electrical measurements",
+  "sessions": [
+    {
+      "id": "first",
+      "vectors": "first/matrix_vectors.json",
+      "success": true,
+      "writes": 8,
+      "valid_status_frames": 29,
+      "initial_flags": 12,
+      "final_flags": 12,
+      "elapsed_s": 39.580858595028985,
+      "first_response_range_s": [
+        0.08792030700715259,
+        0.16072461399016902
+      ],
+      "two_confirmation_range_s": [
+        1.4750914010219276,
+        1.7109724640031345
+      ]
+    },
+    {
+      "id": "repeat",
+      "vectors": "repeat/matrix_vectors.json",
+      "success": true,
+      "writes": 8,
+      "valid_status_frames": 38,
+      "initial_flags": 12,
+      "final_flags": 12,
+      "elapsed_s": 46.858126109000295,
+      "first_response_range_s": [
+        0.10087275196565315,
+        0.1747826809878461
+      ],
+      "two_confirmation_range_s": [
+        1.476008657948114,
+        1.7499148370116018
+      ]
+    },
+    {
+      "id": "manual-camera",
+      "vectors": "manual-camera/matrix_vectors.json",
+      "success": true,
+      "writes": 8,
+      "valid_status_frames": 28,
+      "initial_flags": 12,
+      "final_flags": 12,
+      "elapsed_s": 36.23584454203956,
+      "first_response_range_s": [
+        0.09973611903842539,
+        0.17489913303870708
+      ],
+      "two_confirmation_range_s": [
+        1.4877774160122499,
+        1.7114643310196698
+      ]
+    }
+  ]
+}

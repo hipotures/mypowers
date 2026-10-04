@@ -1,0 +1,11 @@
+{
+  "utc": "2026-10-04T15:41:38.478536+00:00",
+  "scenario": "station-bt-off",
+  "scan_timeout_s": 20,
+  "client_timeout_s": 25,
+  "type": "builtins.RuntimeError",
+  "message": "Station not found; check station Bluetooth and phone connection",
+  "repr": "RuntimeError('Station not found; check station Bluetooth and phone connection')",
+  "traceback": "Traceback (most recent call last):\n  File \"/tmp/allpowers-contention/demo_exception.py\", line 8, in main\n    await asyncio.wait_for(read_station(argparse.Namespace(address=\"2A:02:01:48:6B:D0\",adapter=\"hci2\",seconds=5)),55)\n  File \"/home/user/.local/share/uv/python/cpython-3.12.14-linux-x86_64-gnu/lib/python3.12/asyncio/tasks.py\", line 520, in wait_for\n    return await fut\n           ^^^^^^^^^\n  File \"/home/user/DEV/tmp/read_allpowers.py\", line 47, in read_station\n    raise RuntimeError(\"Station not found; check station Bluetooth and phone connection\")\nRuntimeError: Station not found; check station Bluetooth and phone connection\n",
+  "duration_s": 20.032928424014244
+}

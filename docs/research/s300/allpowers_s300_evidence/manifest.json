@@ -1,0 +1,808 @@
+{
+  "schema": 1,
+  "updated_utc": "2026-10-04T15:17:42.813958+00:00",
+  "photo_policy": "Photos remain only in /tmp/allpowers-camera/ per user instruction; paths may become unavailable after /tmp cleanup.",
+  "captures": [
+    {
+      "path": "captures/20261004T141301Z-session.jsonl",
+      "sha256": "b89eb839aa11ee95105e890ff3b41c1ef30c1790928d544769314c460137b527",
+      "bytes": 172954
+    },
+    {
+      "path": "captures/20261004T142218Z-session.jsonl",
+      "sha256": "b175bcf0beb34ab0afc2c953cd304a811dc7ec87ad57e347d9b9a3759c8a5f1a",
+      "bytes": 272229
+    },
+    {
+      "path": "captures/20261004T143651Z-session.jsonl",
+      "sha256": "16d57973725aaba396e778062621cff368f4be318e748c0be7966e1fa0d92dc0",
+      "bytes": 284528
+    },
+    {
+      "path": "captures/20261004T145147Z-session.jsonl",
+      "sha256": "07462788269fd2aa9f8150646c60fc9cb431b94fcf0323c416bbacc3142ef54a",
+      "bytes": 121568
+    },
+    {
+      "path": "captures/20261004T150133Z-usb-c-observation.jsonl",
+      "sha256": "7996d9aed6afb6fe274b720dd2649f3c40f08eab01a8ab1d46df6b58f5fcedfe",
+      "bytes": 153322
+    },
+    {
+      "path": "captures/probe-ac.jsonl",
+      "sha256": "b0a022fd5c34d258d5cad7b21becce70540edc0364421cbf914f7cb1598548c9",
+      "bytes": 4674
+    },
+    {
+      "path": "captures/probe-dc.jsonl",
+      "sha256": "d3f800435da3d74dcbd0a8b5f23545561eb1a7f3f771395ca521c96444f565ec",
+      "bytes": 4630
+    },
+    {
+      "path": "captures/probe-light.jsonl",
+      "sha256": "33169df1aa90bb52a88586407de67512f21d8375aa7c3f086316e9fc0f8b9457",
+      "bytes": 5622
+    },
+    {
+      "path": "captures/probe-observe.jsonl",
+      "sha256": "f83034fb46f997935658c75e6bf81e9b24af375496aa6bd161976d395b27f75f",
+      "bytes": 1130
+    },
+    {
+      "path": "captures/usb-c-photo-events.jsonl",
+      "sha256": "7d7995f9374e52b863c7e9d00874c969711c64a90265147d1d655c1907b70717",
+      "bytes": 15344
+    }
+  ],
+  "photographs": [
+    {
+      "path": "/tmp/allpowers-camera/20261004T140028Z-initial.jpg",
+      "sha256": "7ff7468060eac21e10d1e9ba82ce5c11308fa6f450f531fcf2d4177c2574eb86",
+      "bytes": 36159
+    },
+    {
+      "path": "/tmp/allpowers-camera/20261004T140305Z-display-awake.jpg",
+      "sha256": "5a0196fc9032ce566c0fde21afa23ffd0edfbdd8e620bcfdb74cb4c7363f7068",
+      "bytes": 42466
+    },
+    {
+      "path": "/tmp/allpowers-camera/20261004T140403Z-iOfoyd.jpg",
+      "sha256": "3e387f53bd27eca31da1238813d8e82a32d4716def6a0e5b23e0de46f331fe06",
+      "bytes": 51213
+    },
+    {
+      "path": "/tmp/allpowers-camera/20261004T141301Z-vA6EAJ.jpg",
+      "sha256": "c088d7d3023adb2b1debe934cb6789b07b8713f54beec0412d408ac01b8846ba",
+      "bytes": 68641
+    },
+    {
+      "path": "/tmp/allpowers-camera/20261004T142008Z-FYhwbh.jpg",
+      "sha256": "4dd03cc89763cd98bdf8a7b640e1de5163ec0ece5284437bbbfed86c9ac9532d",
+      "bytes": 65381
+    },
+    {
+      "path": "/tmp/allpowers-camera/20261004T142301Z-UjcYEE.jpg",
+      "sha256": "a262d08f2d19d50fe38f92a0e085451843c84976bc4f6c59188d7cf0c8e6ba9c",
+      "bytes": 55387
+    },
+    {
+      "path": "/tmp/allpowers-camera/20261004T142415Z-kdAIWD.jpg",
+      "sha256": "ee39b76424d983e0bab461bd83e2e5316b0863a3f44a0a66d048ec3eac843065",
+      "bytes": 58376
+    },
+    {
+      "path": "/tmp/allpowers-camera/20261004T142616Z-dhxj3P.jpg",
+      "sha256": "db144acba82baa3bbf2a01e6c6d4a9ed15deb4756d94910f7732a4150d4cdcbb",
+      "bytes": 67685
+    },
+    {
+      "path": "/tmp/allpowers-camera/20261004T142743Z-kH0mra.jpg",
+      "sha256": "6e579971445663acc29f63c0348858b2671d2386d23d066ba72d8b067c8f8242",
+      "bytes": 54067
+    },
+    {
+      "path": "/tmp/allpowers-camera/20261004T142915Z-KSkyUm.jpg",
+      "sha256": "4f716761f450dfd9165506431d37f7dbaf9099c281f91527e64a8be223824bfb",
+      "bytes": 36177
+    },
+    {
+      "path": "/tmp/allpowers-camera/20261004T142932Z-DGkKDp.jpg",
+      "sha256": "c74a30cf623255da977cdcfbe532b4cdb606fb1ed0c96066c57ce563e1f552e6",
+      "bytes": 54424
+    },
+    {
+      "path": "/tmp/allpowers-camera/20261004T143914Z-7lZeQv.jpg",
+      "sha256": "7cb6207ebddf74851f516fa474d5e744bb70e962769feb7a1e16938a821e1576",
+      "bytes": 65812
+    },
+    {
+      "path": "/tmp/allpowers-camera/20261004T144056Z-l9wl1P.jpg",
+      "sha256": "d147e3c7f5204f1d989249142523f23801942da417c775179b25d07aa3eb96a3",
+      "bytes": 56936
+    },
+    {
+      "path": "/tmp/allpowers-camera/20261004T144703Z-KSus81.jpg",
+      "sha256": "c623d4937e5d8694280527081555271b1d808d3b44b3364185bcd2215c4cb8fa",
+      "bytes": 57959
+    },
+    {
+      "path": "/tmp/allpowers-camera/20261004T144758Z-rYF164.jpg",
+      "sha256": "5d4f424cae47bb90f4630f247202a70cfee178b491ef73ce7485780093cadf12",
+      "bytes": 7403
+    },
+    {
+      "path": "/tmp/allpowers-camera/20261004T144835Z-PKch8s.jpg",
+      "sha256": "9e1c73264a5f6ee7eb2085c39189619e923576785fc7211d9fdb3d5df3bb4b8f",
+      "bytes": 50695
+    },
+    {
+      "path": "/tmp/allpowers-camera/20261004T144957Z-UQiFiz.jpg",
+      "sha256": "cde42725d51ca7ff3cf2964390615a890e94bb1ed8f9442a6022f53e4f3f840b",
+      "bytes": 55120
+    },
+    {
+      "path": "/tmp/allpowers-camera/20261004T145641Z-JZC1EX.jpg",
+      "sha256": "229075f1d3fc1b9fdd0ea1b7bd370f06ba09790a4274ff3ff9a4bd40dcd80c06",
+      "bytes": 49309
+    },
+    {
+      "path": "/tmp/allpowers-camera/20261004T145720Z-HE7KTP.jpg",
+      "sha256": "0bdf82f032a32e736069737342d94ae9f76df5037d24cdaecc0745627fe57993",
+      "bytes": 50768
+    },
+    {
+      "path": "/tmp/allpowers-camera/20261004T150037Z-gCxCWw.jpg",
+      "sha256": "78e70957fd61d432e5b9e4bb7a2583ca54d4729c998e7593bee6f6a9e83a0a96",
+      "bytes": 58239
+    },
+    {
+      "path": "/tmp/allpowers-camera/20261004T150226Z-WltMz7.jpg",
+      "sha256": "6ef93f7566e1f1850a8460193b8f4e2ed4e5e2ac85392a20a750bf2f71f7dd5b",
+      "bytes": 57498
+    },
+    {
+      "path": "/tmp/allpowers-camera/20261004T150229Z-95pisI.jpg",
+      "sha256": "657a1a24748433d9c3d1a4d22597ddb2d681887f3b797e7716cbc34835b26646",
+      "bytes": 57555
+    },
+    {
+      "path": "/tmp/allpowers-camera/20261004T150232Z-Xkbfzi.jpg",
+      "sha256": "5e320360cde841bf64801fcf4f292cfcbbb8a2aae066ea157e3596a7f0f31f5a",
+      "bytes": 57314
+    },
+    {
+      "path": "/tmp/allpowers-camera/20261004T150236Z-oK0c90.jpg",
+      "sha256": "780dfc83f5a1db40555eeaa4e952b352eb2b0a1818722218b45bf073b4edba54",
+      "bytes": 57632
+    },
+    {
+      "path": "/tmp/allpowers-camera/20261004T150239Z-ObArk8.jpg",
+      "sha256": "6ed0f616ad30cdd5263acd0599d93f2b86ecd8d81918a67768ccb0cce12179e9",
+      "bytes": 57041
+    },
+    {
+      "path": "/tmp/allpowers-camera/20261004T150242Z-j8aPq8.jpg",
+      "sha256": "af9e99c77a50b3c3a394d12444e6ededeefdd0851af9b93a2bd387b1b946b064",
+      "bytes": 57413
+    },
+    {
+      "path": "/tmp/allpowers-camera/20261004T150245Z-d61K7V.jpg",
+      "sha256": "7e0eff72bf132d621d6dbedd5cf3209f4eaa68d7b6787e607ffe61df84d2a5ec",
+      "bytes": 57258
+    },
+    {
+      "path": "/tmp/allpowers-camera/20261004T150248Z-O1o6Mg.jpg",
+      "sha256": "39dd4b0061b2627726f8b88f873dbb842b728514d68333aaa28cd810f78e0742",
+      "bytes": 57639
+    },
+    {
+      "path": "/tmp/allpowers-camera/20261004T150251Z-Ux5rgu.jpg",
+      "sha256": "6836dbdf50f50f25a2fe8fbfbb8da6a294e12836848e62f8d1dd205e1f6a3213",
+      "bytes": 57923
+    },
+    {
+      "path": "/tmp/allpowers-camera/20261004T150254Z-VIF12g.jpg",
+      "sha256": "786abb7cd23ade51628c51e3891063dbef8e13607197462a83d017092480b246",
+      "bytes": 57664
+    },
+    {
+      "path": "/tmp/allpowers-camera/20261004T150257Z-NWoy40.jpg",
+      "sha256": "ddea7783b3b5990f1599e902971d18ee1b564cabe6205aa22f7aae7b6ae1d0e4",
+      "bytes": 57633
+    },
+    {
+      "path": "/tmp/allpowers-camera/20261004T150301Z-SiAmgi.jpg",
+      "sha256": "f2b2e87a4a7bfa11185b0e2723b641b6ee50c293a92fe0eaf93a410cefbcaed6",
+      "bytes": 57579
+    },
+    {
+      "path": "/tmp/allpowers-camera/20261004T150304Z-A2VX1P.jpg",
+      "sha256": "238adb1f36dcd96348926f570c7a2c72ac8549a7c481288471c72af6ac0862e1",
+      "bytes": 57978
+    },
+    {
+      "path": "/tmp/allpowers-camera/20261004T150307Z-Ccm6kt.jpg",
+      "sha256": "e1949a7ccc2b1d7e004bf61e9dd720cc0d5b13876706944b74a33219e722dc2f",
+      "bytes": 58539
+    },
+    {
+      "path": "/tmp/allpowers-camera/20261004T150310Z-aqcD9R.jpg",
+      "sha256": "75ef3fc94ad4573362650deace11e8c1ab7eb51077b5429852580698337f6e6b",
+      "bytes": 57807
+    },
+    {
+      "path": "/tmp/allpowers-camera/20261004T150313Z-AztpAy.jpg",
+      "sha256": "98aa2f0c707049c87f403656dac962d8c0311acbd3938cb85f826e6044540110",
+      "bytes": 57883
+    },
+    {
+      "path": "/tmp/allpowers-camera/20261004T150316Z-GUDJwN.jpg",
+      "sha256": "9e52b95f778294dad5c8a7944f7717b3d4ee18612af808b089ac5b48974323ac",
+      "bytes": 57955
+    },
+    {
+      "path": "/tmp/allpowers-camera/20261004T150319Z-RSeSxx.jpg",
+      "sha256": "4b399eb865ebec144018b63551fa597fb9b8c6e581a2682739ec5548eea80682",
+      "bytes": 58502
+    },
+    {
+      "path": "/tmp/allpowers-camera/20261004T150323Z-Eh7tgw.jpg",
+      "sha256": "5410163da3d048084573c4f54242f192f08072be94f3edc72d2c8fa30523797a",
+      "bytes": 58442
+    },
+    {
+      "path": "/tmp/allpowers-camera/20261004T150326Z-FO3IhZ.jpg",
+      "sha256": "162cbde253fa4f471569e6107c020d0940965831edc16b74c40996634c3a7e6d",
+      "bytes": 57940
+    },
+    {
+      "path": "/tmp/allpowers-camera/20261004T150329Z-JuKE29.jpg",
+      "sha256": "ef8b86d1d3cafd252376399e65cc9287073a4e4cc7e71fc4acde57b8c2ede5b2",
+      "bytes": 49843
+    },
+    {
+      "path": "/tmp/allpowers-camera/20261004T150332Z-Jro15e.jpg",
+      "sha256": "9f604af1800f4a1bc8dcb499ccb121d5ad26e9b092b214368199eaff174cca68",
+      "bytes": 49381
+    },
+    {
+      "path": "/tmp/allpowers-camera/20261004T150335Z-3qBGKz.jpg",
+      "sha256": "d5ec325efa8e1cb8d43754e66d7ad4ed1493b2fb0206b4c26bdd8dc0f7421047",
+      "bytes": 49310
+    },
+    {
+      "path": "/tmp/allpowers-camera/20261004T150338Z-3pOB9T.jpg",
+      "sha256": "5903b49319fce2068414a2db346d56532a9c5349181bbfa816ff5cc7e9ecfa86",
+      "bytes": 51040
+    },
+    {
+      "path": "/tmp/allpowers-camera/20261004T150341Z-9JiVbV.jpg",
+      "sha256": "1b02b8b33f382022becfd2e162683cd46aae9421c6f7e560adcec2d0a13a1f86",
+      "bytes": 50335
+    },
+    {
+      "path": "/tmp/allpowers-camera/20261004T150345Z-YrmV36.jpg",
+      "sha256": "21dbbc977386dcebd51c5ce1f58d262aa3f407f2b9b6966ab3d9219a423f5fa8",
+      "bytes": 50354
+    },
+    {
+      "path": "/tmp/allpowers-camera/20261004T150348Z-QNZIAb.jpg",
+      "sha256": "3ddc78a842ce5193210e767bbdf4bf36391a28899aedf3164b1d5bf3fb8574dd",
+      "bytes": 57886
+    },
+    {
+      "path": "/tmp/allpowers-camera/20261004T150351Z-pZhm5R.jpg",
+      "sha256": "5f9cc025d3ec8c311ef2f2d6a9f98f373e8f2a703469b0afce81720247d312fb",
+      "bytes": 50632
+    },
+    {
+      "path": "/tmp/allpowers-camera/20261004T150354Z-TZvFpa.jpg",
+      "sha256": "ee31e0c8425b93e3cc72624c45e80bf651341571825e5babcd8d6abac9b3abea",
+      "bytes": 50542
+    },
+    {
+      "path": "/tmp/allpowers-camera/20261004T150357Z-QQQJs3.jpg",
+      "sha256": "d9cd58b1aff853736472c3e688fbd484c87215f1b7698424cb1553adf371111d",
+      "bytes": 50096
+    },
+    {
+      "path": "/tmp/allpowers-camera/20261004T150400Z-8RjwdZ.jpg",
+      "sha256": "9b413a1e82d97cb3a495bbfe1ee9b38ab74a0294cf409ae5a1d5147663da3b0d",
+      "bytes": 50528
+    },
+    {
+      "path": "/tmp/allpowers-camera/20261004T150403Z-rB11op.jpg",
+      "sha256": "c145f43b20bca157a4ce4b4d92ec159d19cde4d8ffa8ed6dc2163694650d12cd",
+      "bytes": 50153
+    },
+    {
+      "path": "/tmp/allpowers-camera/20261004T150406Z-IkZKB6.jpg",
+      "sha256": "6942f7f4e9ace97ccfdd10a9f0e9b5e3557873323c21336dbc706931520e0058",
+      "bytes": 51147
+    },
+    {
+      "path": "/tmp/allpowers-camera/20261004T150410Z-2GJS5J.jpg",
+      "sha256": "eb5fe59260e0cacc29d4c570d2feb7e1697a2ba81b76251c2582e41cf0f63d8a",
+      "bytes": 49837
+    },
+    {
+      "path": "/tmp/allpowers-camera/20261004T150413Z-PCfSWI.jpg",
+      "sha256": "480c8e316fd53b49c5d2dbec464c51ab66467c734fc6ecc8e6a670091d54b89f",
+      "bytes": 50338
+    },
+    {
+      "path": "/tmp/allpowers-camera/20261004T150416Z-j6AyyT.jpg",
+      "sha256": "afc37b7dcbd0e45462d6286c23611882d5049e976ba331c03d431465149a765c",
+      "bytes": 50378
+    },
+    {
+      "path": "/tmp/allpowers-camera/20261004T150419Z-xdrfaZ.jpg",
+      "sha256": "3df712291fbbc81aedd1f764f0d8637f9de2d3b6da8f920f400e7cb4dac8b69f",
+      "bytes": 50465
+    },
+    {
+      "path": "/tmp/allpowers-camera/20261004T150422Z-1gLPBb.jpg",
+      "sha256": "60e39f433962966a9167db805d7d92fd57d2a9c5144d351601282d8934ae6852",
+      "bytes": 50898
+    },
+    {
+      "path": "/tmp/allpowers-camera/20261004T150425Z-woGMjt.jpg",
+      "sha256": "a0252fc19a70aed09388bbbe3f4a0073e2f12f78cec58109c9290130b3a296bb",
+      "bytes": 50754
+    },
+    {
+      "path": "/tmp/allpowers-camera/20261004T150428Z-LfJsI4.jpg",
+      "sha256": "82ce601a6d5a5e455ae644ae4fa6d72fd0c4229b5e5d707a622fc1b8d38dbc2e",
+      "bytes": 50179
+    },
+    {
+      "path": "/tmp/allpowers-camera/20261004T150432Z-rjCAHU.jpg",
+      "sha256": "be6429e471e15ece7549cb66d9035cd91e14ba74b4ce801550ef85daefa1c2cd",
+      "bytes": 48586
+    },
+    {
+      "path": "/tmp/allpowers-camera/20261004T150435Z-LWVgam.jpg",
+      "sha256": "a8ae8a2d528285ac84a1a6a8b723ac338d0a8ec68072ba5bba69b89a0e66af5e",
+      "bytes": 49367
+    },
+    {
+      "path": "/tmp/allpowers-camera/20261004T150438Z-WfxSiJ.jpg",
+      "sha256": "7b4525a0c48035b8cb42196fcb6927e1facc62574a09fc3bed09cbb5791d4517",
+      "bytes": 50593
+    },
+    {
+      "path": "/tmp/allpowers-camera/20261004T150441Z-SseUAk.jpg",
+      "sha256": "94f9db54205a7fef3403d0063e0dc09ab6488ad53c8c72f97a91ac9808aa6611",
+      "bytes": 50349
+    },
+    {
+      "path": "/tmp/allpowers-camera/20261004T150444Z-GX5SRj.jpg",
+      "sha256": "b0666ba499895af0d4699103f94e684d02599692579cb2c64c8a8df7885f1fa0",
+      "bytes": 51027
+    },
+    {
+      "path": "/tmp/allpowers-camera/20261004T150448Z-cwt1zu.jpg",
+      "sha256": "f5ed9f3cdf2cdaa3e0ee1c55a356b75186c191536922e871f8f0568eca72cbe4",
+      "bytes": 50843
+    },
+    {
+      "path": "/tmp/allpowers-camera/20261004T150451Z-a3812n.jpg",
+      "sha256": "c1ed4ffdbeeaa4f42232c119ca523192e01526c5b57ff887461a314617d9979d",
+      "bytes": 51237
+    },
+    {
+      "path": "/tmp/allpowers-camera/20261004T150454Z-ey1dZr.jpg",
+      "sha256": "9d2ccc0b6f10fdbe96171b9c09f36af2b95cc1efd0ec36e51e686d693409fe95",
+      "bytes": 50938
+    },
+    {
+      "path": "/tmp/allpowers-camera/20261004T150457Z-Q2PzlL.jpg",
+      "sha256": "2188cdff255d76d3fb48d2b83185028866f70db068806a2ee4225c0ecfbd9028",
+      "bytes": 50302
+    },
+    {
+      "path": "/tmp/allpowers-camera/20261004T150500Z-MdUcde.jpg",
+      "sha256": "dafce11b2f27a9691a5a86e7dbd147190096a91b7ed1bdd2a8a58aef93921f5e",
+      "bytes": 50170
+    },
+    {
+      "path": "/tmp/allpowers-camera/20261004T150503Z-dbtJNW.jpg",
+      "sha256": "51af5dc35e8f50e4181a870e629a0fcd6504e3d5f12a4cbbee19cc4280d28688",
+      "bytes": 50231
+    },
+    {
+      "path": "/tmp/allpowers-camera/20261004T150506Z-MTboPm.jpg",
+      "sha256": "497289d28b9f2aec9ea7cf659c7c32732211304d1894bf4ceab25e004501abd7",
+      "bytes": 50392
+    },
+    {
+      "path": "/tmp/allpowers-camera/20261004T150509Z-pHBTlE.jpg",
+      "sha256": "b65860dd9e82ffe4e6e7f1c23107f24c92de977d5a63098b3c7d98784de8b9f6",
+      "bytes": 53611
+    },
+    {
+      "path": "/tmp/allpowers-camera/20261004T150513Z-iNoUiz.jpg",
+      "sha256": "e21a3095b2c5e201091d690432bf253694dc02cf5445a29acdd283eceba83090",
+      "bytes": 50280
+    },
+    {
+      "path": "/tmp/allpowers-camera/20261004T150516Z-uJ5B9w.jpg",
+      "sha256": "97a01a56beeb89ca880d79bf52e4a43bb0faa1c5c52d760cd0dc96a1e963e5e7",
+      "bytes": 50283
+    },
+    {
+      "path": "/tmp/allpowers-camera/20261004T150519Z-9ebaBM.jpg",
+      "sha256": "9e72a4c0e6b0313f0f948f2b95362aa7f54cb8975068d581ca72f0b37daeef1d",
+      "bytes": 50961
+    },
+    {
+      "path": "/tmp/allpowers-camera/20261004T150522Z-T0RPDM.jpg",
+      "sha256": "068fee2aea1ab9fe01774671191aa340e2c552199706878b389afa2de05f2468",
+      "bytes": 50457
+    },
+    {
+      "path": "/tmp/allpowers-camera/20261004T150525Z-qJLiiW.jpg",
+      "sha256": "21ace946366e64e1de5a12e8fc7ab3417e48b40f236b64733dd67ba085a5e992",
+      "bytes": 50166
+    },
+    {
+      "path": "/tmp/allpowers-camera/20261004T150528Z-cgh7ct.jpg",
+      "sha256": "126fbcbe1af0ec612738aa9b2e13f4bfec9b887b73b6d424c608824f98682133",
+      "bytes": 49257
+    },
+    {
+      "path": "/tmp/allpowers-camera/20261004T150531Z-PZe18f.jpg",
+      "sha256": "17506e2cbd1452ba728e658d4294acfecfab1952f7b22971db825765bb7b34de",
+      "bytes": 50733
+    },
+    {
+      "path": "/tmp/allpowers-camera/20261004T150535Z-hs6H9P.jpg",
+      "sha256": "d785ccc8c93f8fdb885d01ae459b4e368219c000f90e500a54a65d34fd17c158",
+      "bytes": 50475
+    },
+    {
+      "path": "/tmp/allpowers-camera/20261004T150538Z-3YBuDD.jpg",
+      "sha256": "ddf6cd6d09e70ea061c16b89f49b01597293362b9c6dcd79c0769c41fe3d1122",
+      "bytes": 50372
+    },
+    {
+      "path": "/tmp/allpowers-camera/20261004T150541Z-z77ojx.jpg",
+      "sha256": "9348bc358328833730606ca292627b281eee95ecbe31cc8d8ceb2b22946cb940",
+      "bytes": 50638
+    },
+    {
+      "path": "/tmp/allpowers-camera/20261004T150544Z-fzNvgo.jpg",
+      "sha256": "cce1750ebbacb2020d3a34bfdcb67a00edd28e62c3421f8b0e7aca8c28738419",
+      "bytes": 50625
+    },
+    {
+      "path": "/tmp/allpowers-camera/20261004T150547Z-MChwQR.jpg",
+      "sha256": "b7523e28f2dd6856aaaf61a713675eeb3a355605b0f35a55baac8ef4f3c87f15",
+      "bytes": 51041
+    },
+    {
+      "path": "/tmp/allpowers-camera/20261004T150550Z-qImegD.jpg",
+      "sha256": "a8fa7a6ec29de1079fd459f949339618608a1b00c4ed2a65864fa9429f3ded7e",
+      "bytes": 50546
+    },
+    {
+      "path": "/tmp/allpowers-camera/20261004T150553Z-PpKxwc.jpg",
+      "sha256": "229ffcb9314584e19e3399d3ba38093075c735c2e253d5e39b11afe5971c7ddc",
+      "bytes": 50372
+    },
+    {
+      "path": "/tmp/allpowers-camera/20261004T150556Z-puLQZc.jpg",
+      "sha256": "c012dfc702b43047804af89b1a4fbaf03538a5d0eb5263e14019aa8b56146eb1",
+      "bytes": 50228
+    },
+    {
+      "path": "/tmp/allpowers-camera/20261004T150559Z-U3sVfP.jpg",
+      "sha256": "2988975b24d182dee5b4c306679d20dda4c33dc54bd1d389e8cfacf6b6ff55d8",
+      "bytes": 50456
+    },
+    {
+      "path": "/tmp/allpowers-camera/20261004T150603Z-fBZF93.jpg",
+      "sha256": "d5e8e7785e9a30a294d55b766abf9171ccca068592ad08aa2d6b450e53e355d1",
+      "bytes": 50515
+    },
+    {
+      "path": "/tmp/allpowers-camera/20261004T150606Z-tn8lcM.jpg",
+      "sha256": "3e34050b3c21df460774d9cbb77d65bc9a3b74eae1de12e10948b73968d7e8ab",
+      "bytes": 50862
+    },
+    {
+      "path": "/tmp/allpowers-camera/20261004T150609Z-j3uOdd.jpg",
+      "sha256": "4b0355b8a68d1a14976f347aae07f03a512c3c783c5b2df5fcb34058562679e7",
+      "bytes": 50630
+    },
+    {
+      "path": "/tmp/allpowers-camera/20261004T150612Z-NEDisC.jpg",
+      "sha256": "56b914859e02497882fb5a2ef1c9cb0fea62d749dd331fbb6d93cb6972ae3748",
+      "bytes": 50343
+    },
+    {
+      "path": "/tmp/allpowers-camera/20261004T150615Z-zo1Yi0.jpg",
+      "sha256": "31e9efda10dc68b8aed7c0ae60f68e06d9d20a33adf1e47df6847ca3353ba26d",
+      "bytes": 50042
+    },
+    {
+      "path": "/tmp/allpowers-camera/20261004T150619Z-oLugl2.jpg",
+      "sha256": "10f0f71dae297cfc5666270e0469ceb1dc7f8501db4cc813058492c9919a3fe6",
+      "bytes": 49819
+    },
+    {
+      "path": "/tmp/allpowers-camera/20261004T150622Z-eNakAK.jpg",
+      "sha256": "96e4e2660e370f60f799fa9aa2b32d4274db759d90be1c2dfa100c43f89f5e2d",
+      "bytes": 50454
+    },
+    {
+      "path": "/tmp/allpowers-camera/20261004T150625Z-NvlDob.jpg",
+      "sha256": "c1b42289c2db4454839c320f92e5cc49baf8e374b12a250d107df24d9a21985c",
+      "bytes": 51002
+    },
+    {
+      "path": "/tmp/allpowers-camera/20261004T150628Z-jlF0EA.jpg",
+      "sha256": "538a5da2d6ef7297fe835c1bbaceff37ce0ca012981920673000e47ed4be01ff",
+      "bytes": 50377
+    },
+    {
+      "path": "/tmp/allpowers-camera/20261004T150631Z-N4ZSK8.jpg",
+      "sha256": "373e4111b7a3ff8c27f30a993699c374c5c0c14ae399b796a30192d4e0327d75",
+      "bytes": 50786
+    },
+    {
+      "path": "/tmp/allpowers-camera/20261004T150634Z-tKOA7z.jpg",
+      "sha256": "006f6e7cbb5ef749da89d3c6a845c37b77be88159d8e6757a614364b5ebc3bda",
+      "bytes": 51023
+    },
+    {
+      "path": "/tmp/allpowers-camera/20261004T150637Z-kRmIpF.jpg",
+      "sha256": "e643ebec42313109541148d6108470b49386e174f703f7b39b17d01c345c390c",
+      "bytes": 50192
+    },
+    {
+      "path": "/tmp/allpowers-camera/20261004T150640Z-YPboIN.jpg",
+      "sha256": "15def1d9885139e5393abc5491d0072c1bd7cda5c5bb8ed8efb056423445e634",
+      "bytes": 50336
+    },
+    {
+      "path": "/tmp/allpowers-camera/20261004T150644Z-V9MAQf.jpg",
+      "sha256": "13744af0f82a00aec73752a53fce5ee0b0da87fdf909d4203ea2ab1665c0ae0a",
+      "bytes": 50541
+    },
+    {
+      "path": "/tmp/allpowers-camera/20261004T150647Z-jwlrtu.jpg",
+      "sha256": "a04df34bac52389436c0d17b3e1c71fdea431fe50d5f4a9e4b505fb9a95199ca",
+      "bytes": 51941
+    },
+    {
+      "path": "/tmp/allpowers-camera/20261004T150650Z-nW6Ca4.jpg",
+      "sha256": "6b8b9c1d1f8f7b13ffd8e8cea1cfc869b422f1ea028db1848a89e42017f1dfd9",
+      "bytes": 50495
+    },
+    {
+      "path": "/tmp/allpowers-camera/20261004T150653Z-sTPQBV.jpg",
+      "sha256": "a5a4bb8ce653557dd8fe8d737241ce1d8bbc7e3356fe51aeab12592dc65d1c29",
+      "bytes": 50591
+    },
+    {
+      "path": "/tmp/allpowers-camera/20261004T150656Z-k8r3k5.jpg",
+      "sha256": "f68bf31a4751981aa9033808fd3762b665fdc3ff244ac19999aedf6e09521e23",
+      "bytes": 51263
+    },
+    {
+      "path": "/tmp/allpowers-camera/20261004T150659Z-wRNOKG.jpg",
+      "sha256": "fcb0e8b7317db193808345d4c8ba3541408b038dcdb60f68cd9e946e7dd7bd17",
+      "bytes": 50830
+    },
+    {
+      "path": "/tmp/allpowers-camera/20261004T150702Z-8Jh0Wn.jpg",
+      "sha256": "863615de093eaa4fc26a80ec86958f5b7be0c5c9ebd438a80f5a21042d1a2878",
+      "bytes": 50317
+    },
+    {
+      "path": "/tmp/allpowers-camera/20261004T150706Z-O6qMLu.jpg",
+      "sha256": "06212546204984f887b6acc84f26c2f35de8d938f3459b72739c5154f60b62b7",
+      "bytes": 51274
+    },
+    {
+      "path": "/tmp/allpowers-camera/20261004T150709Z-obOBJc.jpg",
+      "sha256": "b59ed4f4ed3de0bc74209deaebb30eff21f789d6db1bf70f638bf65ec571a09a",
+      "bytes": 50240
+    },
+    {
+      "path": "/tmp/allpowers-camera/20261004T150712Z-saOHng.jpg",
+      "sha256": "722239880bd0f6be1f3e13a8233ff292328f595cf293bd90e0b2a46968148a02",
+      "bytes": 48630
+    },
+    {
+      "path": "/tmp/allpowers-camera/20261004T150715Z-cF7yPI.jpg",
+      "sha256": "dfdbbb455a669026d852e23780785197bc138d5d76218fd5b8bfe02494ea9d76",
+      "bytes": 50723
+    },
+    {
+      "path": "/tmp/allpowers-camera/20261004T150718Z-S0kRAR.jpg",
+      "sha256": "064239ea27a11ff2a9539bda20cfa3c64d86698a16d34f9ad5ec5d798ddbbf7a",
+      "bytes": 50770
+    },
+    {
+      "path": "/tmp/allpowers-camera/20261004T150721Z-YQeC6b.jpg",
+      "sha256": "77c3078b0e9bd919f6da206b8fca6481cb6f446e2979cb02db1fa5c05284f1c9",
+      "bytes": 50813
+    },
+    {
+      "path": "/tmp/allpowers-camera/20261004T150724Z-jg9X0f.jpg",
+      "sha256": "5c7915623a18548230da7a35892a89be03fb4a6c23222203409f66bbfafce84f",
+      "bytes": 50874
+    },
+    {
+      "path": "/tmp/allpowers-camera/20261004T150908Z-FovKke.jpg",
+      "sha256": "ef7ec4c8566385df45e71ca2183ec596307247ff16e78575801dd766e9e8be85",
+      "bytes": 50741
+    },
+    {
+      "path": "/tmp/allpowers-camera/20261004T150912Z-XQbB2L.jpg",
+      "sha256": "baff43bc7f84876864c084425d4919ccef3735fa9df7418a45ad4686e9d81345",
+      "bytes": 50301
+    },
+    {
+      "path": "/tmp/allpowers-camera/20261004T150915Z-f5MBJX.jpg",
+      "sha256": "81d2d04953125482349af1ae36c100aeaf56c67f1389cc8ff69038a6f6ed502d",
+      "bytes": 50401
+    },
+    {
+      "path": "/tmp/allpowers-camera/20261004T150918Z-1WOaYG.jpg",
+      "sha256": "9f6fc6be40e741eeae3f1ee1c5345ee30f175e76c8cb805775e823c5bac30ba5",
+      "bytes": 49989
+    },
+    {
+      "path": "/tmp/allpowers-camera/20261004T150921Z-hRIwdJ.jpg",
+      "sha256": "96eb1cae7b5028e44bfe376e5a6708147dc6dd1752cad01cfeac3b8437814ae2",
+      "bytes": 49943
+    },
+    {
+      "path": "/tmp/allpowers-camera/20261004T150924Z-euNsjF.jpg",
+      "sha256": "b1ec0754379836b54db83b76cf0bfe6ac1c5b2011d185df57da0bf4db3507c01",
+      "bytes": 50903
+    },
+    {
+      "path": "/tmp/allpowers-camera/20261004T150928Z-QtL1Me.jpg",
+      "sha256": "e5e1e8f8be1a39095384f0bf6c34b97a9cd7e4c410917f7e6c8ef0bc123eb2f0",
+      "bytes": 50278
+    },
+    {
+      "path": "/tmp/allpowers-camera/20261004T150931Z-yZRKqm.jpg",
+      "sha256": "9edfa50c703e7b70fa9d989cb388cdd8e77d979c851ab039277a2393385ca863",
+      "bytes": 50755
+    },
+    {
+      "path": "/tmp/allpowers-camera/20261004T150934Z-xMHfdA.jpg",
+      "sha256": "d7e0589e36762e742575f81627d4fe6f44b9688e95fd440f496ab956bbc95ff9",
+      "bytes": 50089
+    },
+    {
+      "path": "/tmp/allpowers-camera/20261004T150937Z-24xFuF.jpg",
+      "sha256": "14baa4b04d657fc8e291f4a62799cb5ad4a7fb3144619cd80064f474eeca112b",
+      "bytes": 50062
+    },
+    {
+      "path": "/tmp/allpowers-camera/20261004T150940Z-U8zDEM.jpg",
+      "sha256": "ac79b3736a5e97b166d960191598ef3da3999918c135777f5bc0badc5d1f95f8",
+      "bytes": 49665
+    },
+    {
+      "path": "/tmp/allpowers-camera/20261004T150943Z-TD8Kl0.jpg",
+      "sha256": "059cdcd8694e4871b157b1ec57996044a5882d72f1b9db76632f465be6bc6818",
+      "bytes": 49973
+    },
+    {
+      "path": "/tmp/allpowers-camera/20261004T150946Z-Bo9qe1.jpg",
+      "sha256": "45b0326ec0ab20f3a3f79f96aec505ee764833da5f9609abb49e24c08ec60d57",
+      "bytes": 50191
+    },
+    {
+      "path": "/tmp/allpowers-camera/20261004T150949Z-HJEgFF.jpg",
+      "sha256": "0ef214b6b477ffb2ec7506e0430605dcbecd5983c7981ba1898d98edab6d6bbd",
+      "bytes": 50207
+    },
+    {
+      "path": "/tmp/allpowers-camera/20261004T150953Z-RpuGx9.jpg",
+      "sha256": "9c9e951b6c77a3359261048a48e43f345105f87b22ca5567c73bcb1b813f64b1",
+      "bytes": 49958
+    },
+    {
+      "path": "/tmp/allpowers-camera/20261004T150956Z-OuWVxm.jpg",
+      "sha256": "489f1d80c537b526f2254f0639f79786e6f4ae962485dab51b819a04ffc50a90",
+      "bytes": 50047
+    },
+    {
+      "path": "/tmp/allpowers-camera/20261004T150959Z-THGKTQ.jpg",
+      "sha256": "5be4b551daacde82eadff949af64668516ab3787805b9f81ca7ed022d213299d",
+      "bytes": 57137
+    },
+    {
+      "path": "/tmp/allpowers-camera/20261004T151103Z-Ig3vG3.jpg",
+      "sha256": "a79cdd4b219e489545e2b0d5796c00752dfe16884efc58a7bf263db4b95f81f8",
+      "bytes": 51110
+    }
+  ],
+  "static_app_artifacts": [
+    {
+      "path": "/tmp/allpowers-s300-research/app-1.3.0.bin",
+      "package": "com.allpowers.aipower",
+      "version": "1.3.0",
+      "source": "https://d.apkpure.net/b/APK/com.allpowers.aipower?versionCode=130",
+      "sha256": "3d17575942326482ec91031244765a2ac15c8d61b1be3e107d4c963f100ab0e6",
+      "bytes": 43276824,
+      "vendor_signature_independently_verified": false,
+      "redistributed": false
+    },
+    {
+      "path": "/tmp/allpowers-s300-research/app-1.5.0.bin",
+      "package": "com.allpowers.aipower",
+      "version": "1.5.0",
+      "source": "https://apkpure.net/tw/allpowers/com.allpowers.aipower",
+      "sha256": "c2afd39cbc4192ec0aaeb487ae9732d7032a3cecba87f52e03fbc1a7931ef28d",
+      "bytes": 23072781,
+      "vendor_signature_independently_verified": false,
+      "redistributed": false
+    },
+    {
+      "path": "/tmp/allpowers-python-research/allpowers-2.0.1.xapk",
+      "package": "com.allpowers.aipower",
+      "version": "2.0.1/build219",
+      "source": "https://d.apkpure.net/b/XAPK/com.allpowers.aipower?versionCode=219",
+      "sha256": "6162230ee30b58f27b5ed74dd7d286bad8bdb02491fdd1e76960eef41a760361",
+      "bytes": 45620998,
+      "vendor_signature_independently_verified": false,
+      "redistributed": false
+    }
+  ],
+  "analysis_locations": {
+    "javascript_v1_5_0": "/tmp/allpowers-s300-research/apk150_extract/assets/apps/__UNI__BC0B99D/www/app-service.js",
+    "dart_v2_0_1": "/tmp/allpowers-python-research/blutter-out/asm",
+    "protocol_names": [
+      "encodeNewBle",
+      "decodeNewBle",
+      "fit_net_ble.dart",
+      "allpowers_v2_model.dart"
+    ]
+  },
+  "manufacturer_documents": [
+    {
+      "path": "/tmp/allpowers-s300-research/vendor-linked-s300-manual.pdf",
+      "sha256": "67ec94d87f9b003cc041bb13f4ea898d6a6e26606b225f546bb132a2a025dd81",
+      "bytes": 10780806,
+      "redistributed": false
+    },
+    {
+      "path": "/tmp/allpowers-s300-research/vendor-s-series-error-codes.pdf",
+      "sha256": "cd92e2e8da52597d77b08398fb672096793bfc08bb101797afd52087378e71df",
+      "bytes": 57211,
+      "redistributed": false
+    }
+  ],
+  "final_state": {
+    "flags_hex": "0e",
+    "ac_on": true,
+    "dc_on": false,
+    "lamps_on": false,
+    "physical_photo": "/tmp/allpowers-camera/20261004T151103Z-Ig3vG3.jpg",
+    "user_loads_and_cabling": "Left as arranged by user; solar disconnected by user."
+  },
+  "static_analysis_tool": {
+    "name": "Blutter",
+    "source_commit": "4a60ac648bf448c5a7596437243bcd0b9376fdf0",
+    "analyzer_sha256": "cf9a6e7d28fb6cdd08325f4cf068270e60a8268045654bd1273841c506146dae",
+    "command_form": "python3 blutter.py <arm64-v8a-lib-directory> <output-directory>",
+    "outputs": [
+      "/tmp/allpowers-python-research/blutter-out-analysis",
+      "/tmp/allpowers-python-research/blutter-out"
+    ]
+  },
+  "apk_2_0_1_component_hashes": {
+    "base_apk": "5957b4101f378f95c1424fe2b48a75e9ba1f9d9280943cc54e674e609a31fd5f",
+    "arm64_split": "03a71a5a37d5a7e89f76d0743d6a87e06d17ff0aed36b3e2733e03564c5a3d95",
+    "libapp_so": "0f77ec2034e627b7a1d0bea882440abfc99dba5ec6106406417f7d10841f56b9"
+  }
+}

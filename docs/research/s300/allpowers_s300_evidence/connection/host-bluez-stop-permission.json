@@ -1,0 +1,36 @@
+[
+  {
+    "command": [
+      "systemctl",
+      "is-active",
+      "bluetooth"
+    ],
+    "exit": 0,
+    "stdout": "active\n",
+    "stderr": "",
+    "seconds": 0.005557705007959157
+  },
+  {
+    "command": [
+      "systemctl",
+      "--no-ask-password",
+      "stop",
+      "bluetooth.service"
+    ],
+    "exit": 1,
+    "stdout": "",
+    "stderr": "Failed to stop bluetooth.service: Access denied as the requested operation requires interactive authentication. However, interactive authentication has not been enabled by the calling program.\nSee system logs and 'systemctl status bluetooth.service' for details.\n",
+    "seconds": 0.05668792797951028
+  },
+  {
+    "command": [
+      "systemctl",
+      "is-active",
+      "bluetooth"
+    ],
+    "exit": 0,
+    "stdout": "active\n",
+    "stderr": "",
+    "seconds": 0.0031014150008559227
+  }
+]

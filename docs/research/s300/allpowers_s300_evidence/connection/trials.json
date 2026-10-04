@@ -1,0 +1,277 @@
+[
+  {
+    "name": "baseline",
+    "qualification": "VERIFIED_HARDWARE",
+    "capture": "session.jsonl",
+    "event_sequences": [
+      29,
+      30,
+      31,
+      35,
+      39
+    ],
+    "connect_to_subscription_s": 1.926391,
+    "subscription_to_first_status_s": 1.01934
+  },
+  {
+    "name": "linux_first_phone_rejected",
+    "qualification": "VERIFIED_HARDWARE",
+    "capture": "session.jsonl",
+    "event_sequences": [
+      42,
+      50,
+      111,
+      127,
+      147,
+      150,
+      153,
+      161
+    ],
+    "phone_message": "Device offline",
+    "target_callbacks_in_independent_scan_windows": 0,
+    "scope": "Operator app report plus ongoing Linux telemetry; not a phone packet capture"
+  },
+  {
+    "name": "linux_release_phone_recovers",
+    "qualification": "VERIFIED_OPERATOR_REPORT",
+    "capture": "session.jsonl",
+    "event_sequences": [
+      164,
+      168,
+      171,
+      172,
+      179
+    ],
+    "disconnect_s": 2.179845,
+    "observer_scan_to_target_s": 0.732657,
+    "phone_reported_reconnect_s": 5,
+    "phone_automatic_recovery": "UNVERIFIED; operator selected Reconnect"
+  },
+  {
+    "name": "phone_first_linux_not_discovered",
+    "qualification": "VERIFIED_HARDWARE",
+    "capture": "session.jsonl",
+    "event_sequences": [
+      179,
+      185,
+      186,
+      190,
+      195
+    ],
+    "scanner_duration_s": 20.011730758997146,
+    "address_client_error_capture": "phone-first-address-connect.json",
+    "stale_device_error_sequence": 190,
+    "stale_device_error_is_radio_evidence": false
+  },
+  {
+    "name": "phone_release_linux_recovers",
+    "qualification": "VERIFIED_HARDWARE",
+    "capture": "session.jsonl",
+    "event_sequences": [
+      195,
+      198,
+      199,
+      218,
+      220,
+      224,
+      228
+    ],
+    "scan_to_target_s": 0.131081,
+    "connect_to_subscription_s": 0.837592,
+    "subscription_to_first_status_s": 0.015607,
+    "station_bt_toggled": false
+  },
+  {
+    "name": "station_bt_off_existing_subscription_stales_then_disconnects",
+    "qualification": "VERIFIED_HARDWARE",
+    "capture": "session.jsonl",
+    "event_sequences": [
+      258,
+      260,
+      263,
+      267,
+      268,
+      272,
+      273,
+      274,
+      290,
+      306
+    ],
+    "last_frame_to_disconnect_s": 45.978718,
+    "actual_button_timestamp": "UNKNOWN",
+    "property_only_callbacks": [
+      272,
+      273
+    ],
+    "property_only_callbacks_are_advertising_evidence": false,
+    "demo_exception_capture": "station-bt-off-demo.json"
+  },
+  {
+    "name": "station_off_connect_overlaps_host_mutations",
+    "qualification": "EXCLUDED_COMBINED_CONDITIONS",
+    "capture": "session.jsonl",
+    "event_sequences": [
+      292,
+      293,
+      294,
+      299
+    ],
+    "exclude_reason": "Adapter power/rfkill changes overlapped this attempt; no station-specific conclusion"
+  },
+  {
+    "name": "gatt_success_deliberately_wrong_notification_channel",
+    "qualification": "VERIFIED_NEGATIVE_CONTROL",
+    "capture": "session.jsonl",
+    "event_sequences": [
+      329,
+      330,
+      331,
+      335,
+      336,
+      339
+    ],
+    "subscription": "ff03",
+    "correct_fff1_initial_silence": "UNVERIFIED; not reproduced",
+    "connect_to_subscription_s": 3.568774
+  },
+  {
+    "name": "correct_fff1_after_negative_control",
+    "qualification": "VERIFIED_HARDWARE",
+    "capture": "session.jsonl",
+    "event_sequences": [
+      357,
+      358,
+      359,
+      363,
+      367
+    ],
+    "connect_to_subscription_s": 3.819367,
+    "subscription_to_first_status_s": 0.479604
+  },
+  {
+    "name": "actions_passthrough_absent",
+    "qualification": "VERIFIED_HARDWARE",
+    "capture": "session.jsonl",
+    "event_sequences": [
+      528,
+      531,
+      534,
+      538
+    ],
+    "scope": "Controller absent from guest after host passthrough removal; physical host unplug not reported"
+  },
+  {
+    "name": "actions_passthrough_recovery",
+    "qualification": "VERIFIED_HARDWARE",
+    "capture": "session.jsonl",
+    "event_sequences": [
+      541,
+      544,
+      547,
+      550,
+      551,
+      566,
+      568,
+      572,
+      576,
+      609
+    ],
+    "scan_to_target_s": 0.419606,
+    "connect_to_subscription_s": 4.218006,
+    "subscription_to_first_status_s": 0.725955,
+    "station_bt_toggled": false,
+    "rfkill_id_before": 2,
+    "rfkill_id_after": 3
+  },
+  {
+    "name": "actions-powered-off",
+    "qualification": "VERIFIED_LOCAL_CONTROLLER",
+    "capture": "actions-powered-off.jsonl",
+    "exceptions": [
+      {
+        "seq": 6,
+        "command": "resolve",
+        "type": "builtins.RuntimeError",
+        "message": "Actions adapter is not powered",
+        "dbus_error": null,
+        "dbus_details": null,
+        "duration_s": 0.0019322209991514683
+      },
+      {
+        "seq": 10,
+        "command": "rawscan hci2 1",
+        "type": "bleak.exc.BleakDBusError",
+        "message": "[org.bluez.Error.NotReady] Resource Not Ready",
+        "dbus_error": "org.bluez.Error.NotReady",
+        "dbus_details": "Resource Not Ready",
+        "duration_s": 0.006434303999412805
+      }
+    ]
+  },
+  {
+    "name": "actions-rfkill-blocked",
+    "qualification": "VERIFIED_LOCAL_CONTROLLER",
+    "capture": "actions-rfkill-blocked.jsonl",
+    "exceptions": [
+      {
+        "seq": 6,
+        "command": "resolve",
+        "type": "builtins.RuntimeError",
+        "message": "Actions adapter is not powered",
+        "dbus_error": null,
+        "dbus_details": null,
+        "duration_s": 0.0022230600006878376
+      },
+      {
+        "seq": 10,
+        "command": "rawscan hci2 1",
+        "type": "bleak.exc.BleakDBusError",
+        "message": "[org.bluez.Error.NotReady] Resource Not Ready",
+        "dbus_error": "org.bluez.Error.NotReady",
+        "dbus_details": "Resource Not Ready",
+        "duration_s": 0.006856961001176387
+      }
+    ]
+  },
+  {
+    "name": "bluez-unavailable-private-bus",
+    "qualification": "VERIFIED_ISOLATED_TRANSPORT",
+    "capture": "bluez-unavailable-private-bus.jsonl",
+    "exceptions": [
+      {
+        "seq": 6,
+        "command": "resolve",
+        "type": "builtins.RuntimeError",
+        "message": "BlueZ GetManagedObjects failed: org.freedesktop.DBus.Error.ServiceUnknown",
+        "dbus_error": null,
+        "dbus_details": null,
+        "duration_s": 0.0074474390130490065
+      },
+      {
+        "seq": 9,
+        "command": "scan hci2 1",
+        "type": "builtins.RuntimeError",
+        "message": "BlueZ GetManagedObjects failed: org.freedesktop.DBus.Error.ServiceUnknown",
+        "dbus_error": null,
+        "dbus_details": null,
+        "duration_s": 0.0010563809773884714
+      }
+    ]
+  },
+  {
+    "name": "bluez-unavailable-raw-bleak",
+    "qualification": "VERIFIED_ISOLATED_TRANSPORT",
+    "capture": "bluez-unavailable-raw-bleak.jsonl",
+    "exceptions": [
+      {
+        "seq": 7,
+        "command": "rawscan hci2 1",
+        "type": "bleak.exc.BleakDBusError",
+        "message": "[org.freedesktop.DBus.Error.ServiceUnknown] The name org.bluez was not provided by any .service files",
+        "dbus_error": "org.freedesktop.DBus.Error.ServiceUnknown",
+        "dbus_details": "The name org.bluez was not provided by any .service files",
+        "duration_s": 0.006921196007169783
+      }
+    ]
+  }
+]

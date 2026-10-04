@@ -1,0 +1,1220 @@
+{
+  "schema": 1,
+  "not_a_command_allowlist": true,
+  "experiments": [
+    {
+      "capture": "captures/20261004T141301Z-session.jsonl",
+      "tx_seq": 224,
+      "utc": "2026-10-04T14:17:50.567799+00:00",
+      "starting_state": {
+        "flags": 14,
+        "battery": 98,
+        "input_w": 1,
+        "output_w": 0,
+        "minutes": 3138,
+        "hex": "a565b1000108010e62000100000c425a",
+        "monotonic": 439630.840819578
+      },
+      "historical_harness_label": [
+        "request",
+        "noresponse"
+      ],
+      "service": "0000fff0-0000-1000-8000-00805f9b34fb",
+      "characteristic": "0000fff2-0000-1000-8000-00805f9b34fb",
+      "command_hex": "a565b1000106010000000000",
+      "write_with_response": false,
+      "expected_flags_decimal": null,
+      "first_two_status_notifications": [
+        {
+          "seq": 226,
+          "utc": "2026-10-04T14:17:51.904486+00:00",
+          "monotonic": 439632.177880746,
+          "event": "rx",
+          "characteristic": "0000fff1-0000-1000-8000-00805f9b34fb",
+          "hex": "a565b1000108010e62000100000c425a",
+          "valid_envelope": true,
+          "status": {
+            "flags": 14,
+            "battery": 98,
+            "input_w": 1,
+            "output_w": 0,
+            "minutes": 3138,
+            "hex": "a565b1000108010e62000100000c425a",
+            "monotonic": 439632.177812076
+          },
+          "display": false
+        },
+        {
+          "seq": 227,
+          "utc": "2026-10-04T14:17:53.204411+00:00",
+          "monotonic": 439633.47778932,
+          "event": "rx",
+          "characteristic": "0000fff1-0000-1000-8000-00805f9b34fb",
+          "hex": "a565b1000108010e62000100000c425a",
+          "valid_envelope": true,
+          "status": {
+            "flags": 14,
+            "battery": 98,
+            "input_w": 1,
+            "output_w": 0,
+            "minutes": 3138,
+            "hex": "a565b1000108010e62000100000c425a",
+            "monotonic": 439633.477750487
+          },
+          "display": false
+        }
+      ],
+      "confirmation_events": [],
+      "first_status_delay_seconds": 1.3367098460439593,
+      "interpretation": "R600 special status request. No separate response; support UNVERIFIED.",
+      "probe_allowed": false
+    },
+    {
+      "capture": "captures/20261004T141301Z-session.jsonl",
+      "tx_seq": 304,
+      "utc": "2026-10-04T14:19:31.180489+00:00",
+      "starting_state": {
+        "flags": 14,
+        "battery": 98,
+        "input_w": 1,
+        "output_w": 0,
+        "minutes": 3137,
+        "hex": "a565b1000108010e62000100000c4159",
+        "monotonic": 439731.453519387
+      },
+      "historical_harness_label": [
+        "set",
+        "ac",
+        "off",
+        "noresponse"
+      ],
+      "service": "0000fff0-0000-1000-8000-00805f9b34fb",
+      "characteristic": "0000fff2-0000-1000-8000-00805f9b34fb",
+      "command_hex": "a56500b10101000071",
+      "write_with_response": false,
+      "expected_flags_decimal": 12,
+      "first_two_status_notifications": [
+        {
+          "seq": 306,
+          "utc": "2026-10-04T14:19:31.279414+00:00",
+          "monotonic": 439731.552797716,
+          "event": "rx",
+          "characteristic": "0000fff1-0000-1000-8000-00805f9b34fb",
+          "hex": "a565b1000108010862000100000c425c",
+          "valid_envelope": true,
+          "status": {
+            "flags": 8,
+            "battery": 98,
+            "input_w": 1,
+            "output_w": 0,
+            "minutes": 3138,
+            "hex": "a565b1000108010862000100000c425c",
+            "monotonic": 439731.552732202
+          },
+          "display": true
+        },
+        {
+          "seq": 307,
+          "utc": "2026-10-04T14:19:32.867306+00:00",
+          "monotonic": 439733.140681893,
+          "event": "rx",
+          "characteristic": "0000fff1-0000-1000-8000-00805f9b34fb",
+          "hex": "a565b1000108010862000100001d1817",
+          "valid_envelope": true,
+          "status": {
+            "flags": 8,
+            "battery": 98,
+            "input_w": 1,
+            "output_w": 0,
+            "minutes": 7448,
+            "hex": "a565b1000108010862000100001d1817",
+            "monotonic": 439733.140614335
+          },
+          "display": false
+        }
+      ],
+      "confirmation_events": [
+        {
+          "seq": 314,
+          "utc": "2026-10-04T14:19:41.182962+00:00",
+          "monotonic": 439741.456330373,
+          "event": "operation_error",
+          "action": [
+            "set",
+            "ac",
+            "off",
+            "noresponse"
+          ],
+          "type": "TimeoutError",
+          "message": "",
+          "state": {
+            "flags": 8,
+            "battery": 98,
+            "input_w": 1,
+            "output_w": 0,
+            "minutes": 7447,
+            "hex": "a565b1000108010862000100001d1718",
+            "monotonic": 439741.415849423
+          }
+        }
+      ],
+      "first_status_delay_seconds": 0.09894189500482753,
+      "interpretation": "Unsafe three-field AC-off frame: status0e->08, unexpectedly clears app frequency selector04. Not a safe single-field command.",
+      "probe_allowed": false
+    },
+    {
+      "capture": "captures/20261004T142218Z-session.jsonl",
+      "tx_seq": 30,
+      "utc": "2026-10-04T14:22:48.368301+00:00",
+      "starting_state": {
+        "flags": 8,
+        "battery": 98,
+        "input_w": 1,
+        "output_w": 0,
+        "minutes": 7447,
+        "hex": "a565b1000108010862000100001d1718",
+        "monotonic": 439928.64141778
+      },
+      "historical_harness_label": [
+        "set",
+        "usb",
+        "on",
+        "noresponse"
+      ],
+      "service": "0000fff0-0000-1000-8000-00805f9b34fb",
+      "characteristic": "0000fff2-0000-1000-8000-00805f9b34fb",
+      "command_hex": "a56500b10101000475",
+      "write_with_response": false,
+      "expected_flags_decimal": 12,
+      "first_two_status_notifications": [
+        {
+          "seq": 32,
+          "utc": "2026-10-04T14:22:48.505268+00:00",
+          "monotonic": 439928.778645103,
+          "event": "rx",
+          "characteristic": "0000fff1-0000-1000-8000-00805f9b34fb",
+          "hex": "a565b1000108010862000100001d1718",
+          "valid_envelope": true,
+          "status": {
+            "flags": 8,
+            "battery": 98,
+            "input_w": 1,
+            "output_w": 0,
+            "minutes": 7447,
+            "hex": "a565b1000108010862000100001d1718",
+            "monotonic": 439928.778595209
+          },
+          "display": false
+        },
+        {
+          "seq": 33,
+          "utc": "2026-10-04T14:22:49.960863+00:00",
+          "monotonic": 439930.234242458,
+          "event": "rx",
+          "characteristic": "0000fff1-0000-1000-8000-00805f9b34fb",
+          "hex": "a565b1000108010862000100001d1817",
+          "valid_envelope": true,
+          "status": {
+            "flags": 8,
+            "battery": 98,
+            "input_w": 1,
+            "output_w": 0,
+            "minutes": 7448,
+            "hex": "a565b1000108010862000100001d1817",
+            "monotonic": 439930.234181393
+          },
+          "display": false
+        }
+      ],
+      "confirmation_events": [
+        {
+          "seq": 40,
+          "utc": "2026-10-04T14:22:58.371998+00:00",
+          "monotonic": 439938.645386985,
+          "event": "operation_error",
+          "action": [
+            "set",
+            "usb",
+            "on",
+            "noresponse"
+          ],
+          "type": "TimeoutError",
+          "message": "",
+          "state": {
+            "flags": 8,
+            "battery": 98,
+            "input_w": 1,
+            "output_w": 0,
+            "minutes": 7447,
+            "hex": "a565b1000108010862000100001d1718",
+            "monotonic": 439938.429839637
+          }
+        }
+      ],
+      "first_status_delay_seconds": 0.13698524696519598,
+      "interpretation": "Historical USB hypothesis rejected by later source inspection. Legacy app calls TX04 closeBle. No observed USB change or disconnect.",
+      "probe_allowed": false
+    },
+    {
+      "capture": "captures/20261004T142218Z-session.jsonl",
+      "tx_seq": 89,
+      "utc": "2026-10-04T14:24:02.870153+00:00",
+      "starting_state": {
+        "flags": 8,
+        "battery": 98,
+        "input_w": 1,
+        "output_w": 0,
+        "minutes": 7447,
+        "hex": "a565b1000108010862000100001d1718",
+        "monotonic": 440003.143299269
+      },
+      "historical_harness_label": [
+        "set",
+        "ac",
+        "on",
+        "noresponse"
+      ],
+      "service": "0000fff0-0000-1000-8000-00805f9b34fb",
+      "characteristic": "0000fff2-0000-1000-8000-00805f9b34fb",
+      "command_hex": "a56500b10101000273",
+      "write_with_response": false,
+      "expected_flags_decimal": 10,
+      "first_two_status_notifications": [
+        {
+          "seq": 91,
+          "utc": "2026-10-04T14:24:02.992380+00:00",
+          "monotonic": 440003.265763763,
+          "event": "rx",
+          "characteristic": "0000fff1-0000-1000-8000-00805f9b34fb",
+          "hex": "a565b1000108010a62000100001d171a",
+          "valid_envelope": true,
+          "status": {
+            "flags": 10,
+            "battery": 98,
+            "input_w": 1,
+            "output_w": 0,
+            "minutes": 7447,
+            "hex": "a565b1000108010a62000100001d171a",
+            "monotonic": 440003.265698099
+          },
+          "display": true
+        },
+        {
+          "seq": 92,
+          "utc": "2026-10-04T14:24:04.369347+00:00",
+          "monotonic": 440004.642720709,
+          "event": "rx",
+          "characteristic": "0000fff1-0000-1000-8000-00805f9b34fb",
+          "hex": "a565b1000108010a62000100000b9289",
+          "valid_envelope": true,
+          "status": {
+            "flags": 10,
+            "battery": 98,
+            "input_w": 1,
+            "output_w": 0,
+            "minutes": 2962,
+            "hex": "a565b1000108010a62000100000b9289",
+            "monotonic": 440004.642680914
+          },
+          "display": false
+        }
+      ],
+      "confirmation_events": [
+        {
+          "seq": 93,
+          "utc": "2026-10-04T14:24:04.369491+00:00",
+          "monotonic": 440004.642851195,
+          "event": "confirmed",
+          "hex": "a56500b10101000273",
+          "state": {
+            "flags": 10,
+            "battery": 98,
+            "input_w": 1,
+            "output_w": 0,
+            "minutes": 2962,
+            "hex": "a565b1000108010a62000100000b9289",
+            "monotonic": 440004.642680914
+          }
+        }
+      ],
+      "first_status_delay_seconds": 0.12224901799345389,
+      "interpretation": "Historical AC restore:08->0a; selector04 remains cleared. Not restoration of original0e.",
+      "probe_allowed": false
+    },
+    {
+      "capture": "captures/20261004T143651Z-session.jsonl",
+      "tx_seq": 58,
+      "utc": "2026-10-04T14:38:00.204489+00:00",
+      "starting_state": {
+        "flags": 10,
+        "battery": 97,
+        "input_w": 0,
+        "output_w": 0,
+        "minutes": 2955,
+        "hex": "a565b1000108010a61000000000b8b92",
+        "monotonic": 440840.477551146
+      },
+      "historical_harness_label": [
+        "set",
+        "frequency",
+        "on",
+        "noresponse"
+      ],
+      "service": "0000fff0-0000-1000-8000-00805f9b34fb",
+      "characteristic": "0000fff2-0000-1000-8000-00805f9b34fb",
+      "command_hex": "a56500b10101001a6b",
+      "write_with_response": false,
+      "expected_flags_decimal": 14,
+      "first_two_status_notifications": [
+        {
+          "seq": 60,
+          "utc": "2026-10-04T14:38:00.328125+00:00",
+          "monotonic": 440840.601499123,
+          "event": "rx",
+          "characteristic": "0000fff1-0000-1000-8000-00805f9b34fb",
+          "hex": "a565b1000108010e61000000000b8b96",
+          "valid_envelope": true,
+          "status": {
+            "flags": 14,
+            "battery": 97,
+            "input_w": 0,
+            "output_w": 0,
+            "minutes": 2955,
+            "hex": "a565b1000108010e61000000000b8b96",
+            "monotonic": 440840.601457014
+          },
+          "display": true
+        },
+        {
+          "seq": 61,
+          "utc": "2026-10-04T14:38:01.703280+00:00",
+          "monotonic": 440841.976654927,
+          "event": "rx",
+          "characteristic": "0000fff1-0000-1000-8000-00805f9b34fb",
+          "hex": "a565b1000108010e61000000000b8b96",
+          "valid_envelope": true,
+          "status": {
+            "flags": 14,
+            "battery": 97,
+            "input_w": 0,
+            "output_w": 0,
+            "minutes": 2955,
+            "hex": "a565b1000108010e61000000000b8b96",
+            "monotonic": 440841.976608599
+          },
+          "display": false
+        }
+      ],
+      "confirmation_events": [
+        {
+          "seq": 62,
+          "utc": "2026-10-04T14:38:01.703419+00:00",
+          "monotonic": 440841.976780964,
+          "event": "confirmed",
+          "hex": "a56500b10101001a6b",
+          "state": {
+            "flags": 14,
+            "battery": 97,
+            "input_w": 0,
+            "output_w": 0,
+            "minutes": 2955,
+            "hex": "a565b1000108010e61000000000b8b96",
+            "monotonic": 440841.976608599
+          }
+        }
+      ],
+      "first_status_delay_seconds": 0.12364715099101886,
+      "interpretation": "Restoration of original selector04:0a->0e via TX08. Actual Hertz not measured.",
+      "probe_allowed": false
+    },
+    {
+      "capture": "captures/20261004T143651Z-session.jsonl",
+      "tx_seq": 554,
+      "utc": "2026-10-04T14:48:39.866228+00:00",
+      "starting_state": {
+        "flags": 14,
+        "battery": 96,
+        "input_w": 0,
+        "output_w": 19,
+        "minutes": 486,
+        "hex": "a565b1000108010e600000001301e6e3",
+        "monotonic": 441480.139455565
+      },
+      "historical_harness_label": [
+        "set",
+        "beep",
+        "off",
+        "noresponse"
+      ],
+      "service": "0000fff0-0000-1000-8000-00805f9b34fb",
+      "characteristic": "0000fff2-0000-1000-8000-00805f9b34fb",
+      "command_hex": "a56500b10101000a7b",
+      "write_with_response": false,
+      "expected_flags_decimal": 6,
+      "first_two_status_notifications": [
+        {
+          "seq": 556,
+          "utc": "2026-10-04T14:48:40.016176+00:00",
+          "monotonic": 441480.289548342,
+          "event": "rx",
+          "characteristic": "0000fff1-0000-1000-8000-00805f9b34fb",
+          "hex": "a565b1000108010e600000001301e6e3",
+          "valid_envelope": true,
+          "status": {
+            "flags": 14,
+            "battery": 96,
+            "input_w": 0,
+            "output_w": 19,
+            "minutes": 486,
+            "hex": "a565b1000108010e600000001301e6e3",
+            "monotonic": 441480.289507305
+          },
+          "display": false
+        },
+        {
+          "seq": 557,
+          "utc": "2026-10-04T14:48:41.379560+00:00",
+          "monotonic": 441481.652934568,
+          "event": "rx",
+          "characteristic": "0000fff1-0000-1000-8000-00805f9b34fb",
+          "hex": "a565b1000108010e600000001301e6e3",
+          "valid_envelope": true,
+          "status": {
+            "flags": 14,
+            "battery": 96,
+            "input_w": 0,
+            "output_w": 19,
+            "minutes": 486,
+            "hex": "a565b1000108010e600000001301e6e3",
+            "monotonic": 441481.652889774
+          },
+          "display": false
+        }
+      ],
+      "confirmation_events": [
+        {
+          "seq": 564,
+          "utc": "2026-10-04T14:48:49.867953+00:00",
+          "monotonic": 441490.141325982,
+          "event": "operation_error",
+          "action": [
+            "set",
+            "beep",
+            "off",
+            "noresponse"
+          ],
+          "type": "TimeoutError",
+          "message": "",
+          "state": {
+            "flags": 14,
+            "battery": 96,
+            "input_w": 0,
+            "output_w": 19,
+            "minutes": 486,
+            "hex": "a565b1000108010e600000001301e6e3",
+            "monotonic": 441489.940675469
+          }
+        }
+      ],
+      "first_status_delay_seconds": 0.14996102801524103,
+      "interpretation": "App buzzer-off candidate: status remains0e; requestedflag not confirmed.",
+      "probe_allowed": false
+    },
+    {
+      "capture": "captures/20261004T143651Z-session.jsonl",
+      "tx_seq": 602,
+      "utc": "2026-10-04T14:49:40.505242+00:00",
+      "starting_state": {
+        "flags": 14,
+        "battery": 96,
+        "input_w": 0,
+        "output_w": 19,
+        "minutes": 485,
+        "hex": "a565b1000108010e600000001301e5e0",
+        "monotonic": 441540.778402764
+      },
+      "historical_harness_label": [
+        "set",
+        "beep",
+        "on",
+        "noresponse"
+      ],
+      "service": "0000fff0-0000-1000-8000-00805f9b34fb",
+      "characteristic": "0000fff2-0000-1000-8000-00805f9b34fb",
+      "command_hex": "a56500b10101001a6b",
+      "write_with_response": false,
+      "expected_flags_decimal": 14,
+      "first_two_status_notifications": [
+        {
+          "seq": 604,
+          "utc": "2026-10-04T14:49:40.642562+00:00",
+          "monotonic": 441540.915940837,
+          "event": "rx",
+          "characteristic": "0000fff1-0000-1000-8000-00805f9b34fb",
+          "hex": "a565b1000108010e600000001301e5e0",
+          "valid_envelope": true,
+          "status": {
+            "flags": 14,
+            "battery": 96,
+            "input_w": 0,
+            "output_w": 19,
+            "minutes": 485,
+            "hex": "a565b1000108010e600000001301e5e0",
+            "monotonic": 441540.915882267
+          },
+          "display": false
+        },
+        {
+          "seq": 605,
+          "utc": "2026-10-04T14:49:42.016357+00:00",
+          "monotonic": 441542.289733895,
+          "event": "rx",
+          "characteristic": "0000fff1-0000-1000-8000-00805f9b34fb",
+          "hex": "a565b1000108010e600000001301e5e0",
+          "valid_envelope": true,
+          "status": {
+            "flags": 14,
+            "battery": 96,
+            "input_w": 0,
+            "output_w": 19,
+            "minutes": 485,
+            "hex": "a565b1000108010e600000001301e5e0",
+            "monotonic": 441542.28967864
+          },
+          "display": false
+        }
+      ],
+      "confirmation_events": [
+        {
+          "seq": 606,
+          "utc": "2026-10-04T14:49:42.016496+00:00",
+          "monotonic": 441542.289858419,
+          "event": "confirmed",
+          "hex": "a56500b10101001a6b",
+          "state": {
+            "flags": 14,
+            "battery": 96,
+            "input_w": 0,
+            "output_w": 19,
+            "minutes": 485,
+            "hex": "a565b1000108010e600000001301e5e0",
+            "monotonic": 441542.28967864
+          }
+        }
+      ],
+      "first_status_delay_seconds": 0.13733570103067905,
+      "interpretation": "Resend baseline after buzzer candidate.",
+      "probe_allowed": false
+    },
+    {
+      "capture": "captures/20261004T143651Z-session.jsonl",
+      "tx_seq": 618,
+      "utc": "2026-10-04T14:49:57.129943+00:00",
+      "starting_state": {
+        "flags": 14,
+        "battery": 95,
+        "input_w": 0,
+        "output_w": 19,
+        "minutes": 485,
+        "hex": "a565b1000108010e5f0000001301e5df",
+        "monotonic": 441557.403027165
+      },
+      "historical_harness_label": [
+        "set",
+        "screen",
+        "on",
+        "noresponse"
+      ],
+      "service": "0000fff0-0000-1000-8000-00805f9b34fb",
+      "characteristic": "0000fff2-0000-1000-8000-00805f9b34fb",
+      "command_hex": "a56500b10101005a2b",
+      "write_with_response": false,
+      "expected_flags_decimal": 46,
+      "first_two_status_notifications": [
+        {
+          "seq": 620,
+          "utc": "2026-10-04T14:49:57.267360+00:00",
+          "monotonic": 441557.54073022,
+          "event": "rx",
+          "characteristic": "0000fff1-0000-1000-8000-00805f9b34fb",
+          "hex": "a565b1000108010e5f0000001301e5df",
+          "valid_envelope": true,
+          "status": {
+            "flags": 14,
+            "battery": 95,
+            "input_w": 0,
+            "output_w": 19,
+            "minutes": 485,
+            "hex": "a565b1000108010e5f0000001301e5df",
+            "monotonic": 441557.540694703
+          },
+          "display": false
+        },
+        {
+          "seq": 621,
+          "utc": "2026-10-04T14:49:58.643640+00:00",
+          "monotonic": 441558.91704384,
+          "event": "rx",
+          "characteristic": "0000fff1-0000-1000-8000-00805f9b34fb",
+          "hex": "a565b1000108010e5f0000001301e5df",
+          "valid_envelope": true,
+          "status": {
+            "flags": 14,
+            "battery": 95,
+            "input_w": 0,
+            "output_w": 19,
+            "minutes": 485,
+            "hex": "a565b1000108010e5f0000001301e5df",
+            "monotonic": 441558.91695358
+          },
+          "display": false
+        }
+      ],
+      "confirmation_events": [
+        {
+          "seq": 628,
+          "utc": "2026-10-04T14:50:07.132237+00:00",
+          "monotonic": 441567.405617219,
+          "event": "operation_error",
+          "action": [
+            "set",
+            "screen",
+            "on",
+            "noresponse"
+          ],
+          "type": "TimeoutError",
+          "message": "",
+          "state": {
+            "flags": 14,
+            "battery": 95,
+            "input_w": 0,
+            "output_w": 19,
+            "minutes": 485,
+            "hex": "a565b1000108010e5f0000001301e5df",
+            "monotonic": 441567.153773371
+          }
+        }
+      ],
+      "first_status_delay_seconds": 0.13742210599593818,
+      "interpretation": "App screen-on candidate: status remains0e; requestedflag not confirmed.",
+      "probe_allowed": false
+    },
+    {
+      "capture": "captures/20261004T143651Z-session.jsonl",
+      "tx_seq": 638,
+      "utc": "2026-10-04T14:50:19.267362+00:00",
+      "starting_state": {
+        "flags": 14,
+        "battery": 95,
+        "input_w": 0,
+        "output_w": 19,
+        "minutes": 485,
+        "hex": "a565b1000108010e5f0000001301e5df",
+        "monotonic": 441579.540550999
+      },
+      "historical_harness_label": [
+        "set",
+        "screen",
+        "off",
+        "noresponse"
+      ],
+      "service": "0000fff0-0000-1000-8000-00805f9b34fb",
+      "characteristic": "0000fff2-0000-1000-8000-00805f9b34fb",
+      "command_hex": "a56500b10101001a6b",
+      "write_with_response": false,
+      "expected_flags_decimal": 14,
+      "first_two_status_notifications": [
+        {
+          "seq": 640,
+          "utc": "2026-10-04T14:50:19.380448+00:00",
+          "monotonic": 441579.653827914,
+          "event": "rx",
+          "characteristic": "0000fff1-0000-1000-8000-00805f9b34fb",
+          "hex": "a565b1000108010e5f0000001301e5df",
+          "valid_envelope": true,
+          "status": {
+            "flags": 14,
+            "battery": 95,
+            "input_w": 0,
+            "output_w": 19,
+            "minutes": 485,
+            "hex": "a565b1000108010e5f0000001301e5df",
+            "monotonic": 441579.653771608
+          },
+          "display": false
+        },
+        {
+          "seq": 641,
+          "utc": "2026-10-04T14:50:20.754232+00:00",
+          "monotonic": 441581.027619247,
+          "event": "rx",
+          "characteristic": "0000fff1-0000-1000-8000-00805f9b34fb",
+          "hex": "a565b1000108010e5f0000001301e5df",
+          "valid_envelope": true,
+          "status": {
+            "flags": 14,
+            "battery": 95,
+            "input_w": 0,
+            "output_w": 19,
+            "minutes": 485,
+            "hex": "a565b1000108010e5f0000001301e5df",
+            "monotonic": 441581.027546079
+          },
+          "display": false
+        }
+      ],
+      "confirmation_events": [
+        {
+          "seq": 642,
+          "utc": "2026-10-04T14:50:20.754413+00:00",
+          "monotonic": 441581.027774349,
+          "event": "confirmed",
+          "hex": "a56500b10101001a6b",
+          "state": {
+            "flags": 14,
+            "battery": 95,
+            "input_w": 0,
+            "output_w": 19,
+            "minutes": 485,
+            "hex": "a565b1000108010e5f0000001301e5df",
+            "monotonic": 441581.027546079
+          }
+        }
+      ],
+      "first_status_delay_seconds": 0.11310420895460993,
+      "interpretation": "Resend baseline after screen candidate.",
+      "probe_allowed": false
+    },
+    {
+      "capture": "captures/20261004T143651Z-session.jsonl",
+      "tx_seq": 667,
+      "utc": "2026-10-04T14:50:53.754696+00:00",
+      "starting_state": {
+        "flags": 14,
+        "battery": 95,
+        "input_w": 0,
+        "output_w": 19,
+        "minutes": 484,
+        "hex": "a565b1000108010e5f0000001301e4de",
+        "monotonic": 441614.027722052
+      },
+      "historical_harness_label": [
+        "set",
+        "voice",
+        "on",
+        "noresponse"
+      ],
+      "service": "0000fff0-0000-1000-8000-00805f9b34fb",
+      "characteristic": "0000fff2-0000-1000-8000-00805f9b34fb",
+      "command_hex": "a56500b10101009aeb",
+      "write_with_response": false,
+      "expected_flags_decimal": 78,
+      "first_two_status_notifications": [
+        {
+          "seq": 669,
+          "utc": "2026-10-04T14:50:53.879332+00:00",
+          "monotonic": 441614.152708637,
+          "event": "rx",
+          "characteristic": "0000fff1-0000-1000-8000-00805f9b34fb",
+          "hex": "a565b1000108010e5f0000001301e4de",
+          "valid_envelope": true,
+          "status": {
+            "flags": 14,
+            "battery": 95,
+            "input_w": 0,
+            "output_w": 19,
+            "minutes": 484,
+            "hex": "a565b1000108010e5f0000001301e4de",
+            "monotonic": 441614.152655476
+          },
+          "display": false
+        },
+        {
+          "seq": 670,
+          "utc": "2026-10-04T14:50:55.254448+00:00",
+          "monotonic": 441615.527825371,
+          "event": "rx",
+          "characteristic": "0000fff1-0000-1000-8000-00805f9b34fb",
+          "hex": "a565b1000108010e5f0000001301e4de",
+          "valid_envelope": true,
+          "status": {
+            "flags": 14,
+            "battery": 95,
+            "input_w": 0,
+            "output_w": 19,
+            "minutes": 484,
+            "hex": "a565b1000108010e5f0000001301e4de",
+            "monotonic": 441615.52774504
+          },
+          "display": false
+        }
+      ],
+      "confirmation_events": [
+        {
+          "seq": 677,
+          "utc": "2026-10-04T14:51:03.757698+00:00",
+          "monotonic": 441624.031073892,
+          "event": "operation_error",
+          "action": [
+            "set",
+            "voice",
+            "on",
+            "noresponse"
+          ],
+          "type": "TimeoutError",
+          "message": "",
+          "state": {
+            "flags": 14,
+            "battery": 95,
+            "input_w": 0,
+            "output_w": 19,
+            "minutes": 484,
+            "hex": "a565b1000108010e5f0000001301e4de",
+            "monotonic": 441623.791105186
+          }
+        }
+      ],
+      "first_status_delay_seconds": 0.12463838898111135,
+      "interpretation": "App voice-on candidate: status remains0e; requestedflag not confirmed.",
+      "probe_allowed": false
+    },
+    {
+      "capture": "captures/20261004T143651Z-session.jsonl",
+      "tx_seq": 700,
+      "utc": "2026-10-04T14:51:33.743577+00:00",
+      "starting_state": {
+        "flags": 14,
+        "battery": 95,
+        "input_w": 0,
+        "output_w": 19,
+        "minutes": 484,
+        "hex": "a565b1000108010e5f0000001301e4de",
+        "monotonic": 441654.016721787
+      },
+      "historical_harness_label": [
+        "set",
+        "voice",
+        "off",
+        "noresponse"
+      ],
+      "service": "0000fff0-0000-1000-8000-00805f9b34fb",
+      "characteristic": "0000fff2-0000-1000-8000-00805f9b34fb",
+      "command_hex": "a56500b10101001a6b",
+      "write_with_response": false,
+      "expected_flags_decimal": 14,
+      "first_two_status_notifications": [
+        {
+          "seq": 702,
+          "utc": "2026-10-04T14:51:33.854417+00:00",
+          "monotonic": 441654.127797969,
+          "event": "rx",
+          "characteristic": "0000fff1-0000-1000-8000-00805f9b34fb",
+          "hex": "a565b1000108010e5f0000001301e4de",
+          "valid_envelope": true,
+          "status": {
+            "flags": 14,
+            "battery": 95,
+            "input_w": 0,
+            "output_w": 19,
+            "minutes": 484,
+            "hex": "a565b1000108010e5f0000001301e4de",
+            "monotonic": 441654.127729169
+          },
+          "display": false
+        },
+        {
+          "seq": 703,
+          "utc": "2026-10-04T14:51:35.229672+00:00",
+          "monotonic": 441655.50306363,
+          "event": "rx",
+          "characteristic": "0000fff1-0000-1000-8000-00805f9b34fb",
+          "hex": "a565b1000108010e5f0000001301e4de",
+          "valid_envelope": true,
+          "status": {
+            "flags": 14,
+            "battery": 95,
+            "input_w": 0,
+            "output_w": 19,
+            "minutes": 484,
+            "hex": "a565b1000108010e5f0000001301e4de",
+            "monotonic": 441655.50296834
+          },
+          "display": false
+        }
+      ],
+      "confirmation_events": [
+        {
+          "seq": 704,
+          "utc": "2026-10-04T14:51:35.229862+00:00",
+          "monotonic": 441655.503224283,
+          "event": "confirmed",
+          "hex": "a56500b10101001a6b",
+          "state": {
+            "flags": 14,
+            "battery": 95,
+            "input_w": 0,
+            "output_w": 19,
+            "minutes": 484,
+            "hex": "a565b1000108010e5f0000001301e4de",
+            "monotonic": 441655.50296834
+          }
+        }
+      ],
+      "first_status_delay_seconds": 0.11086168698966503,
+      "interpretation": "Resend baseline after voice candidate.",
+      "probe_allowed": false
+    },
+    {
+      "capture": "captures/20261004T145147Z-session.jsonl",
+      "tx_seq": 200,
+      "utc": "2026-10-04T14:56:02.540560+00:00",
+      "starting_state": {
+        "flags": 14,
+        "battery": 94,
+        "input_w": 0,
+        "output_w": 19,
+        "minutes": 484,
+        "hex": "a565b1000108010e5e0000001301e4df",
+        "monotonic": 441922.813652921
+      },
+      "historical_harness_label": [
+        "invalid_checksum"
+      ],
+      "service": "0000fff0-0000-1000-8000-00805f9b34fb",
+      "characteristic": "0000fff2-0000-1000-8000-00805f9b34fb",
+      "command_hex": "a56500b10101001b6b",
+      "write_with_response": false,
+      "expected_flags_decimal": 14,
+      "first_two_status_notifications": [
+        {
+          "seq": 202,
+          "utc": "2026-10-04T14:56:03.877400+00:00",
+          "monotonic": 441924.150777058,
+          "event": "rx",
+          "characteristic": "0000fff1-0000-1000-8000-00805f9b34fb",
+          "hex": "a565b1000108010e5e0000001301e4df",
+          "valid_envelope": true,
+          "status": {
+            "flags": 14,
+            "battery": 94,
+            "input_w": 0,
+            "output_w": 19,
+            "minutes": 484,
+            "hex": "a565b1000108010e5e0000001301e4df",
+            "monotonic": 441924.150712927
+          },
+          "display": false
+        },
+        {
+          "seq": 203,
+          "utc": "2026-10-04T14:56:05.190386+00:00",
+          "monotonic": 441925.463761941,
+          "event": "rx",
+          "characteristic": "0000fff1-0000-1000-8000-00805f9b34fb",
+          "hex": "a565b1000108010e5e0000001301e4df",
+          "valid_envelope": true,
+          "status": {
+            "flags": 14,
+            "battery": 94,
+            "input_w": 0,
+            "output_w": 19,
+            "minutes": 484,
+            "hex": "a565b1000108010e5e0000001301e4df",
+            "monotonic": 441925.463707238
+          },
+          "display": false
+        }
+      ],
+      "confirmation_events": [
+        {
+          "seq": 204,
+          "utc": "2026-10-04T14:56:05.190599+00:00",
+          "monotonic": 441925.463958501,
+          "event": "confirmed",
+          "hex": "a56500b10101001b6b",
+          "state": {
+            "flags": 14,
+            "battery": 94,
+            "input_w": 0,
+            "output_w": 19,
+            "minutes": 484,
+            "hex": "a565b1000108010e5e0000001301e4df",
+            "monotonic": 441925.463707238
+          }
+        }
+      ],
+      "first_status_delay_seconds": 1.3368570639868267,
+      "interpretation": "Invalid checksum DC-on example: status remains0e; no physical DC-on effect/error packet. Harness confirmed label means unchanged status, not acceptance.",
+      "probe_allowed": false
+    },
+    {
+      "capture": "captures/20261004T145147Z-session.jsonl",
+      "tx_seq": 235,
+      "utc": "2026-10-04T14:56:44.865268+00:00",
+      "starting_state": {
+        "flags": 14,
+        "battery": 94,
+        "input_w": 0,
+        "output_w": 19,
+        "minutes": 483,
+        "hex": "a565b1000108010e5e0000001301e3d8",
+        "monotonic": 441965.138475955
+      },
+      "historical_harness_label": [
+        "close_ble"
+      ],
+      "service": "0000fff0-0000-1000-8000-00805f9b34fb",
+      "characteristic": "0000fff2-0000-1000-8000-00805f9b34fb",
+      "command_hex": "a56500b10101001e6f",
+      "write_with_response": false,
+      "expected_flags_decimal": 14,
+      "first_two_status_notifications": [
+        {
+          "seq": 237,
+          "utc": "2026-10-04T14:56:45.016253+00:00",
+          "monotonic": 441965.289627518,
+          "event": "rx",
+          "characteristic": "0000fff1-0000-1000-8000-00805f9b34fb",
+          "hex": "a565b1000108010e5e0000001301e3d8",
+          "valid_envelope": true,
+          "status": {
+            "flags": 14,
+            "battery": 94,
+            "input_w": 0,
+            "output_w": 19,
+            "minutes": 483,
+            "hex": "a565b1000108010e5e0000001301e3d8",
+            "monotonic": 441965.289584897
+          },
+          "display": false
+        },
+        {
+          "seq": 238,
+          "utc": "2026-10-04T14:56:46.327145+00:00",
+          "monotonic": 441966.600516765,
+          "event": "rx",
+          "characteristic": "0000fff1-0000-1000-8000-00805f9b34fb",
+          "hex": "a565b1000108010e5e0000001301e3d8",
+          "valid_envelope": true,
+          "status": {
+            "flags": 14,
+            "battery": 94,
+            "input_w": 0,
+            "output_w": 19,
+            "minutes": 483,
+            "hex": "a565b1000108010e5e0000001301e3d8",
+            "monotonic": 441966.600480667
+          },
+          "display": false
+        }
+      ],
+      "confirmation_events": [
+        {
+          "seq": 239,
+          "utc": "2026-10-04T14:56:46.327245+00:00",
+          "monotonic": 441966.60060454,
+          "event": "confirmed",
+          "hex": "a56500b10101001e6f",
+          "state": {
+            "flags": 14,
+            "battery": 94,
+            "input_w": 0,
+            "output_w": 19,
+            "minutes": 483,
+            "hex": "a565b1000108010e5e0000001301e3d8",
+            "monotonic": 441966.600480667
+          }
+        }
+      ],
+      "first_status_delay_seconds": 0.15099968697177246,
+      "interpretation": "Legacy closeBle candidate with preserved baseline: status remains0e and link active; Bluetooth-off UNVERIFIED.",
+      "probe_allowed": false
+    },
+    {
+      "capture": "captures/20261004T145147Z-session.jsonl",
+      "tx_seq": 268,
+      "utc": "2026-10-04T14:57:23.329029+00:00",
+      "starting_state": {
+        "flags": 14,
+        "battery": 94,
+        "input_w": 0,
+        "output_w": 19,
+        "minutes": 483,
+        "hex": "a565b1000108010e5e0000001301e3d8",
+        "monotonic": 442003.602028464
+      },
+      "historical_harness_label": [
+        "set",
+        "ac",
+        "on",
+        "noresponse"
+      ],
+      "service": "0000fff0-0000-1000-8000-00805f9b34fb",
+      "characteristic": "0000fff2-0000-1000-8000-00805f9b34fb",
+      "command_hex": "a56500b10101001a6b",
+      "write_with_response": false,
+      "expected_flags_decimal": 14,
+      "first_two_status_notifications": [
+        {
+          "seq": 270,
+          "utc": "2026-10-04T14:57:23.427478+00:00",
+          "monotonic": 442003.700879327,
+          "event": "rx",
+          "characteristic": "0000fff1-0000-1000-8000-00805f9b34fb",
+          "hex": "a565b1000108010e5e0000001301e3d8",
+          "valid_envelope": true,
+          "status": {
+            "flags": 14,
+            "battery": 94,
+            "input_w": 0,
+            "output_w": 19,
+            "minutes": 483,
+            "hex": "a565b1000108010e5e0000001301e3d8",
+            "monotonic": 442003.700775011
+          },
+          "display": false
+        },
+        {
+          "seq": 271,
+          "utc": "2026-10-04T14:57:24.752345+00:00",
+          "monotonic": 442005.025720261,
+          "event": "rx",
+          "characteristic": "0000fff1-0000-1000-8000-00805f9b34fb",
+          "hex": "a565b1000108010e5e0000001301e3d8",
+          "valid_envelope": true,
+          "status": {
+            "flags": 14,
+            "battery": 94,
+            "input_w": 0,
+            "output_w": 19,
+            "minutes": 483,
+            "hex": "a565b1000108010e5e0000001301e3d8",
+            "monotonic": 442005.025675897
+          },
+          "display": false
+        }
+      ],
+      "confirmation_events": [
+        {
+          "seq": 272,
+          "utc": "2026-10-04T14:57:24.752484+00:00",
+          "monotonic": 442005.025843052,
+          "event": "confirmed",
+          "hex": "a56500b10101001a6b",
+          "state": {
+            "flags": 14,
+            "battery": 94,
+            "input_w": 0,
+            "output_w": 19,
+            "minutes": 483,
+            "hex": "a565b1000108010e5e0000001301e3d8",
+            "monotonic": 442005.025675897
+          }
+        }
+      ],
+      "first_status_delay_seconds": 0.09849092504009604,
+      "interpretation": "Resend baseline after Bluetooth candidate.",
+      "probe_allowed": false
+    }
+  ]
+}

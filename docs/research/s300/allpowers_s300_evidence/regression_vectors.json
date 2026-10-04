@@ -1,0 +1,993 @@
+{
+  "schema": 1,
+  "station_address": "2A:02:01:48:6B:D0",
+  "station_name": "AP S300 V2.0",
+  "hardware_version": "UNKNOWN",
+  "firmware_version": "UNKNOWN",
+  "captures_are": "Application-level Bleak TX/RX, not HCI or official-app captures",
+  "dynamic_fields": "Battery, power, minutes vary. Check expected flags, envelope, length and XOR.",
+  "round_trips": [
+    {
+      "id": "canonical_ac",
+      "classification": "VERIFIED WRITE",
+      "probe_allowed": true,
+      "initial_flags_hex": "0e",
+      "operations": [
+        {
+          "capture": "captures/20261004T143651Z-session.jsonl",
+          "tx_seq": 118,
+          "utc": "2026-10-04T14:39:14.628517+00:00",
+          "starting_state": {
+            "flags": 14,
+            "battery": 97,
+            "input_w": 0,
+            "output_w": 0,
+            "minutes": 3129,
+            "hex": "a565b1000108010e61000000000c3923",
+            "monotonic": 440914.901625316
+          },
+          "historical_harness_label": [
+            "set",
+            "ac",
+            "off",
+            "noresponse"
+          ],
+          "service": "0000fff0-0000-1000-8000-00805f9b34fb",
+          "characteristic": "0000fff2-0000-1000-8000-00805f9b34fb",
+          "command_hex": "a56500b10101001869",
+          "write_with_response": false,
+          "expected_flags_decimal": 12,
+          "first_two_status_notifications": [
+            {
+              "seq": 120,
+              "utc": "2026-10-04T14:39:15.001475+00:00",
+              "monotonic": 440915.274851809,
+              "event": "rx",
+              "characteristic": "0000fff1-0000-1000-8000-00805f9b34fb",
+              "hex": "a565b1000108010c61000000000c3921",
+              "valid_envelope": true,
+              "status": {
+                "flags": 12,
+                "battery": 97,
+                "input_w": 0,
+                "output_w": 0,
+                "minutes": 3129,
+                "hex": "a565b1000108010c61000000000c3921",
+                "monotonic": 440915.274793319
+              },
+              "display": true
+            },
+            {
+              "seq": 121,
+              "utc": "2026-10-04T14:39:16.328607+00:00",
+              "monotonic": 440916.601983636,
+              "event": "rx",
+              "characteristic": "0000fff1-0000-1000-8000-00805f9b34fb",
+              "hex": "a565b1000108010c61000000001d070e",
+              "valid_envelope": true,
+              "status": {
+                "flags": 12,
+                "battery": 97,
+                "input_w": 0,
+                "output_w": 0,
+                "minutes": 7431,
+                "hex": "a565b1000108010c61000000001d070e",
+                "monotonic": 440916.601931718
+              },
+              "display": false
+            }
+          ],
+          "confirmation_events": [
+            {
+              "seq": 122,
+              "utc": "2026-10-04T14:39:16.328802+00:00",
+              "monotonic": 440916.602170187,
+              "event": "confirmed",
+              "hex": "a56500b10101001869",
+              "state": {
+                "flags": 12,
+                "battery": 97,
+                "input_w": 0,
+                "output_w": 0,
+                "minutes": 7431,
+                "hex": "a565b1000108010c61000000001d070e",
+                "monotonic": 440916.601931718
+              }
+            }
+          ],
+          "first_status_delay_seconds": 0.3729737170506269,
+          "expected_physical_effect": "AC output disabled; DC and lamps unchanged.",
+          "physical_evidence": {
+            "path": "/tmp/allpowers-camera/20261004T143914Z-7lZeQv.jpg",
+            "observation": "AC and DC indicators off; lamps off."
+          }
+        },
+        {
+          "capture": "captures/20261004T143651Z-session.jsonl",
+          "tx_seq": 178,
+          "utc": "2026-10-04T14:40:31.291395+00:00",
+          "starting_state": {
+            "flags": 12,
+            "battery": 97,
+            "input_w": 0,
+            "output_w": 0,
+            "minutes": 8645,
+            "hex": "a565b1000108010c610000000021c5f0",
+            "monotonic": 440991.564565713
+          },
+          "historical_harness_label": [
+            "set",
+            "ac",
+            "on",
+            "noresponse"
+          ],
+          "service": "0000fff0-0000-1000-8000-00805f9b34fb",
+          "characteristic": "0000fff2-0000-1000-8000-00805f9b34fb",
+          "command_hex": "a56500b10101001a6b",
+          "write_with_response": false,
+          "expected_flags_decimal": 14,
+          "first_two_status_notifications": [
+            {
+              "seq": 180,
+              "utc": "2026-10-04T14:40:31.428129+00:00",
+              "monotonic": 440991.70149869,
+              "event": "rx",
+              "characteristic": "0000fff1-0000-1000-8000-00805f9b34fb",
+              "hex": "a565b1000108010e610000000021c5f2",
+              "valid_envelope": true,
+              "status": {
+                "flags": 14,
+                "battery": 97,
+                "input_w": 0,
+                "output_w": 0,
+                "minutes": 8645,
+                "hex": "a565b1000108010e610000000021c5f2",
+                "monotonic": 440991.701464665
+              },
+              "display": true
+            },
+            {
+              "seq": 181,
+              "utc": "2026-10-04T14:40:33.003206+00:00",
+              "monotonic": 440993.276580525,
+              "event": "rx",
+              "characteristic": "0000fff1-0000-1000-8000-00805f9b34fb",
+              "hex": "a565b1000108010e61000000000b8a97",
+              "valid_envelope": true,
+              "status": {
+                "flags": 14,
+                "battery": 97,
+                "input_w": 0,
+                "output_w": 0,
+                "minutes": 2954,
+                "hex": "a565b1000108010e61000000000b8a97",
+                "monotonic": 440993.276535781
+              },
+              "display": false
+            }
+          ],
+          "confirmation_events": [
+            {
+              "seq": 182,
+              "utc": "2026-10-04T14:40:33.003338+00:00",
+              "monotonic": 440993.276701974,
+              "event": "confirmed",
+              "hex": "a56500b10101001a6b",
+              "state": {
+                "flags": 14,
+                "battery": 97,
+                "input_w": 0,
+                "output_w": 0,
+                "minutes": 2954,
+                "hex": "a565b1000108010e61000000000b8a97",
+                "monotonic": 440993.276535781
+              }
+            }
+          ],
+          "first_status_delay_seconds": 0.13674422103213146,
+          "expected_physical_effect": "Restore baseline: AC on, DC off, lamps off; preserve selector and persistent flag.",
+          "physical_evidence": {
+            "path": "/tmp/allpowers-camera/20261004T144703Z-KSus81.jpg",
+            "observation": "Later baseline photo: AC on, DC off, lamps off, charger load 19 W. Not an immediate restoration photo."
+          }
+        }
+      ],
+      "restored_state": {
+        "flags": 14,
+        "battery": 97,
+        "input_w": 0,
+        "output_w": 0,
+        "minutes": 2954,
+        "hex": "a565b1000108010e61000000000b8a97",
+        "monotonic": 440993.276535781
+      },
+      "restoration_confirmed": true
+    },
+    {
+      "id": "canonical_dc",
+      "classification": "VERIFIED WRITE",
+      "probe_allowed": true,
+      "initial_flags_hex": "0e",
+      "operations": [
+        {
+          "capture": "captures/20261004T143651Z-session.jsonl",
+          "tx_seq": 200,
+          "utc": "2026-10-04T14:40:56.403270+00:00",
+          "starting_state": {
+            "flags": 14,
+            "battery": 97,
+            "input_w": 0,
+            "output_w": 19,
+            "minutes": 494,
+            "hex": "a565b1000108010e610000001301eeea",
+            "monotonic": 441016.676456709
+          },
+          "historical_harness_label": [
+            "set",
+            "dc",
+            "on",
+            "noresponse"
+          ],
+          "service": "0000fff0-0000-1000-8000-00805f9b34fb",
+          "characteristic": "0000fff2-0000-1000-8000-00805f9b34fb",
+          "command_hex": "a56500b10101001b6a",
+          "write_with_response": false,
+          "expected_flags_decimal": 15,
+          "first_two_status_notifications": [
+            {
+              "seq": 202,
+              "utc": "2026-10-04T14:40:56.530044+00:00",
+              "monotonic": 441016.803420469,
+              "event": "rx",
+              "characteristic": "0000fff1-0000-1000-8000-00805f9b34fb",
+              "hex": "a565b1000108010f610000001301eeeb",
+              "valid_envelope": true,
+              "status": {
+                "flags": 15,
+                "battery": 97,
+                "input_w": 0,
+                "output_w": 19,
+                "minutes": 494,
+                "hex": "a565b1000108010f610000001301eeeb",
+                "monotonic": 441016.803368811
+              },
+              "display": true
+            },
+            {
+              "seq": 203,
+              "utc": "2026-10-04T14:40:57.903125+00:00",
+              "monotonic": 441018.176496508,
+              "event": "rx",
+              "characteristic": "0000fff1-0000-1000-8000-00805f9b34fb",
+              "hex": "a565b1000108010f610000001301e5e0",
+              "valid_envelope": true,
+              "status": {
+                "flags": 15,
+                "battery": 97,
+                "input_w": 0,
+                "output_w": 19,
+                "minutes": 485,
+                "hex": "a565b1000108010f610000001301e5e0",
+                "monotonic": 441018.176459548
+              },
+              "display": false
+            }
+          ],
+          "confirmation_events": [
+            {
+              "seq": 204,
+              "utc": "2026-10-04T14:40:57.903234+00:00",
+              "monotonic": 441018.176593801,
+              "event": "confirmed",
+              "hex": "a56500b10101001b6a",
+              "state": {
+                "flags": 15,
+                "battery": 97,
+                "input_w": 0,
+                "output_w": 19,
+                "minutes": 485,
+                "hex": "a565b1000108010f610000001301e5e0",
+                "monotonic": 441018.176459548
+              }
+            }
+          ],
+          "first_status_delay_seconds": 0.1267886699642986,
+          "expected_physical_effect": "DC group enabled; AC and lamps unchanged.",
+          "physical_evidence": {
+            "path": "/tmp/allpowers-camera/20261004T144056Z-l9wl1P.jpg",
+            "observation": "AC and DC indicators on; lamps off; LCD USB/DC/AC symbols visible."
+          }
+        },
+        {
+          "capture": "captures/20261004T143651Z-session.jsonl",
+          "tx_seq": 462,
+          "utc": "2026-10-04T14:46:49.229956+00:00",
+          "starting_state": {
+            "flags": 15,
+            "battery": 96,
+            "input_w": 0,
+            "output_w": 19,
+            "minutes": 484,
+            "hex": "a565b1000108010f600000001301e4e0",
+            "monotonic": 441369.502825659
+          },
+          "historical_harness_label": [
+            "set",
+            "dc",
+            "off",
+            "noresponse"
+          ],
+          "service": "0000fff0-0000-1000-8000-00805f9b34fb",
+          "characteristic": "0000fff2-0000-1000-8000-00805f9b34fb",
+          "command_hex": "a56500b10101001a6b",
+          "write_with_response": false,
+          "expected_flags_decimal": 14,
+          "first_two_status_notifications": [
+            {
+              "seq": 464,
+              "utc": "2026-10-04T14:46:49.367419+00:00",
+              "monotonic": 441369.640797603,
+              "event": "rx",
+              "characteristic": "0000fff1-0000-1000-8000-00805f9b34fb",
+              "hex": "a565b1000108010e600000001301e4e1",
+              "valid_envelope": true,
+              "status": {
+                "flags": 14,
+                "battery": 96,
+                "input_w": 0,
+                "output_w": 19,
+                "minutes": 484,
+                "hex": "a565b1000108010e600000001301e4e1",
+                "monotonic": 441369.640742099
+              },
+              "display": true
+            },
+            {
+              "seq": 465,
+              "utc": "2026-10-04T14:46:50.941323+00:00",
+              "monotonic": 441371.214700562,
+              "event": "rx",
+              "characteristic": "0000fff1-0000-1000-8000-00805f9b34fb",
+              "hex": "a565b1000108010e600000001301e8ed",
+              "valid_envelope": true,
+              "status": {
+                "flags": 14,
+                "battery": 96,
+                "input_w": 0,
+                "output_w": 19,
+                "minutes": 488,
+                "hex": "a565b1000108010e600000001301e8ed",
+                "monotonic": 441371.214649836
+              },
+              "display": false
+            }
+          ],
+          "confirmation_events": [
+            {
+              "seq": 466,
+              "utc": "2026-10-04T14:46:50.941470+00:00",
+              "monotonic": 441371.214830577,
+              "event": "confirmed",
+              "hex": "a56500b10101001a6b",
+              "state": {
+                "flags": 14,
+                "battery": 96,
+                "input_w": 0,
+                "output_w": 19,
+                "minutes": 488,
+                "hex": "a565b1000108010e600000001301e8ed",
+                "monotonic": 441371.214649836
+              }
+            }
+          ],
+          "first_status_delay_seconds": 0.13747005898039788,
+          "expected_physical_effect": "Restore baseline: AC on, DC off, lamps off; preserve selector and persistent flag.",
+          "physical_evidence": {
+            "path": "/tmp/allpowers-camera/20261004T144703Z-KSus81.jpg",
+            "observation": "DC off, AC remains on, lamps off."
+          }
+        }
+      ],
+      "restored_state": {
+        "flags": 14,
+        "battery": 96,
+        "input_w": 0,
+        "output_w": 19,
+        "minutes": 488,
+        "hex": "a565b1000108010e600000001301e8ed",
+        "monotonic": 441371.214649836
+      },
+      "restoration_confirmed": true
+    },
+    {
+      "id": "canonical_light",
+      "classification": "VERIFIED WRITE",
+      "probe_allowed": true,
+      "initial_flags_hex": "0e",
+      "operations": [
+        {
+          "capture": "captures/20261004T143651Z-session.jsonl",
+          "tx_seq": 492,
+          "utc": "2026-10-04T14:47:25.341511+00:00",
+          "starting_state": {
+            "flags": 14,
+            "battery": 96,
+            "input_w": 0,
+            "output_w": 19,
+            "minutes": 488,
+            "hex": "a565b1000108010e600000001301e8ed",
+            "monotonic": 441405.6146416
+          },
+          "historical_harness_label": [
+            "set",
+            "light",
+            "on",
+            "noresponse"
+          ],
+          "service": "0000fff0-0000-1000-8000-00805f9b34fb",
+          "characteristic": "0000fff2-0000-1000-8000-00805f9b34fb",
+          "command_hex": "a56500b10101003a4b",
+          "write_with_response": false,
+          "expected_flags_decimal": 30,
+          "first_two_status_notifications": [
+            {
+              "seq": 494,
+              "utc": "2026-10-04T14:47:25.454296+00:00",
+              "monotonic": 441405.727666958,
+              "event": "rx",
+              "characteristic": "0000fff1-0000-1000-8000-00805f9b34fb",
+              "hex": "a565b1000108011e600000001301e8fd",
+              "valid_envelope": true,
+              "status": {
+                "flags": 30,
+                "battery": 96,
+                "input_w": 0,
+                "output_w": 19,
+                "minutes": 488,
+                "hex": "a565b1000108011e600000001301e8fd",
+                "monotonic": 441405.72762516
+              },
+              "display": true
+            },
+            {
+              "seq": 495,
+              "utc": "2026-10-04T14:47:26.842555+00:00",
+              "monotonic": 441407.115934001,
+              "event": "rx",
+              "characteristic": "0000fff1-0000-1000-8000-00805f9b34fb",
+              "hex": "a565b1000108011e600000001301afba",
+              "valid_envelope": true,
+              "status": {
+                "flags": 30,
+                "battery": 96,
+                "input_w": 0,
+                "output_w": 19,
+                "minutes": 431,
+                "hex": "a565b1000108011e600000001301afba",
+                "monotonic": 441407.115870792
+              },
+              "display": false
+            }
+          ],
+          "confirmation_events": [
+            {
+              "seq": 496,
+              "utc": "2026-10-04T14:47:26.842747+00:00",
+              "monotonic": 441407.116106947,
+              "event": "confirmed",
+              "hex": "a56500b10101003a4b",
+              "state": {
+                "flags": 30,
+                "battery": 96,
+                "input_w": 0,
+                "output_w": 19,
+                "minutes": 431,
+                "hex": "a565b1000108011e600000001301afba",
+                "monotonic": 441407.115870792
+              }
+            }
+          ],
+          "first_status_delay_seconds": 0.11279361101333052,
+          "expected_physical_effect": "Common lamps enabled; AC and DC unchanged.",
+          "physical_evidence": {
+            "path": "/tmp/allpowers-camera/20261004T144758Z-rYF164.jpg",
+            "observation": "Canonical lamps-on photograph entirely saturated; proves bright illumination but cannot resolve each lamp. Earlier lamp trial photo resolves two illuminated positions."
+          }
+        },
+        {
+          "capture": "captures/20261004T143651Z-session.jsonl",
+          "tx_seq": 523,
+          "utc": "2026-10-04T14:48:02.629605+00:00",
+          "starting_state": {
+            "flags": 30,
+            "battery": 96,
+            "input_w": 0,
+            "output_w": 19,
+            "minutes": 430,
+            "hex": "a565b1000108011e600000001301aebb",
+            "monotonic": 441442.902658869
+          },
+          "historical_harness_label": [
+            "set",
+            "light",
+            "off",
+            "noresponse"
+          ],
+          "service": "0000fff0-0000-1000-8000-00805f9b34fb",
+          "characteristic": "0000fff2-0000-1000-8000-00805f9b34fb",
+          "command_hex": "a56500b10101001a6b",
+          "write_with_response": false,
+          "expected_flags_decimal": 14,
+          "first_two_status_notifications": [
+            {
+              "seq": 525,
+              "utc": "2026-10-04T14:48:02.766360+00:00",
+              "monotonic": 441443.039737518,
+              "event": "rx",
+              "characteristic": "0000fff1-0000-1000-8000-00805f9b34fb",
+              "hex": "a565b1000108010e600000001301aeab",
+              "valid_envelope": true,
+              "status": {
+                "flags": 14,
+                "battery": 96,
+                "input_w": 0,
+                "output_w": 19,
+                "minutes": 430,
+                "hex": "a565b1000108010e600000001301aeab",
+                "monotonic": 441443.03968038
+              },
+              "display": true
+            },
+            {
+              "seq": 526,
+              "utc": "2026-10-04T14:48:04.141386+00:00",
+              "monotonic": 441444.414763065,
+              "event": "rx",
+              "characteristic": "0000fff1-0000-1000-8000-00805f9b34fb",
+              "hex": "a565b1000108010e600000001301e7e2",
+              "valid_envelope": true,
+              "status": {
+                "flags": 14,
+                "battery": 96,
+                "input_w": 0,
+                "output_w": 19,
+                "minutes": 487,
+                "hex": "a565b1000108010e600000001301e7e2",
+                "monotonic": 441444.414710125
+              },
+              "display": false
+            }
+          ],
+          "confirmation_events": [
+            {
+              "seq": 527,
+              "utc": "2026-10-04T14:48:04.141567+00:00",
+              "monotonic": 441444.414928707,
+              "event": "confirmed",
+              "hex": "a56500b10101001a6b",
+              "state": {
+                "flags": 14,
+                "battery": 96,
+                "input_w": 0,
+                "output_w": 19,
+                "minutes": 487,
+                "hex": "a565b1000108010e600000001301e7e2",
+                "monotonic": 441444.414710125
+              }
+            }
+          ],
+          "first_status_delay_seconds": 0.13676646002568305,
+          "expected_physical_effect": "Restore baseline: AC on, DC off, lamps off; preserve selector and persistent flag.",
+          "physical_evidence": {
+            "path": "/tmp/allpowers-camera/20261004T144835Z-PKch8s.jpg",
+            "observation": "Lamps off, AC on, DC off. Photo blurred; indicators visible."
+          }
+        }
+      ],
+      "restored_state": {
+        "flags": 14,
+        "battery": 96,
+        "input_w": 0,
+        "output_w": 19,
+        "minutes": 487,
+        "hex": "a565b1000108010e600000001301e7e2",
+        "monotonic": 441444.414710125
+      },
+      "restoration_confirmed": true
+    },
+    {
+      "id": "historical_dc",
+      "classification": "VERIFIED WRITE (historical profile only)",
+      "probe_allowed": false,
+      "initial_flags_hex": "0a",
+      "operations": [
+        {
+          "capture": "captures/20261004T142218Z-session.jsonl",
+          "tx_seq": 187,
+          "utc": "2026-10-04T14:26:10.968501+00:00",
+          "starting_state": {
+            "flags": 10,
+            "battery": 98,
+            "input_w": 1,
+            "output_w": 0,
+            "minutes": 2961,
+            "hex": "a565b1000108010a62000100000b918a",
+            "monotonic": 440131.241699336
+          },
+          "historical_harness_label": [
+            "set",
+            "dc",
+            "on",
+            "response"
+          ],
+          "service": "0000fff0-0000-1000-8000-00805f9b34fb",
+          "characteristic": "0000fff2-0000-1000-8000-00805f9b34fb",
+          "command_hex": "a56500b10101000372",
+          "write_with_response": true,
+          "expected_flags_decimal": 11,
+          "first_two_status_notifications": [
+            {
+              "seq": 189,
+              "utc": "2026-10-04T14:26:11.130546+00:00",
+              "monotonic": 440131.403921704,
+              "event": "rx",
+              "characteristic": "0000fff1-0000-1000-8000-00805f9b34fb",
+              "hex": "a565b1000108010b62000100000b918b",
+              "valid_envelope": true,
+              "status": {
+                "flags": 11,
+                "battery": 98,
+                "input_w": 1,
+                "output_w": 0,
+                "minutes": 2961,
+                "hex": "a565b1000108010b62000100000b918b",
+                "monotonic": 440131.403873022
+              },
+              "display": true
+            },
+            {
+              "seq": 190,
+              "utc": "2026-10-04T14:26:12.494289+00:00",
+              "monotonic": 440132.767666611,
+              "event": "rx",
+              "characteristic": "0000fff1-0000-1000-8000-00805f9b34fb",
+              "hex": "a565b1000108010b62000100000a7863",
+              "valid_envelope": true,
+              "status": {
+                "flags": 11,
+                "battery": 98,
+                "input_w": 1,
+                "output_w": 0,
+                "minutes": 2680,
+                "hex": "a565b1000108010b62000100000a7863",
+                "monotonic": 440132.767625243
+              },
+              "display": false
+            }
+          ],
+          "confirmation_events": [
+            {
+              "seq": 191,
+              "utc": "2026-10-04T14:26:12.494465+00:00",
+              "monotonic": 440132.767827654,
+              "event": "confirmed",
+              "hex": "a56500b10101000372",
+              "state": {
+                "flags": 11,
+                "battery": 98,
+                "input_w": 1,
+                "output_w": 0,
+                "minutes": 2680,
+                "hex": "a565b1000108010b62000100000a7863",
+                "monotonic": 440132.767625243
+              }
+            }
+          ],
+          "first_status_delay_seconds": 0.16206104395678267,
+          "physical_evidence": {
+            "path": "/tmp/allpowers-camera/20261004T142616Z-dhxj3P.jpg",
+            "observation": "DC indicator on."
+          },
+          "expected_physical_effect": "Enable dc while preserving observed baseline 0a."
+        },
+        {
+          "capture": "captures/20261004T142218Z-session.jsonl",
+          "tx_seq": 224,
+          "utc": "2026-10-04T14:26:56.531687+00:00",
+          "starting_state": {
+            "flags": 11,
+            "battery": 98,
+            "input_w": 1,
+            "output_w": 0,
+            "minutes": 2680,
+            "hex": "a565b1000108010b62000100000a7863",
+            "monotonic": 440176.804826357
+          },
+          "historical_harness_label": [
+            "set",
+            "dc",
+            "off",
+            "response"
+          ],
+          "service": "0000fff0-0000-1000-8000-00805f9b34fb",
+          "characteristic": "0000fff2-0000-1000-8000-00805f9b34fb",
+          "command_hex": "a56500b10101000273",
+          "write_with_response": true,
+          "expected_flags_decimal": 10,
+          "first_two_status_notifications": [
+            {
+              "seq": 226,
+              "utc": "2026-10-04T14:26:56.680227+00:00",
+              "monotonic": 440176.953602216,
+              "event": "rx",
+              "characteristic": "0000fff1-0000-1000-8000-00805f9b34fb",
+              "hex": "a565b1000108010a62000100000a7862",
+              "valid_envelope": true,
+              "status": {
+                "flags": 10,
+                "battery": 98,
+                "input_w": 1,
+                "output_w": 0,
+                "minutes": 2680,
+                "hex": "a565b1000108010a62000100000a7862",
+                "monotonic": 440176.95355131
+              },
+              "display": true
+            },
+            {
+              "seq": 227,
+              "utc": "2026-10-04T14:26:58.055656+00:00",
+              "monotonic": 440178.329039593,
+              "event": "rx",
+              "characteristic": "0000fff1-0000-1000-8000-00805f9b34fb",
+              "hex": "a565b1000108010a62000100000b918a",
+              "valid_envelope": true,
+              "status": {
+                "flags": 10,
+                "battery": 98,
+                "input_w": 1,
+                "output_w": 0,
+                "minutes": 2961,
+                "hex": "a565b1000108010a62000100000b918a",
+                "monotonic": 440178.328959502
+              },
+              "display": false
+            }
+          ],
+          "confirmation_events": [
+            {
+              "seq": 228,
+              "utc": "2026-10-04T14:26:58.055829+00:00",
+              "monotonic": 440178.329190738,
+              "event": "confirmed",
+              "hex": "a56500b10101000273",
+              "state": {
+                "flags": 10,
+                "battery": 98,
+                "input_w": 1,
+                "output_w": 0,
+                "minutes": 2961,
+                "hex": "a565b1000108010a62000100000b918a",
+                "monotonic": 440178.328959502
+              }
+            }
+          ],
+          "first_status_delay_seconds": 0.1485560149885714,
+          "physical_evidence": {
+            "path": "/tmp/allpowers-camera/20261004T142932Z-DGkKDp.jpg",
+            "observation": "Later baseline photo: AC on, DC off, lamps off."
+          },
+          "expected_physical_effect": "Restore previous baseline 0a; does not restore the earlier 04 selector lost before this pair."
+        }
+      ],
+      "restored_state": {
+        "flags": 10,
+        "battery": 98,
+        "input_w": 1,
+        "output_w": 0,
+        "minutes": 2961,
+        "hex": "a565b1000108010a62000100000b918a",
+        "monotonic": 440178.328959502
+      },
+      "restoration_confirmed": true,
+      "limitation": "Not part of the final allowlist; baseline selector was already cleared. Never use as a general encoder."
+    },
+    {
+      "id": "historical_light",
+      "classification": "VERIFIED WRITE (historical profile only)",
+      "probe_allowed": false,
+      "initial_flags_hex": "0a",
+      "operations": [
+        {
+          "capture": "captures/20261004T142218Z-session.jsonl",
+          "tx_seq": 263,
+          "utc": "2026-10-04T14:27:43.444555+00:00",
+          "starting_state": {
+            "flags": 10,
+            "battery": 98,
+            "input_w": 1,
+            "output_w": 0,
+            "minutes": 2961,
+            "hex": "a565b1000108010a62000100000b918a",
+            "monotonic": 440223.717738553
+          },
+          "historical_harness_label": [
+            "set",
+            "light",
+            "on",
+            "noresponse"
+          ],
+          "service": "0000fff0-0000-1000-8000-00805f9b34fb",
+          "characteristic": "0000fff2-0000-1000-8000-00805f9b34fb",
+          "command_hex": "a56500b10101002253",
+          "write_with_response": false,
+          "expected_flags_decimal": 26,
+          "first_two_status_notifications": [
+            {
+              "seq": 265,
+              "utc": "2026-10-04T14:27:43.568383+00:00",
+              "monotonic": 440223.84176226,
+              "event": "rx",
+              "characteristic": "0000fff1-0000-1000-8000-00805f9b34fb",
+              "hex": "a565b1000108011a62000100000b919a",
+              "valid_envelope": true,
+              "status": {
+                "flags": 26,
+                "battery": 98,
+                "input_w": 1,
+                "output_w": 0,
+                "minutes": 2961,
+                "hex": "a565b1000108011a62000100000b919a",
+                "monotonic": 440223.841703129
+              },
+              "display": true
+            },
+            {
+              "seq": 266,
+              "utc": "2026-10-04T14:27:44.944297+00:00",
+              "monotonic": 440225.217676665,
+              "event": "rx",
+              "characteristic": "0000fff1-0000-1000-8000-00805f9b34fb",
+              "hex": "a565b1000108011a6200010000067a7c",
+              "valid_envelope": true,
+              "status": {
+                "flags": 26,
+                "battery": 98,
+                "input_w": 1,
+                "output_w": 0,
+                "minutes": 1658,
+                "hex": "a565b1000108011a6200010000067a7c",
+                "monotonic": 440225.217622433
+              },
+              "display": false
+            }
+          ],
+          "confirmation_events": [
+            {
+              "seq": 267,
+              "utc": "2026-10-04T14:27:44.944423+00:00",
+              "monotonic": 440225.217781833,
+              "event": "confirmed",
+              "hex": "a56500b10101002253",
+              "state": {
+                "flags": 26,
+                "battery": 98,
+                "input_w": 1,
+                "output_w": 0,
+                "minutes": 1658,
+                "hex": "a565b1000108011a6200010000067a7c",
+                "monotonic": 440225.217622433
+              }
+            }
+          ],
+          "first_status_delay_seconds": 0.12384611199377105,
+          "physical_evidence": {
+            "path": "/tmp/allpowers-camera/20261004T142743Z-kH0mra.jpg",
+            "observation": "Both lamp positions show bright illumination; no separate modes resolved."
+          },
+          "expected_physical_effect": "Enable light while preserving observed baseline 0a."
+        },
+        {
+          "capture": "captures/20261004T142218Z-session.jsonl",
+          "tx_seq": 308,
+          "utc": "2026-10-04T14:28:38.643697+00:00",
+          "starting_state": {
+            "flags": 26,
+            "battery": 98,
+            "input_w": 1,
+            "output_w": 0,
+            "minutes": 1657,
+            "hex": "a565b1000108011a620001000006797f",
+            "monotonic": 440278.916777044
+          },
+          "historical_harness_label": [
+            "set",
+            "light",
+            "off",
+            "noresponse"
+          ],
+          "service": "0000fff0-0000-1000-8000-00805f9b34fb",
+          "characteristic": "0000fff2-0000-1000-8000-00805f9b34fb",
+          "command_hex": "a56500b10101000273",
+          "write_with_response": false,
+          "expected_flags_decimal": 10,
+          "first_two_status_notifications": [
+            {
+              "seq": 310,
+              "utc": "2026-10-04T14:28:38.794346+00:00",
+              "monotonic": 440279.067723527,
+              "event": "rx",
+              "characteristic": "0000fff1-0000-1000-8000-00805f9b34fb",
+              "hex": "a565b1000108010a620001000006796f",
+              "valid_envelope": true,
+              "status": {
+                "flags": 10,
+                "battery": 98,
+                "input_w": 1,
+                "output_w": 0,
+                "minutes": 1657,
+                "hex": "a565b1000108010a620001000006796f",
+                "monotonic": 440279.067668444
+              },
+              "display": true
+            },
+            {
+              "seq": 311,
+              "utc": "2026-10-04T14:28:40.156595+00:00",
+              "monotonic": 440280.429981876,
+              "event": "rx",
+              "characteristic": "0000fff1-0000-1000-8000-00805f9b34fb",
+              "hex": "a565b1000108010a62000100000b908b",
+              "valid_envelope": true,
+              "status": {
+                "flags": 10,
+                "battery": 98,
+                "input_w": 1,
+                "output_w": 0,
+                "minutes": 2960,
+                "hex": "a565b1000108010a62000100000b908b",
+                "monotonic": 440280.429874674
+              },
+              "display": false
+            }
+          ],
+          "confirmation_events": [
+            {
+              "seq": 312,
+              "utc": "2026-10-04T14:28:40.156826+00:00",
+              "monotonic": 440280.43019105,
+              "event": "confirmed",
+              "hex": "a56500b10101000273",
+              "state": {
+                "flags": 10,
+                "battery": 98,
+                "input_w": 1,
+                "output_w": 0,
+                "minutes": 2960,
+                "hex": "a565b1000108010a62000100000b908b",
+                "monotonic": 440280.429874674
+              }
+            }
+          ],
+          "first_status_delay_seconds": 0.15066233702236786,
+          "physical_evidence": {
+            "path": "/tmp/allpowers-camera/20261004T142932Z-DGkKDp.jpg",
+            "observation": "Later baseline photo: AC on, DC off, lamps off."
+          },
+          "expected_physical_effect": "Restore previous baseline 0a; does not restore the earlier 04 selector lost before this pair."
+        }
+      ],
+      "restored_state": {
+        "flags": 10,
+        "battery": 98,
+        "input_w": 1,
+        "output_w": 0,
+        "minutes": 2960,
+        "hex": "a565b1000108010a62000100000b908b",
+        "monotonic": 440280.429874674
+      },
+      "restoration_confirmed": true,
+      "limitation": "Not part of the final allowlist; baseline selector was already cleared. Never use as a general encoder."
+    }
+  ]
+}

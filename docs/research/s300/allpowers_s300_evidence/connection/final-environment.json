@@ -1,0 +1,40 @@
+[
+  {
+    "args": [
+      "lsusb",
+      "-d",
+      "10d7:b012"
+    ],
+    "exit": 0,
+    "stdout": "Bus 009 Device 053: ID 10d7:b012 Actions general adapter\n",
+    "stderr": ""
+  },
+  {
+    "args": [
+      "rfkill",
+      "--json"
+    ],
+    "exit": 0,
+    "stdout": "{\n   \"rfkilldevices\": [\n      {\n         \"id\": 0,\n         \"type\": \"bluetooth\",\n         \"device\": \"hci0\",\n         \"soft\": \"unblocked\",\n         \"hard\": \"unblocked\"\n      },{\n         \"id\": 1,\n         \"type\": \"bluetooth\",\n         \"device\": \"hci1\",\n         \"soft\": \"unblocked\",\n         \"hard\": \"unblocked\"\n      },{\n         \"id\": 3,\n         \"type\": \"bluetooth\",\n         \"device\": \"hci2\",\n         \"soft\": \"unblocked\",\n         \"hard\": \"unblocked\"\n      }\n   ]\n}\n",
+    "stderr": ""
+  },
+  {
+    "args": [
+      "bluetoothctl",
+      "list"
+    ],
+    "exit": 0,
+    "stdout": "Controller F4:4E:FC:A1:CB:FF cachyos #3 [default]\nController 64:BC:58:16:C6:59 cachyos #2 \nController 00:1A:7D:DA:71:11 cachyos \n",
+    "stderr": ""
+  },
+  {
+    "args": [
+      "systemctl",
+      "is-active",
+      "bluetooth"
+    ],
+    "exit": 0,
+    "stdout": "active\n",
+    "stderr": ""
+  }
+]

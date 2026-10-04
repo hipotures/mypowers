@@ -1,0 +1,5 @@
+{"event":"adapter","address":"F4:4E:FC:A1:CB:FF","hci":"hci2"}
+{"event":"device","address":"2A:02:01:48:6B:D0","name":"AP S300 V2.0"}
+{"event":"rx","frame":"a565b1000108010e5b0000001301cff1","state":{"flags":14,"dc_enabled":false,"ac_enabled":true,"frequency_flag":true,"unverified_beep_flag":true,"light_enabled":false,"unverified_screen_flag":false,"unverified_voice_flag":false,"battery_percent":91,"input_power_w":0,"output_power_w":19,"remaining_minutes":463}}
+{"event":"rx","frame":"a565b1000108010e5b0000001401bc85","state":{"flags":14,"dc_enabled":false,"ac_enabled":true,"frequency_flag":true,"unverified_beep_flag":true,"light_enabled":false,"unverified_screen_flag":false,"unverified_voice_flag":false,"battery_percent":91,"input_power_w":0,"output_power_w":20,"remaining_minutes":444}}
+{"event":"rx","frame":"a565b1000108010e5b0000001301cff1","state":{"flags":14,"dc_enabled":false,"ac_enabled":true,"frequency_flag":true,"unverified_beep_flag":true,"light_enabled":false,"unverified_screen_flag":false,"unverified_voice_flag":false,"battery_percent":91,"input_power_w":0,"output_power_w":19,"remaining_minutes":463}}

@@ -1,0 +1,18 @@
+[
+  {
+    "operation": "resolve",
+    "type": "builtins.FileNotFoundError",
+    "message": "[Errno 2] No such file or directory",
+    "repr": "FileNotFoundError(2, 'No such file or directory')",
+    "seconds": 0.00028533797012642026,
+    "traceback": "Traceback (most recent call last):\n  File \"/tmp/allpowers-contention/dbus-transport-test.py\", line 9, in main\n    await asyncio.wait_for(fn(),5)\n  File \"/home/user/.local/share/uv/python/cpython-3.12.14-linux-x86_64-gnu/lib/python3.12/asyncio/tasks.py\", line 520, in wait_for\n    return await fut\n           ^^^^^^^^^\n  File \"/home/user/DEV/tmp/control_allpowers.py\", line 150, in resolve_adapter\n    bus = await MessageBus(bus_type=BusType.SYSTEM).connect()\n                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/user/.cache/uv/archive-v0/z7U1NRmGy_5tjVt3/lib/python3.12/site-packages/dbus_fast/aio/message_bus.py\", line 209, in __init__\n    super().__init__(bus_address, bus_type, ProxyObject, negotiate_unix_fd)\n  File \"src/dbus_fast/message_bus.py\", line 176, in dbus_fast.message_bus.BaseMessageBus.__init__\n  File \"src/dbus_fast/message_bus.py\", line 747, in dbus_fast.message_bus.BaseMessageBus._setup_socket\n  File \"src/dbus_fast/message_bus.py\", line 709, in dbus_fast.message_bus.BaseMessageBus._setup_socket\nFileNotFoundError: [Errno 2] No such file or directory\n"
+  },
+  {
+    "operation": "bleak_scanner_start",
+    "type": "builtins.FileNotFoundError",
+    "message": "[Errno 2] No such file or directory",
+    "repr": "FileNotFoundError(2, 'No such file or directory')",
+    "seconds": 0.003364943026099354,
+    "traceback": "Traceback (most recent call last):\n  File \"/tmp/allpowers-contention/dbus-transport-test.py\", line 9, in main\n    await asyncio.wait_for(fn(),5)\n  File \"/home/user/.local/share/uv/python/cpython-3.12.14-linux-x86_64-gnu/lib/python3.12/asyncio/tasks.py\", line 520, in wait_for\n    return await fut\n           ^^^^^^^^^\n  File \"/home/user/.cache/uv/archive-v0/z7U1NRmGy_5tjVt3/lib/python3.12/site-packages/bleak/__init__.py\", line 185, in start\n    await self._backend.start()\n  File \"/home/user/.cache/uv/archive-v0/z7U1NRmGy_5tjVt3/lib/python3.12/site-packages/bleak/backends/bluezdbus/scanner.py\", line 112, in start\n    manager = await get_global_bluez_manager()\n              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/user/.cache/uv/archive-v0/z7U1NRmGy_5tjVt3/lib/python3.12/site-packages/bleak/backends/bluezdbus/manager.py\", line 1219, in get_global_bluez_manager\n    await instance.async_init()\n  File \"/home/user/.cache/uv/archive-v0/z7U1NRmGy_5tjVt3/lib/python3.12/site-packages/bleak/backends/bluezdbus/manager.py\", line 257, in async_init\n    bus = MessageBus(bus_type=BusType.SYSTEM, auth=get_dbus_authenticator())\n          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/home/user/.cache/uv/archive-v0/z7U1NRmGy_5tjVt3/lib/python3.12/site-packages/dbus_fast/aio/message_bus.py\", line 209, in __init__\n    super().__init__(bus_address, bus_type, ProxyObject, negotiate_unix_fd)\n  File \"src/dbus_fast/message_bus.py\", line 176, in dbus_fast.message_bus.BaseMessageBus.__init__\n  File \"src/dbus_fast/message_bus.py\", line 747, in dbus_fast.message_bus.BaseMessageBus._setup_socket\n  File \"src/dbus_fast/message_bus.py\", line 709, in dbus_fast.message_bus.BaseMessageBus._setup_socket\nFileNotFoundError: [Errno 2] No such file or directory\n"
+  }
+]

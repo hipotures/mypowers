@@ -1,0 +1,15 @@
+{
+  "utc": "2026-10-04T15:36:11.173394+00:00",
+  "test": "phone-first address-based implicit scan",
+  "address": "2A:02:01:48:6B:D0",
+  "adapter": "hci2",
+  "client_timeout": 25,
+  "type": "bleak.exc.BleakDeviceNotFoundError",
+  "message": "Device with address 2A:02:01:48:6B:D0 was not found.",
+  "repr": "BleakDeviceNotFoundError('Device with address 2A:02:01:48:6B:D0 was not found.')",
+  "args": [
+    "Device with address 2A:02:01:48:6B:D0 was not found."
+  ],
+  "traceback": "Traceback (most recent call last):\n  File \"/tmp/allpowers-contention/address_connect.py\", line 9, in main\n    await asyncio.wait_for(client.connect(),35)\n  File \"/home/user/.local/share/uv/python/cpython-3.12.14-linux-x86_64-gnu/lib/python3.12/asyncio/tasks.py\", line 520, in wait_for\n    return await fut\n           ^^^^^^^^^\n  File \"/home/user/.cache/uv/archive-v0/JqZKHzvvGvd2U0_N/lib/python3.12/site-packages/bleak/__init__.py\", line 660, in connect\n    await self._backend.connect(self._pair_before_connect, **kwargs)\n  File \"/home/user/.cache/uv/archive-v0/JqZKHzvvGvd2U0_N/lib/python3.12/site-packages/bleak/backends/bluezdbus/client.py\", line 145, in connect\n    raise BleakDeviceNotFoundError(\nbleak.exc.BleakDeviceNotFoundError: Device with address 2A:02:01:48:6B:D0 was not found.\n",
+  "duration_s": 25.0443333130097
+}

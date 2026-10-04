@@ -1,0 +1,58 @@
+{
+  "date": "2026-10-04",
+  "session_start_utc": "2026-10-04T15:31:15.684141+00:00",
+  "session_end_utc": "2026-10-04T15:52:24.766762+00:00",
+  "session_records": 626,
+  "status_frames": 319,
+  "station_control_writes": 0,
+  "last_status": {
+    "seq": 623,
+    "utc": "2026-10-04T15:52:23.816147+00:00",
+    "elapsed_s": 1268.133608,
+    "command": "quit",
+    "event": "rx",
+    "uuid": "0000fff1-0000-1000-8000-00805f9b34fb",
+    "frame": "a565b1000108010c58000000001ed7e4",
+    "state": {
+      "flags": 12,
+      "battery": 88,
+      "input_w": 0,
+      "output_w": 0,
+      "minutes": 7895
+    }
+  },
+  "closed_cleanly": true,
+  "scope": "Same physical S300, Actions adapter, official phone app v1.5.1.155; private-bus experiments explicitly isolated",
+  "traceback_source_caveat": "Main session loaded lab-session-version.py. Some formatted traceback source snippets reflect later edits at the original path; compiled line numbers refer to the archived initial source. Exception types/messages and elapsed timing are recorded directly. Local/private rawscan captures loaded lab-rawscan-version.py. Final utility subsequently received guarded-cleanup fixes.",
+  "sha256": {
+    "allpowers_s300_evidence/connection/README.md": "355dcf2d7032aa1ecae4f11d733a824f3bd5753648cfdfe99d78ec89426a9e3c",
+    "allpowers_s300_evidence/connection/actions-absent-environment.json": "1dbfbb91815ad5323f782a88e025e7321dbfd6d947edbb44c2bce269b7a9e2d3",
+    "allpowers_s300_evidence/connection/actions-powered-off.jsonl": "75dc4d1f33aab7c1ce588b185df00609bb146ec804aa7d71c7f7bdc5665fcde7",
+    "allpowers_s300_evidence/connection/actions-rfkill-blocked.jsonl": "72ea0df28463a6a02a0072d640e926609836790bc26b1bd599ad33774697bb31",
+    "allpowers_s300_evidence/connection/address_connect.py": "745973fdae516600145d4232ea78def44265ec914cfd34020fd8651caa2a711c",
+    "allpowers_s300_evidence/connection/bluez-unavailable-private-bus.jsonl": "c7992cbcea21f0a562092f39e2b1ccd220a82268a7ab7bb653c4353aa2ba3182",
+    "allpowers_s300_evidence/connection/bluez-unavailable-raw-bleak.jsonl": "e47c6b44ba7e6f2c39fcdc66538853b40d677e4733de30b9a5332d4e93dd522c",
+    "allpowers_s300_evidence/connection/dbus-transport-test.py": "c6ae4216ef7e5aff32f189b6b4419459af03ad789eec73c084c7681f5d932651",
+    "allpowers_s300_evidence/connection/dbus-transport-unavailable.json": "2b4c25d32a178b2d108b385740b0f0e144557ca8f7c9b9c6c3d901c7a7a934f3",
+    "allpowers_s300_evidence/connection/demo_exception.py": "df137d08d69d88570aea766eba8ff46c0a9f06bac37c483458e3ec2fffbe50ab",
+    "allpowers_s300_evidence/connection/final-environment.json": "22345979119cfca7574cf4818bf25fb5e7f238a4a833074391d51f4ead3df6be",
+    "allpowers_s300_evidence/connection/host-bluez-stop-permission.json": "7c7a2af47e56c65f9e1adadba7f1ed3b3493998b3d08d6c500aeb906b276e0f8",
+    "allpowers_s300_evidence/connection/host-failures.py": "8e0115c92fb1ed5efad226409db996941b196836b76f109f210ff80b72977b3c",
+    "allpowers_s300_evidence/connection/host-mutations.json": "2756a3298ecf7fdbcb5e26e876515f0bc0a8685ab5534b39e8ed97bf3731b1a8",
+    "allpowers_s300_evidence/connection/lab-rawscan-version.py": "1571ab3c64ae561950feb0c28602850b1c1dcfa08898288735aeb687e0671b37",
+    "allpowers_s300_evidence/connection/lab-session-version.py": "c87739a8b0a5b728bf7a9dc3d1694bbd2abc9df216cb4cf5e44c529d92b765a3",
+    "allpowers_s300_evidence/connection/phone-first-address-connect.json": "246cc1be4cac68474cf0b7404a08518d5c2b22d62cb490be6f29c9ca105b58bb",
+    "allpowers_s300_evidence/connection/private-bus.xml": "c314b8065e8942702eba378f2a68baf61f6bcd7fe7fb76d3bdecf43676bb5376",
+    "allpowers_s300_evidence/connection/session.jsonl": "0d3c809e085945e1db4b79d7748ad83b52e016674f9f78630243e3f63e81af1b",
+    "allpowers_s300_evidence/connection/station-bt-off-demo.json": "a0eb156cb78a8569ec7aa2cb01833d7562eaf71ade9fec90eb2ef32313cf4cd6",
+    "allpowers_s300_evidence/connection/trials.json": "27210e8e535c6b26a7f9d68338d336c5f7a86e3f1453034b0ebe2543dd5e3594"
+  },
+  "final_lab_sha256": "f11a3acd66a2b6f43004d6a2dd54fb4e01d531844091d762d8a46672e5399bb6",
+  "current_sources_sha256": {
+    "s300_connection_lab.py": "f11a3acd66a2b6f43004d6a2dd54fb4e01d531844091d762d8a46672e5399bb6",
+    "test_s300_connection_lab.py": "9e908f9d33b559389432b617c21357792e0402a75436d3d14e614b3e93c36ca2",
+    "control_allpowers.py": "021a41861ed2980a3354bc2a4c120e9e45644a468f94ece83821f1da980ed670",
+    "read_allpowers.py": "cd10bc04cd2a2001ae0448efe3eda7aa03cbc59ca3aa9e811fee7bba06ec97eb",
+    "ALLPOWERS_S300_CONNECTION_VALIDATION.md": "4c377e9c6131ea10c15aa4281a9d12ae4632bbb0d48bd6f18fe705e81816d36b"
+  }
+}

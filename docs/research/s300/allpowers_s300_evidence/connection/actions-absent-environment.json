@@ -1,0 +1,44 @@
+{
+  "operator_kernel_event": "[445104.057996] usb 9-14: USB disconnect, device number 51",
+  "cause": "Operator removed VM USB passthrough usb13 host5-2; physical host unplug not reported",
+  "commands": [
+    {
+      "args": [
+        "lsusb",
+        "-d",
+        "10d7:b012"
+      ],
+      "exit": 1,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "bluetoothctl",
+        "list"
+      ],
+      "exit": 0,
+      "stdout": "Controller 64:BC:58:16:C6:59 cachyos #2 [default]\nController 00:1A:7D:DA:71:11 cachyos \n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "rfkill",
+        "--json"
+      ],
+      "exit": 0,
+      "stdout": "{\n   \"rfkilldevices\": [\n      {\n         \"id\": 0,\n         \"type\": \"bluetooth\",\n         \"device\": \"hci0\",\n         \"soft\": \"unblocked\",\n         \"hard\": \"unblocked\"\n      },{\n         \"id\": 1,\n         \"type\": \"bluetooth\",\n         \"device\": \"hci1\",\n         \"soft\": \"unblocked\",\n         \"hard\": \"unblocked\"\n      }\n   ]\n}\n",
+      "stderr": ""
+    },
+    {
+      "args": [
+        "systemctl",
+        "is-active",
+        "bluetooth"
+      ],
+      "exit": 0,
+      "stdout": "active\n",
+      "stderr": ""
+    }
+  ]
+}

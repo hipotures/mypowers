@@ -1,0 +1,284 @@
+[
+  {
+    "utc": "2026-10-04T15:40:36.709006+00:00",
+    "args": [
+      "busctl",
+      "get-property",
+      "org.bluez",
+      "/org/bluez/hci2",
+      "org.bluez.Adapter1",
+      "Powered"
+    ],
+    "exit": 0,
+    "stdout": "b true\n",
+    "stderr": "",
+    "seconds": 0.0049568109679967165
+  },
+  {
+    "utc": "2026-10-04T15:40:36.712206+00:00",
+    "args": [
+      "rfkill",
+      "--json"
+    ],
+    "exit": 0,
+    "stdout": "{\n   \"rfkilldevices\": [\n      {\n         \"id\": 0,\n         \"type\": \"bluetooth\",\n         \"device\": \"hci0\",\n         \"soft\": \"unblocked\",\n         \"hard\": \"unblocked\"\n      },{\n         \"id\": 1,\n         \"type\": \"bluetooth\",\n         \"device\": \"hci1\",\n         \"soft\": \"unblocked\",\n         \"hard\": \"unblocked\"\n      },{\n         \"id\": 2,\n         \"type\": \"bluetooth\",\n         \"device\": \"hci2\",\n         \"soft\": \"unblocked\",\n         \"hard\": \"unblocked\"\n      }\n   ]\n}\n",
+    "stderr": "",
+    "seconds": 0.002936534001491964
+  },
+  {
+    "utc": "2026-10-04T15:40:36.757855+00:00",
+    "args": [
+      "busctl",
+      "set-property",
+      "org.bluez",
+      "/org/bluez/hci2",
+      "org.bluez.Adapter1",
+      "Powered",
+      "b",
+      "false"
+    ],
+    "exit": 0,
+    "stdout": "",
+    "stderr": "",
+    "seconds": 0.045518224011175334
+  },
+  {
+    "utc": "2026-10-04T15:40:36.761248+00:00",
+    "args": [
+      "rfkill",
+      "--json"
+    ],
+    "exit": 0,
+    "stdout": "{\n   \"rfkilldevices\": [\n      {\n         \"id\": 0,\n         \"type\": \"bluetooth\",\n         \"device\": \"hci0\",\n         \"soft\": \"unblocked\",\n         \"hard\": \"unblocked\"\n      },{\n         \"id\": 1,\n         \"type\": \"bluetooth\",\n         \"device\": \"hci1\",\n         \"soft\": \"unblocked\",\n         \"hard\": \"unblocked\"\n      },{\n         \"id\": 2,\n         \"type\": \"bluetooth\",\n         \"device\": \"hci2\",\n         \"soft\": \"unblocked\",\n         \"hard\": \"unblocked\"\n      }\n   ]\n}\n",
+    "stderr": "",
+    "seconds": 0.0029894630424678326
+  },
+  {
+    "utc": "2026-10-04T15:40:36.765797+00:00",
+    "args": [
+      "busctl",
+      "get-property",
+      "org.bluez",
+      "/org/bluez/hci2",
+      "org.bluez.Adapter1",
+      "Powered"
+    ],
+    "exit": 0,
+    "stdout": "b false\n",
+    "stderr": "",
+    "seconds": 0.004348905000369996
+  },
+  {
+    "utc": "2026-10-04T15:40:36.771621+00:00",
+    "args": [
+      "busctl",
+      "get-property",
+      "org.bluez",
+      "/org/bluez/hci2",
+      "org.bluez.Adapter1",
+      "PowerState"
+    ],
+    "exit": 0,
+    "stdout": "s \"off\"\n",
+    "stderr": "",
+    "seconds": 0.005647402023896575
+  },
+  {
+    "utc": "2026-10-04T15:40:37.108673+00:00",
+    "args": [
+      "busctl",
+      "set-property",
+      "org.bluez",
+      "/org/bluez/hci2",
+      "org.bluez.Adapter1",
+      "Powered",
+      "b",
+      "true"
+    ],
+    "exit": 0,
+    "stdout": "",
+    "stderr": "",
+    "seconds": 0.13909276301274076
+  },
+  {
+    "utc": "2026-10-04T15:40:37.111508+00:00",
+    "args": [
+      "rfkill",
+      "--json"
+    ],
+    "exit": 0,
+    "stdout": "{\n   \"rfkilldevices\": [\n      {\n         \"id\": 0,\n         \"type\": \"bluetooth\",\n         \"device\": \"hci0\",\n         \"soft\": \"unblocked\",\n         \"hard\": \"unblocked\"\n      },{\n         \"id\": 1,\n         \"type\": \"bluetooth\",\n         \"device\": \"hci1\",\n         \"soft\": \"unblocked\",\n         \"hard\": \"unblocked\"\n      },{\n         \"id\": 2,\n         \"type\": \"bluetooth\",\n         \"device\": \"hci2\",\n         \"soft\": \"unblocked\",\n         \"hard\": \"unblocked\"\n      }\n   ]\n}\n",
+    "stderr": "",
+    "seconds": 0.0024451380013488233
+  },
+  {
+    "utc": "2026-10-04T15:40:37.116585+00:00",
+    "args": [
+      "busctl",
+      "get-property",
+      "org.bluez",
+      "/org/bluez/hci2",
+      "org.bluez.Adapter1",
+      "Powered"
+    ],
+    "exit": 0,
+    "stdout": "b true\n",
+    "stderr": "",
+    "seconds": 0.004774847999215126
+  },
+  {
+    "utc": "2026-10-04T15:40:37.120448+00:00",
+    "args": [
+      "busctl",
+      "get-property",
+      "org.bluez",
+      "/org/bluez/hci2",
+      "org.bluez.Adapter1",
+      "PowerState"
+    ],
+    "exit": 0,
+    "stdout": "s \"on\"\n",
+    "stderr": "",
+    "seconds": 0.0036547270137816668
+  },
+  {
+    "utc": "2026-10-04T15:40:37.128143+00:00",
+    "args": [
+      "rfkill",
+      "block",
+      "2"
+    ],
+    "exit": 0,
+    "stdout": "",
+    "stderr": "",
+    "seconds": 0.007567319029476494
+  },
+  {
+    "utc": "2026-10-04T15:40:37.432152+00:00",
+    "args": [
+      "rfkill",
+      "--json"
+    ],
+    "exit": 0,
+    "stdout": "{\n   \"rfkilldevices\": [\n      {\n         \"id\": 0,\n         \"type\": \"bluetooth\",\n         \"device\": \"hci0\",\n         \"soft\": \"unblocked\",\n         \"hard\": \"unblocked\"\n      },{\n         \"id\": 1,\n         \"type\": \"bluetooth\",\n         \"device\": \"hci1\",\n         \"soft\": \"unblocked\",\n         \"hard\": \"unblocked\"\n      },{\n         \"id\": 2,\n         \"type\": \"bluetooth\",\n         \"device\": \"hci2\",\n         \"soft\": \"blocked\",\n         \"hard\": \"unblocked\"\n      }\n   ]\n}\n",
+    "stderr": "",
+    "seconds": 0.0035718910512514412
+  },
+  {
+    "utc": "2026-10-04T15:40:37.437494+00:00",
+    "args": [
+      "busctl",
+      "get-property",
+      "org.bluez",
+      "/org/bluez/hci2",
+      "org.bluez.Adapter1",
+      "Powered"
+    ],
+    "exit": 0,
+    "stdout": "b false\n",
+    "stderr": "",
+    "seconds": 0.005051359010394663
+  },
+  {
+    "utc": "2026-10-04T15:40:37.441462+00:00",
+    "args": [
+      "busctl",
+      "get-property",
+      "org.bluez",
+      "/org/bluez/hci2",
+      "org.bluez.Adapter1",
+      "PowerState"
+    ],
+    "exit": 0,
+    "stdout": "s \"off-blocked\"\n",
+    "stderr": "",
+    "seconds": 0.003696696017868817
+  },
+  {
+    "utc": "2026-10-04T15:40:37.614325+00:00",
+    "args": [
+      "busctl",
+      "set-property",
+      "org.bluez",
+      "/org/bluez/hci2",
+      "org.bluez.Adapter1",
+      "Powered",
+      "b",
+      "true"
+    ],
+    "exit": 1,
+    "stdout": "",
+    "stderr": "Failed to set property Powered on interface org.bluez.Adapter1: Failed\n",
+    "seconds": 0.005316848983056843
+  },
+  {
+    "utc": "2026-10-04T15:40:37.617139+00:00",
+    "args": [
+      "rfkill",
+      "unblock",
+      "2"
+    ],
+    "exit": 0,
+    "stdout": "",
+    "stderr": "",
+    "seconds": 0.0025667970185168087
+  },
+  {
+    "utc": "2026-10-04T15:40:37.922930+00:00",
+    "args": [
+      "busctl",
+      "set-property",
+      "org.bluez",
+      "/org/bluez/hci2",
+      "org.bluez.Adapter1",
+      "Powered",
+      "b",
+      "true"
+    ],
+    "exit": 0,
+    "stdout": "",
+    "stderr": "",
+    "seconds": 0.005346775986254215
+  },
+  {
+    "utc": "2026-10-04T15:40:37.925351+00:00",
+    "args": [
+      "rfkill",
+      "--json"
+    ],
+    "exit": 0,
+    "stdout": "{\n   \"rfkilldevices\": [\n      {\n         \"id\": 0,\n         \"type\": \"bluetooth\",\n         \"device\": \"hci0\",\n         \"soft\": \"unblocked\",\n         \"hard\": \"unblocked\"\n      },{\n         \"id\": 1,\n         \"type\": \"bluetooth\",\n         \"device\": \"hci1\",\n         \"soft\": \"unblocked\",\n         \"hard\": \"unblocked\"\n      },{\n         \"id\": 2,\n         \"type\": \"bluetooth\",\n         \"device\": \"hci2\",\n         \"soft\": \"unblocked\",\n         \"hard\": \"unblocked\"\n      }\n   ]\n}\n",
+    "stderr": "",
+    "seconds": 0.0021528259967453778
+  },
+  {
+    "utc": "2026-10-04T15:40:37.928903+00:00",
+    "args": [
+      "busctl",
+      "get-property",
+      "org.bluez",
+      "/org/bluez/hci2",
+      "org.bluez.Adapter1",
+      "Powered"
+    ],
+    "exit": 0,
+    "stdout": "b true\n",
+    "stderr": "",
+    "seconds": 0.003352167026605457
+  },
+  {
+    "utc": "2026-10-04T15:40:37.932822+00:00",
+    "args": [
+      "busctl",
+      "get-property",
+      "org.bluez",
+      "/org/bluez/hci2",
+      "org.bluez.Adapter1",
+      "PowerState"
+    ],
+    "exit": 0,
+    "stdout": "s \"on\"\n",
+    "stderr": "",
+    "seconds": 0.0037872960092499852
+  }
+]
