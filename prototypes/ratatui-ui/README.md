@@ -49,8 +49,10 @@ screen or raw ANSI rendering:
 - One `Block` uses `Borders::ALL` and `BorderType::Rounded`, with centered top and
   bottom border titles. Controls have no individual boxes.
 - `Paragraph`, `Line`, and `Span` render the station name, live circle, percentage,
-  time, independent power readings, states, scale labels, and key hints.
+  time, independent power readings, states, and key hints.
 - Two built-in `Sparkline` widgets use explicit `.max(100)` and `.max(300)`.
+  Each sits directly below its power reading in its own half of the screen.
+  Graphs have no repeated labels, values, or scale captions.
   The newest sample stays at the right edge. `SparklineBar::style` colors each
   sample green, yellow, or orange using its fraction of that fixed range. Red is
   reserved for the low-battery end of the gradient and the offline indicator.
@@ -94,7 +96,7 @@ ls -lh target/release/mypowers-ratatui
 ```
 
 The release profile uses size optimization, thin LTO, and stripped symbols.
-The measured x86_64 Linux release binary is approximately **646 KiB** (661,096
+The measured x86_64 Linux release binary is approximately **640 KiB** (654,776
 bytes), dynamically linked. Its exact size varies with compiler and platform.
 Only Ratatui and Crossterm are direct dependencies; `Cargo.lock` fixes the
 resolved dependency graph.

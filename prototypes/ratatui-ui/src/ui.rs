@@ -79,11 +79,10 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
         Constraint::Length(1),
         Constraint::Length(1),
         Constraint::Fill(1),
-        Constraint::Length(2),
+        Constraint::Length(4),
         Constraint::Fill(1),
         Constraint::Length(2),
         Constraint::Fill(1),
-        Constraint::Length(2),
         Constraint::Length(1),
     ])
     .split(content);
@@ -124,11 +123,22 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
         rows[4],
     );
 
-    let power = Layout::horizontal([Constraint::Ratio(1, 2); 2]).split(rows[6]);
-    for (rect, label, value) in [
-        (power[0], "INPUT", app.input),
-        (power[1], "OUTPUT", app.output),
+    let power = Layout::horizontal([
+        Constraint::Fill(1),
+        Constraint::Length(4),
+        Constraint::Fill(1),
+    ])
+    .split(rows[6]);
+    for (rect, label, value, history, maximum) in [
+        (power[0], "INPUT", app.input, &app.input_history, 100),
+        (power[2], "OUTPUT", app.output, &app.output_history, 300),
     ] {
+        let parts = Layout::vertical([
+            Constraint::Length(2),
+            Constraint::Length(1),
+            Constraint::Length(1),
+        ])
+        .split(rect);
         frame.render_widget(
             Paragraph::new(vec![
                 Line::from(label).style(Style::default().fg(MUTED)),
@@ -141,8 +151,9 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
                 ]),
             ])
             .alignment(Alignment::Center),
-            rect,
+            parts[0],
         );
+        graph(frame, parts[2], value, history, maximum, app.colored_bars);
     }
 
     let controls = Layout::horizontal([Constraint::Ratio(1, 3); 3]).split(rows[8]);
@@ -169,26 +180,6 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
             rect,
         );
     }
-
-    let graphs = Layout::vertical([Constraint::Length(1); 2]).split(rows[10]);
-    graph(
-        frame,
-        graphs[0],
-        "INPUT",
-        app.input,
-        &app.input_history,
-        100,
-        app.colored_bars,
-    );
-    graph(
-        frame,
-        graphs[1],
-        "OUTPUT",
-        app.output,
-        &app.output_history,
-        300,
-        app.colored_bars,
-    );
 }
 
 fn centered(area: Rect, width: u16, height: u16) -> Rect {
@@ -200,31 +191,8 @@ fn centered(area: Rect, width: u16, height: u16) -> Rect {
         .split(column)[0]
 }
 
-fn graph(
-    frame: &mut Frame,
-    area: Rect,
-    label: &str,
-    value: u64,
-    history: &[u64],
-    maximum: u64,
-    colored: bool,
-) {
-    let parts = Layout::horizontal([
-        Constraint::Length(7),
-        Constraint::Length(7),
-        Constraint::Fill(1),
-        Constraint::Length(7),
-    ])
-    .split(area);
-    frame.render_widget(
-        Paragraph::new(label).style(Style::default().fg(MUTED)),
-        parts[0],
-    );
-    frame.render_widget(
-        Paragraph::new(format!("{value:>3} W")).style(Style::default().fg(TEXT)),
-        parts[1],
-    );
-    let visible = history.len().min(parts[2].width as usize);
+fn graph(frame: &mut Frame, area: Rect, value: u64, history: &[u64], maximum: u64, colored: bool) {
+    let visible = history.len().min(area.width as usize);
     let data: Vec<SparklineBar> = history[history.len() - visible..]
         .iter()
         .map(|&sample| {
@@ -235,13 +203,7 @@ fn graph(
             }))
         })
         .collect();
-    frame.render_widget(Sparkline::default().data(data).max(maximum), parts[2]);
-    frame.render_widget(
-        Paragraph::new(format!("{maximum} W"))
-            .alignment(Alignment::Right)
-            .style(Style::default().fg(DIM)),
-        parts[3],
-    );
+    frame.render_widget(Sparkline::default().data(data).max(maximum), area);
 }
 
 fn load_color(value: u64, maximum: u64) -> Color {
@@ -333,8 +295,6 @@ mod tests {
                 "48h 57m",
                 "63 W",
                 "181 W",
-                "100 W",
-                "300 W",
                 "LAMPS",
                 "╭",
                 "╮",
@@ -346,6 +306,14 @@ mod tests {
                     "Missing {expected} at {width}x{height}"
                 );
             }
+            for expected in ["INPUT", "OUTPUT", "63 W", "181 W"] {
+                assert_eq!(
+                    text.matches(expected).count(),
+                    1,
+                    "Duplicate {expected} at {width}x{height}"
+                );
+            }
+            assert!(!text.contains("100 W") && !text.contains("300 W"));
             for (i, rect) in app.controls.iter().enumerate() {
                 assert_eq!(rect.height, 2);
                 assert!(rect.width >= 18);
@@ -381,11 +349,15 @@ mod tests {
         app.output_history.fill(150);
         let buffer = render(80, 24, &mut app);
         let text = lines(&buffer);
-        for maximum in ["100 W", "300 W"] {
-            let row = text.iter().position(|line| line.contains(maximum)).unwrap();
-            assert!(text[row].contains("▄▄▄▄"));
+        let row = text.iter().position(|line| line.contains("INPUT")).unwrap() + 3;
+        for half in [0..40, 40..80] {
+            let symbols: String = half
+                .clone()
+                .map(|x| buffer[(x, row as u16)].symbol())
+                .collect();
+            assert!(symbols.contains("▄▄▄▄"));
             assert!(
-                !text[row].contains('█'),
+                !symbols.contains('█'),
                 "Half scale must not autoscale to full height"
             );
         }
@@ -393,12 +365,9 @@ mod tests {
             *value = [10, 50, 90][i % 3];
         }
         let colored = render(80, 24, &mut app);
-        let row = lines(&colored)
-            .iter()
-            .position(|line| line.contains("100 W"))
-            .unwrap() as u16;
+        let row = row as u16;
         for color in [GREEN, YELLOW, ORANGE] {
-            assert!((0..80).any(|x| colored[(x, row)].fg == color));
+            assert!((0..40).any(|x| colored[(x, row)].fg == color));
         }
         assert!(!(0..80).any(|x| colored[(x, row)].fg == RED));
         app.colored_bars = false;
