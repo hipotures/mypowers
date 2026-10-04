@@ -1,0 +1,22 @@
+[Unit]
+Description=MyPowers S300 monitor and controller
+After=dbus.service bluetooth.service
+
+[Service]
+Type=simple
+User=mypowers
+Group=mypowers
+ExecStart=/usr/local/bin/mypowersd --env-file /etc/mypowers/server.env
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=15
+KillSignal=SIGTERM
+StateDirectory=mypowers
+LogsDirectory=mypowers
+RuntimeDirectory=mypowers
+RuntimeDirectoryMode=0700
+UMask=0077
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target

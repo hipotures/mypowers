@@ -1,0 +1,54 @@
+import sys
+from types import SimpleNamespace
+from unittest.mock import Mock
+
+import pytest
+
+from mypowers import entrypoints
+from mypowers.daemon import main as daemon
+
+
+@pytest.mark.parametrize(
+    "name,module,extra",
+    [
+        ("daemon", "mypowers.daemon.main", "server"),
+        ("cli", "mypowers_cli.main", "cli"),
+        ("tui", "mypowers_tui.main", "tui"),
+    ],
+)
+def test_lazy_entrypoints_and_missing_extra(monkeypatch, capsys, name, module, extra):
+    function = Mock()
+    importer = Mock(return_value=SimpleNamespace(main=function))
+    monkeypatch.setattr(entrypoints.importlib, "import_module", importer)
+    getattr(entrypoints, name)()
+    importer.assert_called_once_with(module)
+    function.assert_called_once()
+    importer.side_effect = ModuleNotFoundError("missing", name="dependency")
+    with pytest.raises(SystemExit) as caught:
+        getattr(entrypoints, name)()
+    assert caught.value.code == 2
+    assert f"mypowers[{extra}]" in capsys.readouterr().err
+
+
+def test_daemon_config_foreground_workers_and_private_token(config, tmp_path, monkeypatch, capsys):
+    monkeypatch.setattr(daemon, "load", lambda *args, **kwargs: config)
+    monkeypatch.setattr(sys, "argv", ["mypowersd", "check-config"])
+    daemon.main()
+    assert "data_dir" in capsys.readouterr().out
+    runner = Mock()
+    monkeypatch.setattr(daemon.uvicorn, "run", runner)
+    monkeypatch.setattr(sys, "argv", ["mypowersd"])
+    daemon.main()
+    assert runner.call_args.kwargs["workers"] == 1
+    monkeypatch.setattr(sys, "argv", ["mypowersd", "--workers", "2"])
+    with pytest.raises(SystemExit) as caught:
+        daemon.main()
+    assert caught.value.code == 2
+    path = tmp_path / "token"
+    monkeypatch.setattr(sys, "argv", ["mypowersd", "token", "generate", "--output", str(path)])
+    daemon.main()
+    assert path.stat().st_mode & 0o777 == 0o600
+    assert len(path.read_text().strip()) >= 32
+    assert path.read_text().strip() not in capsys.readouterr().out
+    with pytest.raises(SystemExit):
+        daemon.main()

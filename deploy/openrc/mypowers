@@ -1,0 +1,16 @@
+#!/sbin/openrc-run
+
+description="MyPowers S300 monitor and controller"
+command="/usr/local/bin/mypowersd"
+command_args="--env-file /etc/mypowers/server.env"
+command_user="mypowers:mypowers"
+supervisor="supervise-daemon"
+respawn_delay=5
+respawn_max=5
+respawn_period=60
+retry="TERM/15/KILL/5"
+
+ depend() {
+    need dbus
+    after bluetooth
+ }

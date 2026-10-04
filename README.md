@@ -1,0 +1,87 @@
+# MyPowers
+
+MyPowers monitors one qualified ALLPOWERS S300 and explicitly controls its AC group, DC group
+and common lamps. A foreground daemon owns BLE, records periodic SQLite history and serves an
+HTTP/WebSocket API. The Rich CLI and interactive Rich TUI use that same API locally or remotely.
+Closing a frontend never stops collection or changes station outputs.
+
+The qualified unit is `2A:02:01:48:6B:D0`, readable name `AP S300 V2.0`, using the Actions adapter
+`F4:4E:FC:A1:CB:FF`. Adapter identifiers are resolved on every attempt; there is no fallback.
+Only the eight experimentally qualified combined states are writable. Unknown firmware,
+temperature, per-port data and lamp/SOS modes are not presented as supported capabilities.
+
+## Development
+
+Requires Linux, Python 3.12+, SQLite 3.37+, and `uv`. Real hardware additionally needs system
+D-Bus/BlueZ and permission to use the intended controller. MyPowers installs no OS packages.
+
+```bash
+uv sync --locked --extra server --extra cli --extra tui --group dev
+# Copy the example once; keep local secrets/runtime files out of Git.
+cp .env.example .env
+uv run mypowersd check-config --env-file .env
+uv run mypowersd --env-file .env
+```
+
+In another terminal:
+
+```bash
+uv run mypowers --env-file .env status
+uv run mypowers --env-file .env status --json
+uv run mypowers-tui --env-file .env
+uv run mypowers --env-file .env tui
+```
+
+The development example explicitly disables authentication on loopback and uses the real BLE
+backend. To use the simulated backend, explicitly set `MYPOWERS_BACKEND=simulated` or pass
+`mypowersd --backend simulated`; it is never selected on BLE failure. Production refuses it.
+Development data/log/runtime directories are `.local/dev/data`, `.local/dev/logs`, `.local/dev/run`.
+No `.env` file is read unless selected. Installed user defaults follow XDG directories.
+
+```bash
+# Real output changes: run only when you intend to change connected loads.
+uv run mypowers --env-file .env ac on
+uv run mypowers --env-file .env dc off
+uv run mypowers --env-file .env light on
+uv run mypowers --env-file .env connection pause
+uv run mypowers --env-file .env connection resume
+uv run mypowers --env-file .env logs --tail 10
+uv run mypowers --env-file .env logs --follow
+uv run mypowers --env-file .env debug on --duration 15m
+uv run mypowers --env-file .env debug off
+```
+
+Use Tab/Shift-Tab and Enter/Space in the TUI, mouse clicks for controls, `d`/`l` for views,
+`f` to filter logs, `?` for help, and `q`/Ctrl+C/Ctrl+Z to exit cleanly. Ctrl+Z is mapped to exit
+in this release. `--no-mouse`, `--no-color`, `NO_COLOR`, `--timezone Europe/Warsaw`, and `--utc`
+are supported. Paste cannot trigger controls. Stale/pending states disable output intentions.
+Unknown/unconfirmed outcomes show a command ID and are never automatically replayed.
+
+## Verification and installation
+
+```bash
+uv run ruff check src frontends tests
+uv run ruff format --check src frontends tests
+uv run mypy src frontends
+uv run pytest -m 'not hardware'
+uv run pytest -m 'not hardware' --cov --cov-report=json:coverage.json
+uv run python tests/check_coverage.py coverage.json
+uv build
+uv run python tests/verify_wheel.py dist/mypowers-0.1.0-py3-none-any.whl
+```
+
+The separate research baseline is documented in the validation report. Offline tests always
+use fakes and temporary storage. Real hardware acceptance requires a separate explicit runner;
+see [hardware preparation](tests/hardware/README.md). Output-test opt-in requires operator-established
+safe loads and ordinary common-lamp mode. A 0 W reading is not a safe-load declaration.
+
+Install one wheel with independent extras: `mypowers[server]`, `mypowers[cli]`, or `mypowers[tui]`.
+The server needs no Rich; clients need no BLE/server/storage libraries. See [deployment](deploy/README.md)
+for locked exports, installation, supervisors and Caddy. No process creates a venv at runtime.
+
+- [API and streams](docs/api.md), [generated OpenAPI](docs/openapi.json)
+- [Configuration](docs/configuration.md), [operations](docs/operations.md)
+- [Implementation validation and acceptance results](docs/validation/IMPLEMENTATION_VALIDATION.md)
+- [Preserved exact-unit research](docs/research/s300/README.md)
+
+The application follows the supplied PRD, preserved as [docs/PRD.md](docs/PRD.md). Research remains unchanged.

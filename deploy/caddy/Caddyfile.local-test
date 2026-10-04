@@ -1,0 +1,10 @@
+{
+    admin off
+    skip_install_trust
+    auto_https disable_redirects
+}
+https://localhost:{$MYPOWERS_TEST_TLS_PORT:18443} {
+    bind 127.0.0.1
+    tls internal
+    reverse_proxy 127.0.0.1:{$MYPOWERS_TEST_BACKEND_PORT:8765}
+}

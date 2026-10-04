@@ -1,0 +1,31 @@
+name: Offline verification
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ['3.12', '3.14']
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6.8.0
+        with:
+          python-version: ${{ matrix.python }}
+          enable-cache: true
+      - run: uv sync --locked --python ${{ matrix.python }} --extra server --extra cli --extra tui --group dev
+      - run: uv run ruff check src frontends tests
+      - run: uv run ruff format --check src frontends tests
+      - run: uv run mypy src frontends
+      - run: uv run pytest -m 'not hardware' --cov --cov-report=term --cov-report=json:coverage.json
+      - name: Coverage requirements
+        run: uv run python tests/check_coverage.py coverage.json
+      - name: Imported research baseline
+        working-directory: docs/research/s300
+        run: uv run --no-project --python ${{ matrix.python }} --with bleak==3.0.2 --with dbus-fast==3.1.2 python -m unittest test_control_allpowers.py test_s300_matrix.py test_s300_connection_lab.py
+      - run: uv build
+      - run: uv run python tests/verify_wheel.py dist/mypowers-0.1.0-py3-none-any.whl

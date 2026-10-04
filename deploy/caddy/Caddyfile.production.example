@@ -1,0 +1,12 @@
+{
+    admin localhost:2019
+}
+
+# This required file must define a provider-specific TLS snippet named dns01.
+# A missing file/snippet deliberately prevents startup; no HTTP-01 fallback.
+import /etc/caddy/mypowers-dns01.caddy
+
+mypower.efez.net {
+    import dns01
+    reverse_proxy 127.0.0.1:8765
+}

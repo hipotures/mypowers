@@ -1,0 +1,88 @@
+# API v1
+
+The daemon uses loopback HTTP in production behind Caddy HTTPS/WSS. All application endpoints
+require `Authorization: Bearer ...` when authentication is enabled. `GET /health/live` returns
+only `{"status":"ok"}`. It measures HTTP liveness independently of station availability. Status
+returns 200 with independent connection, freshness, qualification, history and logging health.
+API responses have `Cache-Control: no-store`. Production disables interactive docs/OpenAPI serving;
+the checked-in [OpenAPI artifact](openapi.json) describes typed requests and responses.
+
+| Method/path | Purpose |
+|---|---|
+| GET `/api/v1/status` | Complete immutable transport snapshot |
+| GET `/api/v1/capabilities` | Only qualified reads and AC/DC/common-lamp outputs |
+| GET `/api/v1/history` | UTC `[since,until)` raw sample page, limit/cursor |
+| PUT `/api/v1/outputs/{ac,dc,light}` | One explicit boolean intention with idempotency UUID |
+| GET `/api/v1/commands/{uuid}` | Retained asynchronous result |
+| PUT `/api/v1/connection` | `{"desired":"paused"}` or `{"desired":"running"}` |
+| POST `/api/v1/connection/retry` | Empty JSON object; coalesced wakeup |
+| GET `/api/v1/logs` | Tail or UTC range, min_level/limit/cursor |
+| PUT `/api/v1/runtime/log-level` | DEBUG/INFO/WARNING/ERROR, optional duration_seconds ≤86400 |
+| DELETE `/api/v1/runtime/log-level` | Remove override and restore startup baseline |
+| WS `/api/v1/events` | Initial snapshot, state/command/heartbeat observations |
+| WS `/api/v1/logs/stream` | Snapshot, retained log records then live records, gap/heartbeat |
+
+A mutation needs JSON Content-Type. Unknown fields, string booleans and invalid enums fail.
+Host is restricted to loopback or configured public hostname; untrusted browser Origin fails.
+HTTP codes: 401 auth, 403 policy, 409 busy/conflict/profile, 422 validation, 413 body limit,
+429 admission limits, 503 unavailable required subsystem. Errors never echo raw request input:
+
+```json
+{"schema_version":1,"error":{"code":"state_conflict","message":"Station output state changed; refresh before retrying.","retryable":false,"request_id":"uuid"}}
+```
+
+Control example (`Idempotency-Key` is a UUID):
+
+```json
+{"enabled":true,"server_instance_id":"88767477-2a2a-481f-843b-30d56a5e3f10","expected_outputs_revision":3}
+```
+
+202 admits a daemon-owned command; the client polls its resource. Pending states are accepted,
+waiting_for_status and sent. Terminal states are confirmed, no_change, rejected, failed and
+unconfirmed. Two consecutive post-send complete flags from the active session are required for
+confirmed. Dynamic numeric fields may vary. No-change requires a new live sample and sends nothing.
+A potentially transmitted but unconfirmed operation forces session resynchronization and is never
+replayed. Client loss cannot cancel an admitted operation or trigger automatic restoration.
+
+The output revision advances on complete flags changes or revoked authorization, not numeric-only
+updates. A server UUID protects against replay after restart. Idempotent retries return the existing
+operation before busy checks; different normalized bodies with the same key conflict. Keys/results
+are bounded in RAM and not persisted across crashes. Frontends never automatically resubmit PUTs.
+
+Snapshot fields are documented by `Status`, `Connection`, `Telemetry`, `Sample`, `Controls` and
+`Command` in OpenAPI. `telemetry.sample` is null before observation; stale last-known readings remain
+visible. All receive/log times use aware RFC3339 UTC milliseconds; history stores receive epoch
+milliseconds. Sample age/deadlines use monotonic time. `state_version`, receive sequence, stream
+sequence and output revision are distinct counters. Segments break on acquisition/recording gaps
+and wall-clock jumps. Zero is a real value; remaining_minutes=0 displays `0h 00m`.
+
+History default range is last hour ending at server time; limit defaults 1,000, maximum 10,000.
+Pages order by `(received_at_ms,id)` and keep a signed high-water ID to exclude subsequent inserts,
+including backward clock insertions. Pass the cursor with unchanged or omitted range filters.
+Disabled/degraded history is a 503, distinct from a successful empty page. No aggregate endpoints.
+
+Log default page is 100, maximum 1,000; CLI defaults tail 10. Tail and range/cursor are exclusive.
+Queries read only active/retained application files off-loop with a 3-second/64-MiB scan budget.
+Signed cursors reference file identities/offsets; removed sources return 410 log_cursor_expired.
+Malformed/final partial lines are skipped with a count. Ring fallback explicitly sets source=ring,
+gap=true. Logs include raw frame_hex only at DEBUG, never in SQLite or normal status/command DTOs.
+
+## Stream schema
+
+All streams send a `snapshot` first. Each message has schema_version=1, type,
+server_instance_id, monotonically increasing connection-local stream_sequence, server_time and
+optional data. State data is a full status; command data is a Command; log data is a JSONL record.
+Heartbeats arrive at least every five seconds. Clients consider server connectivity lost after
+15 seconds without a valid message. Reachable-server station loss is displayed separately.
+
+```json
+{"schema_version":1,"type":"heartbeat","server_instance_id":"uuid","stream_sequence":3,"server_time":"2026-10-04T12:00:00.000Z","data":null}
+```
+
+Native WS clients authenticate in handshake headers. Browser clients may authenticate as their
+first message `{"type":"authenticate","token":"..."}` within five seconds; no application data is
+sent beforehand. Tokens in query parameters are refused. Browser Origin is validated before
+upgrade. WS messages are observational: no socket command can control the station. Log streams
+accept cursor/min_level query filters; tokens never belong there. Expired cursor closes explicitly.
+After reconnect, discard old stream assumptions, accept the new full snapshot and query retained
+command IDs. Slow queues close 1013; command results remain queryable. No durable state replay.
