@@ -163,6 +163,33 @@ def test_supervisor_redaction_including_exception_and_query_token():
     assert record.exc_info is None and secret not in record.getMessage()
 
 
+@pytest.mark.parametrize("colors", [False, True])
+def test_uvicorn_formatter_keeps_interpolation_and_redaction(colors):
+    from uvicorn.logging import DefaultFormatter
+
+    from mypowers.diagnostics.redaction import RedactionFilter
+
+    formatter = DefaultFormatter(fmt="%(levelprefix)s %(message)s", use_colors=colors)
+    cases = [
+        ("Started server process [%d]", (4321,), "Started server process [4321]"),
+        (
+            "Uvicorn running on %s://%s:%d (Press CTRL+C to quit)",
+            ("http", "127.0.0.1", 5364),
+            "Uvicorn running on http://127.0.0.1:5364 (Press CTRL+C to quit)",
+        ),
+        ("Listener %s", ("http://[::1]:5364",), "Listener http://[::1]:5364"),
+        ("Failed %s", ("https://user:private@host:443",), "Failed [url redacted]"),
+        ("Failed %s", ("https://host:443/path?token=private",), "Failed [url redacted]"),
+    ]
+    for message, args, expected in cases:
+        record = logging.LogRecord("uvicorn.error", logging.INFO, "", 0, message, args, None)
+        record.color_message = "\x1b[36m" + message + " private\x1b[0m"
+        assert RedactionFilter(("private",)).filter(record)
+        rendered = formatter.format(record)
+        assert expected in rendered
+        assert "private" not in rendered and "%d" not in rendered and "%s" not in rendered
+
+
 def test_overload_prioritizes_operational_records_over_debug(tmp_path):
     logs = Diagnostics("instance", tmp_path)
     logs.accept("INFO", "important", "Retain this operational event.", {})
