@@ -145,6 +145,53 @@ fn layouts_preserve_inline_values_two_row_graphs_and_unknown_values() {
 }
 
 #[test]
+fn log_scrollbar_tracks_overflow_scroll_filter_and_resize() {
+    let mut app = app();
+    app.view = View::Logs;
+    for sequence in 0..80 {
+        app.update(Event::Log(json!({
+            "sequence": sequence,
+            "level": "INFO",
+            "message": format!("Record {sequence:03}"),
+        })));
+    }
+    let bottom = render(&mut app, 60, 18);
+    let thumb_rows = |buffer: &Buffer| {
+        (0..buffer.area.height)
+            .filter(|&y| (0..buffer.area.width).any(|x| buffer[(x, y)].symbol() == "█"))
+            .collect::<Vec<_>>()
+    };
+    assert!(!thumb_rows(&bottom).is_empty());
+    assert!(text(&bottom).contains("Record 079"));
+    app.mouse(MouseEvent {
+        kind: MouseEventKind::ScrollUp,
+        column: 30,
+        row: 10,
+        modifiers: KeyModifiers::NONE,
+    });
+    assert!(!text(&render(&mut app, 60, 18)).contains("Record 079"));
+    for _ in 0..100 {
+        app.key(KeyEvent::new(KeyCode::PageUp, KeyModifiers::NONE));
+    }
+    let top = render(&mut app, 60, 18);
+    assert!(text(&top).contains("Record 000"));
+    assert!(!text(&top).contains("Record 079"));
+    assert!(thumb_rows(&top)[0] < thumb_rows(&bottom)[0]);
+    app.key(KeyEvent::new(KeyCode::End, KeyModifiers::NONE));
+    assert!(text(&render(&mut app, 60, 18)).contains("Record 079"));
+    app.scroll = 1000;
+    render(&mut app, 120, 40);
+    assert_eq!(app.scroll, 80 - 35);
+    app.log_level = 3;
+    let filtered = render(&mut app, 60, 18);
+    assert!(thumb_rows(&filtered).is_empty());
+    assert_eq!(app.scroll, 0);
+    app.log_level = 0;
+    app.logs.truncate(4);
+    assert!(thumb_rows(&render(&mut app, 60, 18)).is_empty());
+}
+
+#[test]
 fn click_activates_once_on_release_and_resize_or_revision_discards_old_press() {
     let mut app = app();
     render(&mut app, 80, 24);

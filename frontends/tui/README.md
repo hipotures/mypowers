@@ -85,6 +85,10 @@ the graph saturates. Logs retain at most 1,000 records and show history gaps,
 effective level, and DEBUG override expiry. Clipboard support is optional and
 requires `wl-copy` and an accessible Wayland session.
 
+The log view shows a vertical scrollbar when filtered records exceed the visible
+rows. The thumb tracks the displayed position and viewport size. Use the mouse
+wheel, arrows, or PageUp/PageDown to scroll; End follows the newest records.
+
 ## Verify
 
 ```sh

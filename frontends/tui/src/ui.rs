@@ -8,7 +8,10 @@ use ratatui::{
     layout::{Alignment, Constraint, Flex, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, BorderType, Borders, Paragraph, Sparkline, SparklineBar, Widget},
+    widgets::{
+        Block, BorderType, Borders, Paragraph, Scrollbar, ScrollbarOrientation, ScrollbarState,
+        Sparkline, SparklineBar, Widget,
+    },
 };
 use std::time::Duration;
 
@@ -314,7 +317,7 @@ fn dashboard(frame: &mut Frame, content: Rect, app: &mut App) {
     );
 }
 
-fn logs(frame: &mut Frame, area: Rect, app: &App) {
+fn logs(frame: &mut Frame, area: Rect, app: &mut App) {
     let parts = Layout::vertical([
         Constraint::Length(2),
         Constraint::Fill(1),
@@ -339,10 +342,11 @@ fn logs(frame: &mut Frame, area: Rect, app: &App) {
                 .is_some_and(|index| index >= app.log_level)
         })
         .collect();
-    let end = filtered
-        .len()
-        .saturating_sub(app.scroll.min(filtered.len()));
-    let start = end.saturating_sub(parts[1].height as usize);
+    let viewport = parts[1].height as usize;
+    let max_scroll = filtered.len().saturating_sub(viewport);
+    app.scroll = app.scroll.min(max_scroll);
+    let end = filtered.len().saturating_sub(app.scroll);
+    let start = end.saturating_sub(viewport);
     let lines: Vec<_> = filtered[start..end]
         .iter()
         .map(|log| {
@@ -374,7 +378,27 @@ fn logs(frame: &mut Frame, area: Rect, app: &App) {
             ])
         })
         .collect();
-    frame.render_widget(Paragraph::new(lines), parts[1]);
+    let mut text_area = parts[1];
+    if max_scroll > 0 {
+        text_area.width = text_area.width.saturating_sub(2);
+    }
+    frame.render_widget(Paragraph::new(lines), text_area);
+    if max_scroll > 0 {
+        let mut state = ScrollbarState::new(max_scroll + 1)
+            .position(start)
+            .viewport_content_length(viewport);
+        frame.render_stateful_widget(
+            Scrollbar::new(ScrollbarOrientation::VerticalRight)
+                .begin_symbol(None)
+                .end_symbol(None)
+                .track_symbol(Some("│"))
+                .track_style(Style::default().fg(TRACK))
+                .thumb_symbol("█")
+                .thumb_style(Style::default().fg(MUTED)),
+            parts[1],
+            &mut state,
+        );
+    }
     frame.render_widget(
         Paragraph::new(safe(app.display_notice())).style(Style::default().fg(MUTED)),
         parts[2],
