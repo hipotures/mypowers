@@ -2,12 +2,10 @@ use crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent,
 use ratatui::layout::{Position, Rect};
 
 const HISTORY: usize = 128;
-pub const LIVE_PULSE: [&str; 4] = ["∙", "•", "●", "•"];
 
 pub struct App {
     pub live: bool,
     pub colored_bars: bool,
-    pub tick: usize,
     pub input: u64,
     pub output: u64,
     pub input_history: Vec<u64>,
@@ -26,7 +24,6 @@ impl Default for App {
         let mut app = Self {
             live: true,
             colored_bars: true,
-            tick: 0,
             input: 63,
             output: 181,
             input_history,

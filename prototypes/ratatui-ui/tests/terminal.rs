@@ -96,11 +96,7 @@ fn actual_binary_handles_keyboard_mouse_resize_and_quit() {
         output.contains("38;2;"),
         "Actual terminal output must include RGB colors"
     );
-    assert!(output.contains('∙'));
-    assert!(
-        !output.contains('•'),
-        "The live circle should not change size within two seconds"
-    );
+    assert!(output.contains('●'));
     assert!(output.contains("TERMINAL_RESTORED status=0"));
 }
 
@@ -121,7 +117,6 @@ fn offline_and_uniform_sparklines_run_in_a_real_terminal() {
     );
     let output = run_pty(&command, b"q", false);
     assert!(output.contains("OFFLINE") && output.contains('●'));
-    assert!(!output.contains('∙'));
     assert!(output.contains("TERMINAL_RESTORED status=0"));
 }
 

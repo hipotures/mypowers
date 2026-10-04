@@ -29,9 +29,8 @@ The most recently toggled output retains a subtle selection background.
 All toggles affect local fake state only. Both input and output readings remain
 visible regardless of those states.
 
-The green live circle gently grows and shrinks through three glyph sizes. Each
-size is held for three seconds; a full pulse takes twelve seconds. Rendering
-updates at 8 FPS. Independent fake power readings and their
+Connection status is a static, bold green circle (`●`); offline status uses a
+static red circle. Rendering updates at 8 FPS. Independent fake power readings and their
 128-sample histories update once per second. Battery stays at 78%, remaining time
 at 48h 57m. Initial readings are 63 W input and 181 W output; AC starts on, DC and
 lamps off.
@@ -95,7 +94,7 @@ ls -lh target/release/mypowers-ratatui
 ```
 
 The release profile uses size optimization, thin LTO, and stripped symbols.
-The measured x86_64 Linux release binary is approximately **646 KiB** (661,144
+The measured x86_64 Linux release binary is approximately **646 KiB** (661,096
 bytes), dynamically linked. Its exact size varies with compiler and platform.
 Only Ratatui and Crossterm are direct dependencies; `Cargo.lock` fixes the
 resolved dependency graph.
@@ -128,6 +127,5 @@ MYPOWERS_PREVIEW_DIR=target/preview cargo test layouts_keep_controls
   to cells; fill precision is half a cell. Terminals without true color reduce
   the smoothness.
 - Border curvature, circle sizes, and block heights depend on the terminal font.
-  The live pulse uses three discrete glyph sizes rather than continuous scaling.
 - Mouse motion requires support from the terminal; keyboard controls always
   remain available. Verification here covers Linux, not other operating systems.

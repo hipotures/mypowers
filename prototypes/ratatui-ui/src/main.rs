@@ -46,7 +46,6 @@ fn main() -> io::Result<()> {
         }
         if now >= next_frame {
             terminal.draw(|frame| ui::draw(frame, &mut app))?;
-            app.tick = app.tick.wrapping_add(1);
             next_frame = now + Duration::from_millis(125);
         }
         if event::poll(next_frame.saturating_duration_since(Instant::now()))? {
