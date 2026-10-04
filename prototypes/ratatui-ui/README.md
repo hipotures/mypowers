@@ -64,7 +64,8 @@ screen or raw ANSI rendering:
 - `Paragraph`, `Line`, and `Span` render the station name, live circle, percentage,
   time, independent power readings, states, and key hints.
 - Two built-in `Sparkline` widgets use explicit `.max(100)` and `.max(300)`.
-  Each sits directly below its power reading in its own half of the screen.
+  Each is two rows tall and sits directly below its power reading in its own
+  half of the screen, providing sixteen eighth-cell height increments.
   Graphs have no repeated labels, values, or scale captions.
   The newest sample stays at the right edge. `SparklineBar::style` colors each
   sample green, yellow, or orange using its fraction of that fixed range. Red is
@@ -140,7 +141,7 @@ MYPOWERS_PREVIEW_DIR=target/preview cargo test layouts_keep_controls
 
 - Terminal cells fix text size. Percentage prominence comes from placement and
   bold weight; this prototype does not emulate a scalable display font.
-- A one-row Sparkline has nine discrete height levels, including zero. Tiny
+- A two-row Sparkline has seventeen discrete height levels, including zero. Tiny
   samples can therefore disappear even though the fixed scale is correct.
 - The battery gradient is continuous in RGB interpolation but still quantized
   to cells; fill precision is half a cell. Terminals without true color reduce

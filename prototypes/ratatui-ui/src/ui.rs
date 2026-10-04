@@ -96,7 +96,7 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
         Constraint::Length(1),
         Constraint::Length(1),
         Constraint::Fill(1),
-        Constraint::Length(4),
+        Constraint::Length(5),
         Constraint::Fill(1),
         Constraint::Length(2),
         Constraint::Fill(1),
@@ -153,7 +153,7 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
         let parts = Layout::vertical([
             Constraint::Length(2),
             Constraint::Length(1),
-            Constraint::Length(1),
+            Constraint::Length(2),
         ])
         .split(rect);
         frame.render_widget(
@@ -403,12 +403,27 @@ mod tests {
                 .clone()
                 .map(|x| buffer[(x, row as u16)].symbol())
                 .collect();
-            assert!(symbols.contains("▄▄▄▄"));
             assert!(
                 !symbols.contains('█'),
-                "Half scale must not autoscale to full height"
+                "Half scale must leave the upper graph row empty"
+            );
+            let lower: String = half.map(|x| buffer[(x, row as u16 + 1)].symbol()).collect();
+            assert!(
+                lower.contains("████"),
+                "Half scale should fill exactly one of the two rows"
             );
         }
+        for (i, value) in app.input_history.iter_mut().enumerate() {
+            *value = [31, 37][i % 2];
+        }
+        let finer = render(80, 24, &mut app);
+        let lower: String = (0..40)
+            .map(|x| finer[(x, row as u16 + 1)].symbol())
+            .collect();
+        assert!(
+            lower.contains('▄') && lower.contains('▅'),
+            "31% and 37% should occupy different two-row height levels"
+        );
         for (i, value) in app.input_history.iter_mut().enumerate() {
             *value = [10, 50, 90][i % 3];
         }
