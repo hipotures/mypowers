@@ -32,7 +32,10 @@ def test_independent_link_freshness_wall_clock_and_invalid(core):
 def test_new_session_and_old_callback(core):
     service, _, writer, session = core
     sample = service.latest
+    service.set_phase("station_not_found", retry_in_seconds=2, link_connected=False)
+    assert service.connection.retry_in_seconds == 2
     new_session = service.begin_session(writer, "hci9")
+    assert service.connection.retry_in_seconds is None
     service.receive(frame(31), session)
     assert service.latest == sample
     assert service.snapshot().telemetry.state == "stale"
@@ -40,6 +43,7 @@ def test_new_session_and_old_callback(core):
     assert not service.snapshot().controls.allowed
     service.receive(frame(), new_session)
     assert service.snapshot().controls.allowed
+    assert service.connection.retry_in_seconds is None
     service.end_session()
     assert not service.snapshot().controls.allowed
 

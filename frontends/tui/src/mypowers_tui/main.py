@@ -35,9 +35,9 @@ class Application:
                 async for message in self.client.stream():
                     if message.type in {"snapshot", "state"} and message.data:
                         self.dashboard.update(Status.model_validate(message.data))
-                    elif message.type == "command" and message.data:
+                    elif message.type == "command" and message.data and not self.dashboard.pending:
                         result = message.data
-                        self.dashboard.notice = f"{result['output'].upper()}: {result['status']}"
+                        self.show_command(result["output"], result["status"], result["command_id"])
             except Exception:
                 self.dashboard.server_connected = False
                 self.dashboard.notice = "Server connection lost. Reconnecting..."
@@ -117,14 +117,17 @@ class Application:
                 return
             self.spawn(self.operation(action))
 
+    def show_command(self, output: str, outcome: str, command_id: str) -> None:
+        self.dashboard.notice = f"{output.upper()} {outcome} | {command_id}"
+        if outcome == "unconfirmed":
+            self.dashboard.notice = f"Outcome uncertain | {command_id}; do not replay."
+
     async def control(self, output: Output, desired: bool, snapshot: Status) -> None:
         dash = self.dashboard
         try:
             admitted = await self.client.admit(output, desired, snapshot)
             result = await self.client.wait_command(admitted)
-            dash.notice = f"{output.value.upper()} {result.status} | {result.command_id}"
-            if result.status == "unconfirmed":
-                dash.notice = f"Outcome uncertain | {result.command_id}; do not replay."
+            self.show_command(output.value, result.status, result.command_id)
         except AppError as error:
             dash.notice = error.message
         except Exception:

@@ -158,6 +158,7 @@ class Core:
                 "phase": phase,
                 "reason_code": reason,
                 "message": message or phase.replace("_", " ").capitalize() + ".",
+                "retry_in_seconds": None,
                 **updates,
             }
         )

@@ -51,6 +51,7 @@ async def test_tui_server_failure_runtime_actions_and_unconfirmed_display(core):
     dashboard.update(core[0].snapshot())
     stop = asyncio.Event()
     calls = []
+    outcome = "unconfirmed"
 
     class Client:
         async def request(self, method, path, **kwargs):
@@ -63,7 +64,7 @@ async def test_tui_server_failure_runtime_actions_and_unconfirmed_display(core):
             )
 
         async def wait_command(self, value):
-            return value.model_copy(update={"status": "unconfirmed"})
+            return value.model_copy(update={"status": outcome})
 
         async def stream(self, logs=False, **kwargs):
             if logs:
@@ -90,7 +91,7 @@ async def test_tui_server_failure_runtime_actions_and_unconfirmed_display(core):
                     server_instance_id="instance",
                     stream_sequence=2,
                     server_time="now",
-                    data={"output": "ac", "status": "unconfirmed"},
+                    data={"output": "ac", "status": "unconfirmed", "command_id": "known"},
                 )
             stop.set()
             raise OSError("stream lost")
@@ -109,6 +110,31 @@ async def test_tui_server_failure_runtime_actions_and_unconfirmed_display(core):
     assert calls[-1][0] == "DELETE"
     await app.control(Output.AC, True, dashboard.status)
     assert "uncertain" in dashboard.notice and "known" in dashboard.notice
+
+    async def late_confirmation():
+        yield StreamMessage(
+            type="command",
+            server_instance_id="instance",
+            stream_sequence=3,
+            server_time="now",
+            data={"output": "ac", "status": "confirmed", "command_id": "known"},
+        )
+        stop.set()
+
+    app.client.stream = late_confirmation
+    dashboard.pending = "AC On"
+    notice = dashboard.notice
+    stop.clear()
+    await app.state_stream()
+    assert dashboard.pending == "AC On" and dashboard.notice == notice
+    outcome = "confirmed"
+    await app.control(Output.AC, True, dashboard.status)
+    assert dashboard.pending is None
+    notice = dashboard.notice
+    # A later WS copy must preserve the outcome and identifier displayed by HTTP polling.
+    stop.clear()
+    await app.state_stream()
+    assert dashboard.notice == notice and "known" in notice
     app.activate("help")
     dashboard.render(100, 28)
     app.activate("logs")
