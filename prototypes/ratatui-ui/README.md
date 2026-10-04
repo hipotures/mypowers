@@ -63,6 +63,7 @@ screen or raw ANSI rendering:
   bottom border titles. Controls have no individual boxes.
 - `Paragraph`, `Line`, and `Span` render the station name, live circle, percentage,
   time, independent power readings, states, and key hints.
+  Each power label and value share one line, such as `INPUT 63W` and `OUTPUT 181W`.
 - Two built-in `Sparkline` widgets use explicit `.max(100)` and `.max(300)`.
   Each is two rows tall and sits directly below its power reading in its own
   half of the screen, providing sixteen eighth-cell height increments.

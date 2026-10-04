@@ -96,7 +96,7 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
         Constraint::Length(1),
         Constraint::Length(1),
         Constraint::Fill(1),
-        Constraint::Length(5),
+        Constraint::Length(4),
         Constraint::Fill(1),
         Constraint::Length(2),
         Constraint::Fill(1),
@@ -151,22 +151,20 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
         (power[2], "OUTPUT", app.output, &app.output_history, 300),
     ] {
         let parts = Layout::vertical([
-            Constraint::Length(2),
+            Constraint::Length(1),
             Constraint::Length(1),
             Constraint::Length(2),
         ])
         .split(rect);
         frame.render_widget(
-            Paragraph::new(vec![
-                Line::from(label).style(Style::default().fg(MUTED)),
-                Line::from(vec![
-                    Span::styled(
-                        value.to_string(),
-                        Style::default().fg(TEXT).add_modifier(Modifier::BOLD),
-                    ),
-                    Span::styled(" W", Style::default().fg(MUTED)),
-                ]),
-            ])
+            Paragraph::new(Line::from(vec![
+                Span::styled(format!("{label} "), Style::default().fg(MUTED)),
+                Span::styled(
+                    value.to_string(),
+                    Style::default().fg(TEXT).add_modifier(Modifier::BOLD),
+                ),
+                Span::styled("W", Style::default().fg(MUTED)),
+            ]))
             .alignment(Alignment::Center),
             parts[0],
         );
@@ -314,8 +312,8 @@ mod tests {
                 "AP S300 V2.0",
                 "78%",
                 "48h 57m",
-                "63 W",
-                "181 W",
+                "INPUT 63W",
+                "OUTPUT 181W",
                 "LAMPS",
                 "╭",
                 "╮",
@@ -327,7 +325,7 @@ mod tests {
                     "Missing {expected} at {width}x{height}"
                 );
             }
-            for expected in ["INPUT", "OUTPUT", "63 W", "181 W"] {
+            for expected in ["INPUT", "OUTPUT", "63W", "181W"] {
                 assert_eq!(
                     text.matches(expected).count(),
                     1,
@@ -397,7 +395,7 @@ mod tests {
         app.output_history.fill(150);
         let buffer = render(80, 24, &mut app);
         let text = lines(&buffer);
-        let row = text.iter().position(|line| line.contains("INPUT")).unwrap() + 3;
+        let row = text.iter().position(|line| line.contains("INPUT")).unwrap() + 2;
         for half in [0..40, 40..80] {
             let symbols: String = half
                 .clone()
