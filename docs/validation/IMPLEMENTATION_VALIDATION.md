@@ -1,5 +1,9 @@
 # Implementation validation
 
+This report records the source commit named below. A subsequent user instruction replaces the
+explicit-dotenv-only rule with automatic current-directory `.env` loading; current behavior is
+documented in [configuration](../configuration.md).
+
 Validated on 2026-10-04. Application implementation and local validation are complete. Real-unit
 read validation passed; physical control acceptance remains **NOT RUN**. Production deployment
 remains **NOT RUN**. These results concern the new application, separately from archived research.

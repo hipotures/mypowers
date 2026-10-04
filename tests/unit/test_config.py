@@ -51,9 +51,8 @@ def test_invalid_yaml_without_echo(tmp_path, yaml):
         load(config=str(path))
 
 
-def test_explicit_missing_defaults_unknown_env_and_no_implicit_dotenv(tmp_path, monkeypatch):
+def test_explicit_missing_defaults_and_unknown_env(tmp_path, monkeypatch):
     monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
-    (tmp_path / ".env").write_text("MYPOWERS_AUTH_REQUIRED=false\n")
     assert environment() == {}
     with pytest.raises(ValueError, match="token"):
         load()
@@ -64,6 +63,26 @@ def test_explicit_missing_defaults_unknown_env_and_no_implicit_dotenv(tmp_path, 
     monkeypatch.setenv("MYPOWERS_AUTH_REQUIERD", "not-a-secret")
     with pytest.raises(ValueError, match="Unknown environment names"):
         load()
+
+
+def test_current_directory_dotenv_for_server_and_clients(tmp_path, monkeypatch):
+    (tmp_path / ".env").write_text(
+        "MYPOWERS_AUTH_REQUIRED=false\nMYPOWERS_PORT=5364\n"
+        "MYPOWERS_SERVER_URL=http://127.0.0.1:5364\nMYPOWERS_DATA_DIR=./data\n"
+    )
+    assert load().api.port == 5364
+    assert load().data_dir == tmp_path / "data"
+    assert client_config().server == "http://127.0.0.1:5364"
+    explicit = write_env(tmp_path, "MYPOWERS_SERVER_URL=http://localhost:7000\n")
+    assert client_config(explicit).server == "http://localhost:7000"
+    assert "MYPOWERS_PORT" not in environment(explicit)
+    monkeypatch.setenv("MYPOWERS_SERVER_URL", "http://localhost:8000")
+    assert client_config().server == "http://localhost:8000"
+    assert client_config(server="http://localhost:9000").server == "http://localhost:9000"
+    nested = tmp_path / "nested"
+    nested.mkdir()
+    monkeypatch.chdir(nested)
+    assert "MYPOWERS_PORT" not in environment()  # Never search parent directories.
 
 
 @pytest.mark.parametrize(

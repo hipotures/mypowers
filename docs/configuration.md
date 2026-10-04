@@ -1,7 +1,10 @@
 # Configuration
 
-Precedence is CLI overrides, process environment, explicitly selected dotenv, selected YAML,
-then validated defaults. Select YAML with `--config`, `MYPOWERS_CONFIG`, or the XDG default
+Precedence is CLI overrides, process environment, dotenv, selected YAML, then validated defaults.
+Server, CLI and TUI read `.env` from the current directory when `--env-file` is omitted.
+An explicit `--env-file PATH` replaces that selection; files are not merged and parent directories
+are not searched. An absent default `.env` uses process environment and defaults.
+Select YAML with `--config`, `MYPOWERS_CONFIG`, or the XDG default
 `$XDG_CONFIG_HOME/mypowers/config.yaml` (`~/.config/mypowers/config.yaml` fallback). An explicitly
 selected missing file fails; an absent default file uses defaults. Dotenv is parsed as data with
 interpolation disabled, never executed or discovered recursively. Unknown `MYPOWERS_*` names
@@ -10,7 +13,7 @@ are errors, including misspellings; client names and the known output-test opt-i
 Relative YAML paths are resolved against the YAML directory, dotenv paths against its directory,
 and CLI/environment paths against the initial working directory. Paths become absolute once.
 Duplicate/unknown YAML keys, unsafe tags, invalid MACs/types/ranges and nonfinite durations fail.
-Error messages omit raw input and token values. `mypowersd check-config --env-file .env` prints
+Error messages omit raw input and token values. `mypowersd check-config` prints
 resolved settings and paths, excluding the token.
 
 `config/production.example.yaml` is the complete supported YAML shape. Defaults: scan 20s, total

@@ -13,7 +13,8 @@ from mypowers.api import create_app
 from mypowers.contracts import AppError
 from mypowers.daemon.service import Service
 
-RESULT_FILE = os.environ.get("MYPOWERS_API_LOAD_RESULT_FILE")
+RESULT_PATH = os.environ.get("MYPOWERS_API_LOAD_RESULT_FILE")
+RESULT_FILE = Path(RESULT_PATH).resolve() if RESULT_PATH else None
 
 
 def test_status_remains_responsive_through_twenty_second_scan(config):

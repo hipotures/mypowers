@@ -22,6 +22,8 @@ PATH_NAMES = frozenset(
 
 def environment(env_file: str | None = None) -> dict[str, str]:
     values: dict[str, str] = {}
+    if env_file is None and Path(".env").exists():
+        env_file = ".env"
     if env_file:
         path = Path(env_file).resolve()
         if not path.is_file():

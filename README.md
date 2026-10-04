@@ -19,36 +19,38 @@ D-Bus/BlueZ and permission to use the intended controller. MyPowers installs no 
 uv sync --locked --extra server --extra cli --extra tui --group dev
 # Copy the example once; keep local secrets/runtime files out of Git.
 cp .env.example .env
-uv run mypowersd check-config --env-file .env
-uv run mypowersd --env-file .env
+uv run mypowersd check-config
+uv run mypowersd
 ```
 
 In another terminal:
 
 ```bash
-uv run mypowers --env-file .env status
-uv run mypowers --env-file .env status --json
-uv run mypowers-tui --env-file .env
-uv run mypowers --env-file .env tui
+uv run mypowers status
+uv run mypowers status --json
+uv run mypowers-tui
+uv run mypowers tui
 ```
 
 The development example explicitly disables authentication on loopback and uses the real BLE
 backend. To use the simulated backend, explicitly set `MYPOWERS_BACKEND=simulated` or pass
 `mypowersd --backend simulated`; it is never selected on BLE failure. Production refuses it.
 Development data/log/runtime directories are `.local/dev/data`, `.local/dev/logs`, `.local/dev/run`.
-No `.env` file is read unless selected. Installed user defaults follow XDG directories.
+Server, CLI and TUI read `.env` in the current directory when `--env-file` is omitted.
+Pass `--env-file PATH` to select another file; parent directories are not searched.
+Process environment overrides dotenv values. Installed user defaults follow XDG directories.
 
 ```bash
 # Real output changes: run only when you intend to change connected loads.
-uv run mypowers --env-file .env ac on
-uv run mypowers --env-file .env dc off
-uv run mypowers --env-file .env light on
-uv run mypowers --env-file .env connection pause
-uv run mypowers --env-file .env connection resume
-uv run mypowers --env-file .env logs --tail 10
-uv run mypowers --env-file .env logs --follow
-uv run mypowers --env-file .env debug on --duration 15m
-uv run mypowers --env-file .env debug off
+uv run mypowers ac on
+uv run mypowers dc off
+uv run mypowers light on
+uv run mypowers connection pause
+uv run mypowers connection resume
+uv run mypowers logs --tail 10
+uv run mypowers logs --follow
+uv run mypowers debug on --duration 15m
+uv run mypowers debug off
 ```
 
 Use Tab/Shift-Tab and Enter/Space in the TUI, mouse clicks for controls, `d`/`l` for views,

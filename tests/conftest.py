@@ -20,7 +20,8 @@ from mypowers.protocol import PROFILE, STATION_ADDRESS, STATION_NAME
 
 
 @pytest.fixture(autouse=True)
-def isolated_environment(monkeypatch):
+def isolated_environment(monkeypatch, tmp_path):
+    monkeypatch.chdir(tmp_path)
     monkeypatch.delenv("WEB_CONCURRENCY", raising=False)
     for key in os.environ:
         if key.startswith("MYPOWERS_"):

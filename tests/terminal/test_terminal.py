@@ -118,22 +118,24 @@ async def test_mouse_release_once_layout_guard_pending_stale_and_keyboard(core):
 
 
 @pytest.mark.parametrize("ending", ["q", "sigterm", "ctrlc", "ctrlz"])
-def test_real_pty_mouse_keyboard_resize_and_shell_restoration(daemon_process, ending):
+def test_real_pty_mouse_keyboard_resize_and_shell_restoration(daemon_process, ending, tmp_path):
     _, url, env = daemon_process
     env = {**env, "TERM": "xterm-256color", "NO_COLOR": "1"}
     master, slave = pty.openpty()
     original = termios.tcgetattr(slave)
     size(slave, 100, 28)
     exe = Path(sys.executable).parent / "mypowers-tui"
+    (tmp_path / ".env").write_text(f"MYPOWERS_SERVER_URL={url}\n")
     # exec remains followed by a real shell read, checking that echo/input work after restoration.
-    script = '"$1" --server "$2"; IFS= read -r line; printf "\\nSHELL_ECHO:%s\\n" "$line"'
+    script = '"$1"; IFS= read -r line; printf "\\nSHELL_ECHO:%s\\n" "$line"'
 
     def controlling_terminal():
         os.setsid()
         fcntl.ioctl(slave, termios.TIOCSCTTY, 0)
 
     process = subprocess.Popen(
-        ["bash", "-c", script, "bash", str(exe), url],
+        ["bash", "-c", script, "bash", str(exe)],
+        cwd=tmp_path,
         stdin=slave,
         stdout=slave,
         stderr=slave,

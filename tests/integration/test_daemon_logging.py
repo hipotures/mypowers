@@ -20,17 +20,15 @@ def test_daemon_startup_logs_in_colored_terminal(tmp_path):
     selected.write_text(
         "environment: development\nbackend: simulated\napi:\n  auth_required: false\n"
     )
-    env = {
-        **os.environ,
-        "TERM": "xterm-256color",
-        "MYPOWERS_CONFIG": str(selected),
-        "MYPOWERS_DATA_DIR": str(tmp_path / "data"),
-        "MYPOWERS_LOG_DIR": str(tmp_path / "logs"),
-        "MYPOWERS_RUNTIME_DIR": str(tmp_path / "run"),
-    }
+    (tmp_path / ".env").write_text(
+        f"MYPOWERS_CONFIG={selected}\nMYPOWERS_PORT={port}\n"
+        "MYPOWERS_DATA_DIR=./data\nMYPOWERS_LOG_DIR=./logs\nMYPOWERS_RUNTIME_DIR=./run\n"
+    )
+    env = {**os.environ, "TERM": "xterm-256color"}
     master, slave = pty.openpty()
     process = subprocess.Popen(
-        [str(Path(sys.executable).parent / "mypowersd"), "--port", str(port)],
+        [str(Path(sys.executable).parent / "mypowersd")],
+        cwd=tmp_path,
         stdin=slave,
         stdout=slave,
         stderr=slave,

@@ -72,3 +72,19 @@ def test_unreachable_cli_non_tty_tui_and_token_command(tmp_path):
         text=True,
     )
     assert again.returncode == 2
+
+
+def test_installed_cli_reads_current_dotenv_without_option(daemon_process, tmp_path):
+    _, url, env = daemon_process
+    (tmp_path / ".env").write_text(f"MYPOWERS_SERVER_URL={url}\n")
+    env = {key: value for key, value in env.items() if not key.startswith("MYPOWERS_")}
+    result = subprocess.run(
+        [str(Path(sys.executable).parent / "mypowers"), "status", "--json"],
+        cwd=tmp_path,
+        env=env,
+        capture_output=True,
+        text=True,
+        timeout=8,
+    )
+    assert result.returncode == 0, result.stderr + result.stdout
+    assert json.loads(result.stdout)["server"]["backend"] == "simulated"

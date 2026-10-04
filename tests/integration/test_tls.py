@@ -15,7 +15,8 @@ from mypowers.client import Client
 from mypowers.config import ClientConfig
 
 CADDY_BINARY = os.environ.get("MYPOWERS_CADDY_TEST_BINARY")
-TLS_RESULT_FILE = os.environ.get("MYPOWERS_TLS_RESULT_FILE")
+TLS_RESULT_PATH = os.environ.get("MYPOWERS_TLS_RESULT_FILE")
+TLS_RESULT_FILE = Path(TLS_RESULT_PATH).resolve() if TLS_RESULT_PATH else None
 
 
 async def test_caddy_https_wss_private_ca_and_auth(daemon_process, tmp_path):
