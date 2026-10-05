@@ -7,6 +7,8 @@ permissions:
 jobs:
   verify:
     runs-on: ubuntu-latest
+    env:
+      CARGO_TARGET_DIR: ${{ github.workspace }}/frontends/tui/target
     strategy:
       fail-fast: false
       matrix:
@@ -22,6 +24,10 @@ jobs:
       - run: cargo fmt --check --manifest-path frontends/tui/Cargo.toml
       - run: cargo clippy --locked --manifest-path frontends/tui/Cargo.toml --all-targets -- -D warnings
       - run: cargo test --locked --manifest-path frontends/tui/Cargo.toml
+      - run: cargo fmt --check --manifest-path xtask/Cargo.toml
+      - run: cargo clippy --locked --manifest-path xtask/Cargo.toml --all-targets -- -D warnings
+      - run: cargo test --locked --manifest-path xtask/Cargo.toml
+      - run: cargo xtask ui-snapshots --check
       - run: uv run ruff check src frontends tests
       - run: uv run ruff format --check src frontends tests
       - run: uv run mypy src frontends

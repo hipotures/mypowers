@@ -95,9 +95,22 @@ The [Hello tutorial](https://ratatui.rs/tutorials/hello-ratatui/),
 have also been reviewed. Existing App/effect/renderer separation and contextual
 input routing already fit these principles; no replacement framework is needed.
 
+### 3. Enforce renderer snapshots in offline CI
+
+The existing workflow tested the TUI but did not test the SVG exporter or compare
+saved scenes. Added xtask formatting, Clippy, tests, and `ui-snapshots --check` to
+both existing matrix entries. A job-level Cargo target directory reuses production
+dependency builds and retains the binary location required by PTY tests.
+
+Validation: parsed the workflow YAML and verified that CI checks rather than
+regenerates artifacts. Ran its added Cargo commands locally with the same shared
+target directory: 9 xtask tests passed, formatting and Clippy passed, and all 15
+scenes matched. Before/after SVG hashes and Logs PNG bytes match exactly. Remote
+GitHub Actions execution has not been claimed or triggered.
+
 ## Remaining review
 
-- Detailed tutorial review: Counter App and JSON Editor, including update/render separation.
+- Finish Counter error-handling and JSON Editor tutorial details; review applicable examples.
 - Terminal setup failures, panic cleanup, signal handling, and task lifetime.
 - Key/mouse routing, resize handling, input bursts, and operation responsiveness.
 - Production widgets: Block, Paragraph, Sparkline, Scrollbar, and custom battery Buffer writes.

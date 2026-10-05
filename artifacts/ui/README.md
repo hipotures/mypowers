@@ -26,6 +26,10 @@ compare the before/after images. Commit each batch only after tests and visual
 comparison pass. A matching SVG is an exact comparison of exported symbols,
 positions, colors, and modifiers, not merely a matching text layout.
 
+The offline verification workflow runs exporter tests and this comparison on
+every push and pull request. CI shares the production TUI's Cargo target directory
+to reuse common dependency builds; the saved SVGs are never regenerated in CI.
+
 Fixtures use UTC `2026-10-05T12:00:00Z`, battery 71%, fixed history arrays,
 fixed telemetry age, fixed feedback age, and a fixed idle animation frame.
 Normal scenes use 120x30 terminal cells with the production dashboard's 94x29
