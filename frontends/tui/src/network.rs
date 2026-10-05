@@ -511,6 +511,7 @@ fn valid_log_record(record: &Value) -> bool {
             .as_str()
             .is_some_and(|id| uuid::Uuid::parse_str(id).is_ok())
         && record["message"].as_str().is_some()
+        && record["level"].as_str().is_some()
 }
 
 fn outcome_uncertain() -> Feedback {
@@ -1001,6 +1002,7 @@ mod tests {
             ("timestamp", json!("invalid")),
             ("sequence", json!(-1)),
             ("server_instance_id", json!("invalid")),
+            ("level", json!(42)),
             ("message", json!(42)),
         ] {
             let mut record = valid.clone();
@@ -1031,6 +1033,63 @@ mod tests {
         });
         let (_, received) = receive_stream_record(record.clone()).await;
         assert_eq!(received, Some(record));
+    }
+
+    #[tokio::test]
+    async fn log_pages_require_text_levels_and_preserve_named_levels() {
+        for level in [
+            None,
+            Some(json!(null)),
+            Some(json!(42)),
+            Some(json!([])),
+            Some(json!({})),
+            Some(json!("DEBUG")),
+            Some(json!("INFO")),
+            Some(json!("WARNING")),
+            Some(json!("ERROR")),
+            Some(json!("CRITICAL")),
+        ] {
+            let mut record = json!({
+                "timestamp": "2026-10-05T12:00:00Z", "sequence": 4,
+                "server_instance_id": "88767477-2a2a-481f-843b-30d56a5e3f10",
+                "message": "Diagnostic record"
+            });
+            let valid = level.as_ref().is_some_and(Value::is_string);
+            if let Some(level) = level {
+                record["level"] = level;
+            }
+            let page = json!({
+                "schema_version": 1, "items": [record.clone()],
+                "previous_cursor": null, "next_cursor": null,
+                "has_more_before": false, "has_more_after": false,
+                "source": "files", "gap": false, "skipped_lines": 0
+            });
+            let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+            let api = api_for(&listener);
+            let server = tokio::spawn(async move {
+                let (mut socket, request) = accept_http_request(&listener).await;
+                assert!(request.starts_with("GET /api/v1/logs?"));
+                let body = page.to_string();
+                socket.write_all(format!(
+                    "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+                    body.len()
+                ).as_bytes()).await.unwrap();
+            });
+            let request = crate::logs::Logs::new(Some(chrono_tz::UTC)).open().unwrap();
+            let result = api.log_page(&request).await;
+            if valid {
+                assert_eq!(result.unwrap().items, vec![record]);
+            } else {
+                assert_eq!(
+                    result.unwrap_err(),
+                    "Invalid log page schema or pagination."
+                );
+            }
+            timeout(Duration::from_secs(3), server)
+                .await
+                .unwrap()
+                .unwrap();
+        }
     }
 
     async fn accept_http_request(

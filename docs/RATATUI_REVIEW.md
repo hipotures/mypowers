@@ -722,6 +722,38 @@ All 15 SVGs pass `--check`; regenerated SVGs and Logs PNG bytes match the before
 set exactly. Inspected Logs before and after. Production is unchanged, so the
 installed release binary and previous terminal verification remain applicable.
 
+### 25. Require a textual log level before storing or copying records
+
+Completed the Counter App multi-file tutorial's
+[main loop](https://ratatui.rs/tutorials/counter-app/_multiple-files/main/),
+[terminal wrapper](https://ratatui.rs/tutorials/counter-app/_multiple-files/tui/),
+and [update function](https://ratatui.rs/tutorials/counter-app/_multiple-files/update/).
+MyPowers already separates rendering, state updates and terminal ownership, filters
+key event kinds at the input boundary, and limits drawing to its 250-ms cadence.
+Its existing terminal guard and context-specific exit keys meet the application's
+requirements; the simpler tutorial wrapper does not justify replacing them.
+
+While reviewing data entering the log buffer, found that the shared HTTP/stream
+record validator required timestamps, identity, sequence and message, but omitted
+the level's type. Missing levels could reach the archive and become fallback INFO
+in copied text. Checked the production Diagnostics record builder: it always
+writes a textual level. Added one shared validation condition requiring that
+field to be a string. This preserves named logging levels instead of narrowing
+the record schema to the four API filter choices.
+
+The new HTTP page regression failed on a missing level before the fix; the
+expanded WebSocket regression failed on a numeric level. The HTTP test covers
+missing/null/numeric/array/object levels plus DEBUG, INFO, WARNING, ERROR and
+CRITICAL names. Invalid pages/stream records are rejected before entering the UI;
+correct rows retain their original values. All 14 log tests passed in 1.68 seconds
+and the full 52-test Rust suite passed in 35.08 seconds. Formatting, Clippy with
+warnings denied, and diff checks passed. All 15 SVGs pass `--check`; regenerated
+SVGs and Logs PNG bytes match the before set exactly. Inspected Logs before and
+after.
+All 29 terminal-suite cases passed in 81.57 seconds against isolated services.
+Built the release frontend and updated the local installed binary, without
+restarting existing processes.
+
 ## Remaining review
 
 - Review remaining applicable application examples and tutorial integration details.
