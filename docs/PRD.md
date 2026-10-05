@@ -1027,6 +1027,14 @@ Keep at most 120 seconds of received power samples and a hard cap of 512 live sa
 
 Use small input/output sparklines or equivalent terminal trends. Render using actual timestamps. Different `segment_id` values and missing intervals produce visible gaps; do not bridge outages. Grouping real samples into terminal columns is display reduction, not stored aggregation. Do not infer Wh, charging state, or solar irradiance from these plots.
 
+For each power graph independently, show a dim eleven-cell idle track with a
+small circle moving one cell every two seconds and reversing at the ends only
+when fresh live power is zero and no positive sample remains in its 120-second
+history. Preserve this delay even when zero overwrites a positive sample in the
+same display column. Positive current power immediately restores the normal
+graph; stale, unknown, or disconnected telemetry must not animate the idle track.
+Use Ratatui widgets within the existing render loop.
+
 Provide a Logs overlay modal with day navigation, level filtering, vertical scrolling and a draggable scrollbar. Its two-row header contains day navigation followed by mode, timezone, `Filter ≥ LEVEL`, and page size. Put log navigation/filter/page-size/DEBUG shortcuts in the modal bottom border and close/help/quit shortcuts in the outer bottom border. Runtime log level and any future override expiry appear on the status strip's right side only while Logs is open. No refresh button or shortcut is needed: show the new-record count, use Home for the selected day's beginning, and End to fetch today/live bottom.
 
 Translate local calendar day boundaries in the selected IANA timezone to UTC `since`/`until` filters. Load older/newer pages lazily through the authenticated API; never read log files in the frontend. Keep at most five loaded archive pages and 1,000 recent stream records. The session page-size control supports 50, 100, 250, 500 and 1,000 records per request; persistence through mutable server settings is a separate task. Archive mode stays stationary while new records arrive. Scrolling beyond a completed day's start/end enters the previous/next day. Today's completed bottom enables live follow; scrolling away disables it. These actions use the documented authenticated API. Application errors must not overwrite the alternate screen with uncontrolled tracebacks.

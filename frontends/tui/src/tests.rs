@@ -882,3 +882,145 @@ fn help_lists_only_the_context_that_opened_it() {
         assert!(app.view == View::Dashboard);
     }
 }
+
+#[test]
+fn idle_graphs_wait_for_history_and_resume_independently_on_new_power() {
+    let mut app = App::new(false, None);
+    let mut historical = status();
+    let sample = historical.telemetry.sample.as_mut().unwrap();
+    sample.input_power_w = 1;
+    sample.output_power_w = 0;
+    sample.received_at = (chrono::Utc::now() - chrono::Duration::seconds(60)).to_rfc3339();
+    app.update(Event::Status(Box::new(historical)));
+    let mut idle = status();
+    let sample = idle.telemetry.sample.as_mut().unwrap();
+    sample.sequence = 2;
+    sample.input_power_w = 0;
+    sample.output_power_w = 0;
+    app.update(Event::Status(Box::new(idle)));
+    let screen = text(&render(&mut app, 94, 29));
+    assert!(screen.contains("INPUT 0 W") && screen.contains("OUTPUT 0 W"));
+    // Even a positive sample too small to draw a sparkline bar delays the idle track.
+    assert_eq!(screen.matches('○').count(), 1);
+    let circles = |buffer: &Buffer| {
+        buffer
+            .content
+            .iter()
+            .enumerate()
+            .filter(|(_, cell)| cell.symbol() == "○")
+            .map(|(index, _)| index % usize::from(buffer.area.width))
+            .collect::<Vec<_>>()
+    };
+    assert!(circles(&render(&mut app, 94, 29))[0] > 47);
+    app.samples.front_mut().unwrap().timestamp -= 61.0;
+    app.prune_trends();
+    assert_eq!(text(&render(&mut app, 94, 29)).matches('○').count(), 2);
+
+    let mut current = status();
+    let sample = current.telemetry.sample.as_mut().unwrap();
+    sample.sequence = 3;
+    sample.input_power_w = 0;
+    sample.output_power_w = 42;
+    app.update(Event::Status(Box::new(current)));
+    let screen = text(&render(&mut app, 94, 29));
+    assert!(screen.contains("OUTPUT 42 W"));
+    assert_eq!(screen.matches('○').count(), 1);
+    assert!(circles(&render(&mut app, 94, 29))[0] < 47);
+    // A positive current reading must suppress idle even before any graph samples exist.
+    app.samples.clear();
+    assert_eq!(text(&render(&mut app, 94, 29)).matches('○').count(), 1);
+}
+
+#[test]
+fn idle_graph_waits_even_when_zero_overwrites_positive_history_in_the_same_column() {
+    let mut app = app();
+    app.samples.front_mut().unwrap().timestamp -= 0.1;
+    let mut current = status();
+    let sample = current.telemetry.sample.as_mut().unwrap();
+    sample.sequence = 2;
+    sample.input_power_w = 0;
+    sample.output_power_w = 0;
+    app.update(Event::Status(Box::new(current)));
+    assert!(app.graph_data(40, false).iter().all(|value| *value == 0));
+    assert!(app.graph_data(40, true).iter().all(|value| *value == 0));
+    assert!(!text(&render(&mut app, 94, 29)).contains('○'));
+    app.samples.front_mut().unwrap().timestamp -= 121.0;
+    app.prune_trends();
+    assert_eq!(text(&render(&mut app, 94, 29)).matches('○').count(), 2);
+}
+
+#[test]
+fn idle_marker_moves_slowly_and_reverses_without_affecting_layout() {
+    let mut app = app();
+    let sample = app
+        .status
+        .as_mut()
+        .unwrap()
+        .telemetry
+        .sample
+        .as_mut()
+        .unwrap();
+    sample.input_power_w = 0;
+    sample.output_power_w = 0;
+    app.samples.clear();
+    let mut origin = Vec::new();
+    for (seconds, offset) in [(0, 0), (1, 0), (2, 1), (20, 10), (22, 9), (40, 0)] {
+        app.animation_started = Instant::now() - Duration::from_secs(seconds);
+        let buffer = render(&mut app, 94, 29);
+        let positions: Vec<_> = buffer
+            .content
+            .iter()
+            .enumerate()
+            .filter(|(_, cell)| cell.symbol() == "○")
+            .map(|(index, _)| index)
+            .collect();
+        assert_eq!(positions.len(), 2);
+        if seconds == 0 {
+            origin = positions.clone();
+        }
+        for (index, position) in positions.iter().enumerate() {
+            assert_eq!(*position, origin[index] + offset);
+        }
+        assert!(app.controls.iter().all(|rect| rect.height == 2));
+    }
+    for (width, height) in [(60, 19), (80, 24), (120, 40)] {
+        let screen = text(&render(&mut app, width, height));
+        assert_eq!(screen.matches('○').count(), 2);
+        assert!(screen.contains("INPUT 0 W") && screen.contains("OUTPUT 0 W"));
+    }
+    app.no_color = true;
+    let buffer = render(&mut app, 60, 19);
+    assert_eq!(text(&buffer).matches('○').count(), 2);
+    assert!(
+        buffer
+            .content
+            .iter()
+            .all(|cell| cell.fg == ratatui::style::Color::Reset)
+    );
+}
+
+#[test]
+fn idle_marker_never_animates_missing_stale_or_disconnected_telemetry() {
+    let mut app = app();
+    let sample = app
+        .status
+        .as_mut()
+        .unwrap()
+        .telemetry
+        .sample
+        .as_mut()
+        .unwrap();
+    sample.input_power_w = 0;
+    sample.output_power_w = 0;
+    app.samples.clear();
+    app.received -= Duration::from_secs(4);
+    assert!(!text(&render(&mut app, 94, 29)).contains('○'));
+    app.received = Instant::now();
+    app.connected = false;
+    assert!(!text(&render(&mut app, 94, 29)).contains('○'));
+    app.connected = true;
+    app.status.as_mut().unwrap().telemetry.state = "stale".into();
+    assert!(!text(&render(&mut app, 94, 29)).contains('○'));
+    app.status = None;
+    assert!(!text(&render(&mut app, 94, 29)).contains('○'));
+}

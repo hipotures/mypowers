@@ -410,8 +410,12 @@ fn dashboard(frame: &mut Frame, content: Rect, app: &mut App) {
             .alignment(Alignment::Center),
             parts[0],
         );
-        let data: Vec<_> = app
-            .graph_data(parts[2].width, output)
+        let data = app.graph_data(parts[2].width, output);
+        if app.live() && value == Some(0) && !app.has_power_history(output) {
+            idle_graph(frame, parts[2], app.animation_started.elapsed());
+            continue;
+        }
+        let data: Vec<_> = data
             .into_iter()
             .map(|value| {
                 SparklineBar::from(value).style(Style::default().fg(if app.live() {
@@ -458,6 +462,26 @@ fn dashboard(frame: &mut Frame, content: Rect, app: &mut App) {
             rect,
         );
     }
+}
+
+fn idle_graph(frame: &mut Frame, area: Rect, elapsed: std::time::Duration) {
+    // One cell every two seconds, reversing at either end of an eleven-cell track.
+    let step = (elapsed.as_secs() / 2 % 20) as usize;
+    let position = step.min(20 - step);
+    let track = Line::from(
+        (0..11)
+            .map(|index| {
+                Span::styled(
+                    if index == position { "○" } else { "·" },
+                    Style::default().fg(if index == position { DIM } else { TRACK }),
+                )
+            })
+            .collect::<Vec<_>>(),
+    );
+    frame.render_widget(
+        Paragraph::new(track).alignment(Alignment::Center),
+        Rect::new(area.x, area.bottom() - 1, area.width, 1),
+    );
 }
 
 fn logs(frame: &mut Frame, area: Rect, app: &mut App) {

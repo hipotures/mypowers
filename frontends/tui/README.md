@@ -105,6 +105,15 @@ Log copies are plain text with timestamps in the selected timezone, levels, and
 complete messages, without terminal width clipping. Pages not yet loaded are not
 included. Copy results appear in the status strip.
 
+When a live INPUT or OUTPUT reading is zero and its 120-second trend history has
+no positive samples left, that graph shows a dim eleven-cell `·····○·····` idle
+track. The marker moves one cell every two seconds and reverses at the ends.
+Each graph decides independently; nonzero readings immediately restore the real
+sparkline. Existing positive history delays the idle track until it leaves the
+120-second window, including samples overwritten by zero in a shared display
+column. Missing, stale, or disconnected telemetry never animates it.
+The track uses Ratatui Paragraph/Line/Span widgets and the existing render loop.
+
 The status strip shows one recent action or connection transition, without
 command UUIDs, raw flags, or internal reason codes. New live INFO/WARNING/ERROR
 log messages can provide operational feedback; DEBUG records and replayed

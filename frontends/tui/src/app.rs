@@ -27,6 +27,7 @@ pub struct App {
     pub status: Option<Status>,
     pub connected: bool,
     pub received: Instant,
+    pub animation_started: Instant,
     pub samples: VecDeque<Trend>,
     pub controls: [Rect; 3],
     pub hovered: Option<usize>,
@@ -65,6 +66,7 @@ impl App {
             status: None,
             connected: false,
             received: Instant::now(),
+            animation_started: Instant::now(),
             samples: VecDeque::new(),
             controls: [Rect::default(); 3],
             hovered: None,
@@ -572,6 +574,18 @@ impl App {
             previous = Some((&trend.sample.segment_id, column));
         }
         data
+    }
+
+    pub fn has_power_history(&self, output: bool) -> bool {
+        let now = self.timeline_now();
+        self.samples.iter().any(|trend| {
+            (now - 120.0..=now).contains(&trend.timestamp)
+                && if output {
+                    trend.sample.output_power_w > 0
+                } else {
+                    trend.sample.input_power_w > 0
+                }
+        })
     }
 
     fn timeline_now(&self) -> f64 {
