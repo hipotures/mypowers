@@ -1,7 +1,7 @@
 use crate::{
     app::{App, View},
+    feedback::{Feedback, Severity},
     model::safe,
-    network::ClipboardTarget,
 };
 use ratatui::{
     Frame,
@@ -17,7 +17,7 @@ use ratatui::{
 use std::time::Duration;
 
 pub const MIN_WIDTH: u16 = 60;
-pub const MIN_HEIGHT: u16 = 18;
+pub const MIN_HEIGHT: u16 = 19;
 pub const DASHBOARD_WIDTH: u16 = 94;
 pub const DASHBOARD_HEIGHT: u16 = 28;
 const BACKGROUND: Color = Color::Rgb(16, 21, 27);
@@ -43,7 +43,7 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
     app.logs.clear_hitboxes();
     if screen.width < MIN_WIDTH || screen.height < MIN_HEIGHT {
         frame.render_widget(
-            Paragraph::new("Terminal too small\nNeed at least 60x18")
+            Paragraph::new("Terminal too small\nNeed at least 60x19")
                 .alignment(Alignment::Center)
                 .style(Style::default().fg(MUTED)),
             centered(screen, screen.width, 2),
@@ -55,17 +55,22 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
         }
         return;
     }
-    let area = if app.view != View::Help {
+    let surface = if app.view != View::Help {
         centered(
             screen,
             screen.width.min(DASHBOARD_WIDTH),
-            screen.height.min(DASHBOARD_HEIGHT),
+            screen.height.min(DASHBOARD_HEIGHT + 1),
         )
     } else {
-        centered(screen, screen.width.min(120), screen.height.min(40))
+        centered(screen, screen.width.min(120), screen.height.min(41))
     };
+    let area = Rect {
+        height: surface.height - 1,
+        ..surface
+    };
+    let status_area = Rect::new(surface.x, area.bottom(), surface.width, 1);
     app.title = Rect::new(area.x + (area.width - 10) / 2 + 1, area.y, 8, 1);
-    let mut outer = Block::default()
+    let outer = Block::default()
         .borders(Borders::ALL)
         .border_type(BorderType::Rounded)
         .border_style(Style::default().fg(BORDER))
@@ -83,19 +88,6 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
             .style(Style::default().fg(MUTED))
             .centered(),
         );
-    if let Some((success, time, ClipboardTarget::Snapshot)) = app.clipboard_notice
-        && time.elapsed() < Duration::from_secs(3)
-    {
-        outer = outer.title_top(
-            Line::from(if success {
-                " JSON copied "
-            } else {
-                " Copy failed "
-            })
-            .style(Style::default().fg(if success { GREEN } else { RED }))
-            .right_aligned(),
-        );
-    }
     let inner = outer.inner(area);
     frame.render_widget(outer, area);
     let content = Rect {
@@ -117,7 +109,7 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
             );
             frame.render_widget(Clear, modal);
             app.logs.title = Rect::new(modal.x + (modal.width - 6) / 2 + 1, modal.y, 4, 1);
-            let mut block = Block::default()
+            let block = Block::default()
                 .borders(Borders::ALL)
                 .border_type(BorderType::Rounded)
                 .border_style(Style::default().fg(BORDER))
@@ -132,19 +124,6 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
                         .centered()
                         .style(Style::default().fg(MUTED)),
                 );
-            if let Some((success, time, ClipboardTarget::Logs)) = app.clipboard_notice
-                && time.elapsed() < Duration::from_secs(3)
-            {
-                block = block.title_top(
-                    Line::from(if success {
-                        " Logs copied "
-                    } else {
-                        " Copy failed "
-                    })
-                    .style(Style::default().fg(if success { GREEN } else { RED }))
-                    .right_aligned(),
-                );
-            }
             let inner = block.inner(modal);
             frame.render_widget(block, modal);
             logs(frame, inner, app);
@@ -158,11 +137,82 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
             quit_modal(frame, screen, app);
         }
     }
+    // No persistent alerts exist yet. Keep their region empty, without zero counters.
+    status_line(frame, status_area, app.feedback.as_ref(), Line::default());
     if app.no_color {
         for cell in &mut frame.buffer_mut().content {
             cell.set_fg(Color::Reset).set_bg(Color::Reset);
         }
     }
+}
+
+pub(crate) fn status_line(
+    frame: &mut Frame,
+    area: Rect,
+    feedback: Option<&Feedback>,
+    indicators: Line<'_>,
+) {
+    let right_width = indicators.width().min(usize::from(area.width)) as u16;
+    let left_width = area
+        .width
+        .saturating_sub(right_width.saturating_add(u16::from(right_width > 0)));
+    if let Some(feedback) = feedback
+        && let Some(stage) = feedback.stage()
+    {
+        let color = match feedback.severity {
+            Severity::Success => GREEN,
+            Severity::Info => MUTED,
+            Severity::Warning => YELLOW,
+            Severity::Error => RED,
+        };
+        let Color::Rgb(r, g, b) = color else {
+            unreachable!()
+        };
+        let intensity = [1.0, 0.8, 0.45, 0.2][usize::from(stage)];
+        let fade = |channel: u8, background: u8| {
+            (f64::from(background) + (f64::from(channel) - f64::from(background)) * intensity)
+                .round() as u8
+        };
+        let style = Style::default()
+            .fg(Color::Rgb(fade(r, 16), fade(g, 21), fade(b, 27)))
+            .add_modifier(match stage {
+                0 => Modifier::BOLD,
+                2 | 3 => Modifier::DIM,
+                _ => Modifier::empty(),
+            });
+        frame.render_widget(
+            Paragraph::new(ellipsize(&feedback.message, left_width)).style(style),
+            Rect {
+                width: left_width,
+                ..area
+            },
+        );
+    }
+    frame.render_widget(
+        Paragraph::new(indicators).alignment(Alignment::Right),
+        Rect::new(area.right() - right_width, area.y, right_width, 1),
+    );
+}
+
+fn ellipsize(message: &str, width: u16) -> String {
+    let width = usize::from(width);
+    if width == 0 {
+        return String::new();
+    }
+    if Span::raw(message).width() <= width {
+        return message.to_owned();
+    }
+    let mut result = String::new();
+    for character in message.chars() {
+        let mut next = result.clone();
+        next.push(character);
+        if Span::raw(next.as_str()).width() >= width {
+            break;
+        }
+        result = next;
+    }
+    result.push('…');
+    result
 }
 
 fn dim_background(frame: &mut Frame) {
@@ -184,7 +234,6 @@ fn dashboard(frame: &mut Frame, content: Rect, app: &mut App) {
         Constraint::Fill(1),
         Constraint::Length(2),
         Constraint::Fill(1),
-        Constraint::Length(3),
     ])
     .split(content);
     let header = Layout::horizontal([Constraint::Fill(1), Constraint::Length(21)]).split(rows[0]);
@@ -344,43 +393,6 @@ fn dashboard(frame: &mut Frame, content: Rect, app: &mut App) {
             rect,
         );
     }
-    let history = app
-        .status
-        .as_ref()
-        .and_then(|s| s.history["state"].as_str())
-        .unwrap_or("unknown");
-    let adapter = app
-        .status
-        .as_ref()
-        .and_then(|s| s.connection.adapter_id.as_deref())
-        .unwrap_or("--");
-    let debug = app
-        .status
-        .as_ref()
-        .and_then(|s| s.logging["effective_level"].as_str())
-        .unwrap_or("--");
-    let age = app
-        .age()
-        .map(|age| format!("{age:.1}s"))
-        .unwrap_or_else(|| "--".into());
-    let details = format!(
-        "Age {age}  History {}  {}  Log {}",
-        safe(history),
-        safe(adapter),
-        safe(debug)
-    );
-    frame.render_widget(
-        Paragraph::new(vec![
-            Line::from(details).style(Style::default().fg(DIM)),
-            Line::from(safe(app.display_notice())).style(Style::default().fg(if app.live() {
-                MUTED
-            } else {
-                YELLOW
-            })),
-        ])
-        .wrap(ratatui::widgets::Wrap { trim: false }),
-        rows[10],
-    );
 }
 
 fn logs(frame: &mut Frame, area: Rect, app: &mut App) {

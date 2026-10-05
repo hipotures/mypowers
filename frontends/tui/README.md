@@ -68,7 +68,9 @@ uv run mypowers tui
 | Ctrl-Q / Ctrl-C / Ctrl-Z | Quit immediately and restore the terminal |
 
 The dashboard is centered and capped at 94x28 cells; it fits within smaller
-terminals down to 60x18. The logs modal stays inside that frame with two-cell
+terminals down to 60x19 including the status strip. A single borderless status
+row sits below the dashboard, making its maximum total size 94x29. Hotkeys stay
+in the dashboard's bottom border. The logs modal stays inside that frame with two-cell
 margins on every side (90x24 when the dashboard has its full size). Opening a
 modal dims the dashboard while telemetry updates continue underneath.
 Resize invalidates old mouse presses and
@@ -81,8 +83,9 @@ Local age uses a monotonic clock. Pending, stale, unavailable, or daemon-denied
 states block output requests. The API revalidates UUID/revision and owns command
 execution. Each request has a fresh idempotency UUID and a captured explicit
 boolean target. Mutations are never automatically replayed after errors or
-reconnection. Outcomes include the retained command ID; ambiguous admission
-shows its idempotency key. Quitting leaves daemon collection and outputs running.
+reconnection. Full details in Logs/API retain the command ID and ambiguous
+admission's idempotency key; the status strip shows only concise feedback.
+Quitting leaves daemon collection and outputs running.
 
 Several clients can read the same daemon. Other clients' output changes and
 command events appear live; the daemon admits only one output operation at once.
@@ -97,7 +100,22 @@ effective level, and DEBUG override expiry. Clipboard support is optional and
 requires `wl-copy` and an accessible Wayland session.
 Log copies are plain text with timestamps in the selected timezone, levels, and
 complete messages, without terminal width clipping. Pages not yet loaded are not
-included. The modal border briefly shows `Logs copied` or `Copy failed`.
+included. Copy results appear in the status strip.
+
+The status strip shows one recent action or connection transition, without
+command UUIDs, raw flags, or internal reason codes. New live INFO/WARNING/ERROR
+log messages can provide operational feedback; DEBUG records and replayed
+history never replace the message. Regular telemetry and repeated command states
+do not restart its timer. Feedback fades in four two-second color/style stages
+and becomes empty after eight seconds. Success uses green, information muted
+cyan, warnings yellow, and errors red. The right region is reserved for future
+alerts and remains completely empty for now. Long messages are shortened with
+an ellipsis while preserving space for right-aligned indicators.
+
+Permanent age, history health, adapter, and logging diagnostics are absent from
+the normal dashboard. They remain available through the API; a future Settings
+diagnostics view will present them separately. Full command details remain in
+Logs and the API.
 
 The logs modal opens as a stationary archive for today. Days use the selected
 IANA timezone (or the local system timezone), including daylight-saving transitions;

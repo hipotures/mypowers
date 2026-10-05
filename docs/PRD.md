@@ -971,7 +971,8 @@ Ratatui is the renderer; use its Terminal, Frame, Layout, Block, Paragraph, Spar
 
 ### 14.2 Visual design
 
-At 100 columns by 28 rows or larger, provide a clear full dashboard:
+Cap the bordered dashboard at 94 columns by 28 rows, with a separate borderless
+status row below it (94×29 total). Center the composition in larger terminals.
 
 ```text
 +----------------------------- MYPOWERS --------------------------------+
@@ -986,17 +987,29 @@ At 100 columns by 28 rows or larger, provide a clear full dashboard:
 |                                                                        |
 | AC  [ OFF ]          DC  [ OFF ]          LAMPS  [ OFF ]                 |
 |                                                                        |
-| Station estimate  6h 40m          Last valid update  0.4s ago            |
-| History  recording / 10s          Adapter Actions / hci2                |
+| Station estimate  6h 40m                                               |
 |                                                                        |
-| Event: Light command confirmed                                         |
-| [Dashboard] [Logs] [Retry] [Pause] [Debug: OFF] [Help] [Quit]             |
-+------------------------------------------------------------------------+
++---------- a AC  d DC  l lamps  F3 logs  ? help  q quit -----------------+
+ Lamps ON confirmed
 ```
 
 This is a layout guide with illustrative values, not a requirement to copy ASCII borders or display those readings. Use Ratatui widgets and layout constraints, consistent spacing, and an uncluttered palette. Battery is the strongest visual value; input and output have equal weight. State is expressed by text as well as color. Honor `NO_COLOR`/terminal capabilities. No emoji or Nerd Font dependency.
 
-Retain the approved prototype layout with inline INPUT/OUTPUT readings above two-row graphs. At 60×18 retain primary data and controls. Below 60×18 show a readable resize message with a working exit key. Resizing must not cause exceptions, stale hitboxes, or accidental commands.
+Retain the approved prototype layout with inline INPUT/OUTPUT readings above two-row graphs. At 60×19 retain primary data, controls, and the status row. Below 60×19 show a readable resize message with a working exit key. Resizing must not cause exceptions, stale hitboxes, or accidental commands.
+
+Keep hotkeys in the dashboard's bottom border. The status row contains one concise
+recent action or meaningful connection transition, with no command UUIDs, raw
+flags, internal reason codes, or stack traces. Live operational INFO/WARNING/ERROR
+messages can provide feedback; DEBUG and historical replay cannot. Fade the
+foreground/style in four two-second stages, then clear after eight seconds. A new
+message replaces the previous one. Repeated telemetry must not restart the timer.
+Use green for success, muted cyan for information, yellow for warnings, and red
+for errors. Reserve an independent right-aligned region for future persistent
+alerts, but keep it empty until alerts exist; never render zero counters or
+reassuring health text. Preserve the right region and one separating space when
+shortening a long left message with an ellipsis. Keep full details in Logs/API.
+Permanent age, history health, adapter, and log-level diagnostics belong in the
+future Settings diagnostics view, not on the normal dashboard.
 
 ### 14.3 Data and controls
 

@@ -1,4 +1,5 @@
 use crate::{
+    feedback::{Feedback, Severity, output_name},
     model::{Command, Status, safe},
     network::{ClipboardTarget, Event, Intent},
 };
@@ -31,7 +32,7 @@ pub struct App {
     pub hovered: Option<usize>,
     pub selected: Option<usize>,
     pub title: Rect,
-    pub clipboard_notice: Option<(bool, Instant, ClipboardTarget)>,
+    pub feedback: Option<Feedback>,
     pub notice: String,
     pub connection_notice: String,
     pub log_notice: String,
@@ -45,6 +46,8 @@ pub struct App {
     generation: u64,
     pub quit_yes: bool,
     pub quit_buttons: [Rect; 2],
+    started_at: chrono::DateTime<chrono::Utc>,
+    last_command: Option<(String, String)>,
 }
 
 pub enum Effect {
@@ -67,7 +70,7 @@ impl App {
             hovered: None,
             selected: Some(0),
             title: Rect::default(),
-            clipboard_notice: None,
+            feedback: Some(Feedback::new("Connecting to daemon...", Severity::Info)),
             notice: String::new(),
             connection_notice: "Connecting to daemon...".into(),
             log_notice: String::new(),
@@ -81,12 +84,15 @@ impl App {
             generation: 0,
             quit_yes: true,
             quit_buttons: [Rect::default(); 2],
+            started_at: chrono::Utc::now(),
+            last_command: None,
         }
     }
 
     pub fn update(&mut self, event: Event) {
         match event {
             Event::Status(status) => {
+                self.connection_feedback(&status);
                 let changed = self
                     .status
                     .as_ref()
@@ -94,6 +100,7 @@ impl App {
                 if changed {
                     self.samples.clear();
                     self.press = None;
+                    self.last_command = None;
                 }
                 if self
                     .status
@@ -141,6 +148,20 @@ impl App {
                 self.status = Some(*status);
             }
             Event::Disconnected(reason) => {
+                if self.connected || self.connection_notice == "Connecting to daemon..." {
+                    self.feedback = Some(Feedback::new(
+                        if reason.contains("authentication") || reason.contains("TLS") {
+                            "Daemon unavailable; check authentication, address and TLS"
+                        } else {
+                            "Connection lost; reconnecting to daemon"
+                        },
+                        if reason.contains("authentication") || reason.contains("TLS") {
+                            Severity::Error
+                        } else {
+                            Severity::Warning
+                        },
+                    ));
+                }
                 self.connected = false;
                 self.press = None;
                 self.connection_notice = reason;
@@ -150,24 +171,76 @@ impl App {
                     self.show_command(&command);
                 }
             }
-            Event::Notice(message) => self.log_notice = message,
-            Event::Finished(message) => {
+            Event::Notice(message) => {
+                if self.connected && self.log_notice != message {
+                    self.feedback = Some(Feedback::new(
+                        if message.contains("history gap") {
+                            "Log history incomplete; see Logs"
+                        } else {
+                            "Log stream unavailable; reconnecting"
+                        },
+                        Severity::Warning,
+                    ));
+                }
+                self.log_notice = message;
+            }
+            Event::Finished(message, feedback) => {
                 self.pending = None;
                 if self.view == View::Logs {
                     self.logs.action = Some((message.clone(), Instant::now()));
                 }
                 self.notice = message;
+                self.feedback = Some(feedback);
             }
-            Event::Log(record) => self.logs.record(record),
-            Event::LogPage(request, page) => self.logs.accept(&request, page),
+            Event::Log(record) => {
+                let recent = record["timestamp"]
+                    .as_str()
+                    .and_then(|time| chrono::DateTime::parse_from_rfc3339(time).ok())
+                    .is_some_and(|time| time >= self.started_at);
+                let feedback = recent.then(|| Feedback::log(&record)).flatten();
+                if self.logs.record(record)
+                    && let Some(feedback) = feedback
+                {
+                    self.feedback = Some(feedback);
+                }
+            }
+            Event::LogPage(request, page) => {
+                let current = request.generation == self.logs.generation();
+                let feedback = if page.is_ok() {
+                    Feedback::new("Logs loaded", Severity::Info)
+                } else {
+                    Feedback::new("Could not load logs; see Logs", Severity::Error)
+                };
+                self.logs.accept(&request, page);
+                if current {
+                    self.feedback = Some(feedback);
+                }
+            }
             Event::Copied(success, target) => {
-                self.clipboard_notice = Some((success, Instant::now(), target));
+                self.feedback = Some(Feedback::new(
+                    match (success, target) {
+                        (true, ClipboardTarget::Logs) => "Logs copied",
+                        (true, ClipboardTarget::Snapshot) => "JSON copied",
+                        (false, _) => "Copy failed; check clipboard access",
+                    },
+                    if success {
+                        Severity::Success
+                    } else {
+                        Severity::Error
+                    },
+                ));
             }
             Event::Exit => {}
         }
     }
 
     pub fn show_command(&mut self, command: &Command) {
+        let identity = (command.command_id.clone(), command.status.clone());
+        if self.last_command.as_ref() == Some(&identity) {
+            return;
+        }
+        self.last_command = Some(identity);
+        self.feedback = Some(Feedback::command(command));
         self.notice = format!(
             "{} {} | {}",
             command.output.to_uppercase(),
@@ -187,13 +260,45 @@ impl App {
             .map(|age| age + self.received.elapsed().as_secs_f64())
     }
 
-    pub fn display_notice(&self) -> &str {
-        if !self.notice.is_empty() {
-            &self.notice
-        } else if self.view == View::Logs && !self.log_notice.is_empty() {
-            &self.log_notice
-        } else {
-            &self.connection_notice
+    fn connection_feedback(&mut self, status: &Status) {
+        let old = self.status.as_ref();
+        let new_instance =
+            old.is_some_and(|old| old.server_instance_id != status.server_instance_id);
+        let phase_changed = old.is_none_or(|old| old.connection.phase != status.connection.phase);
+        if !self.connected || new_instance || phase_changed {
+            let (message, severity) = match status.connection.phase.as_str() {
+                "connected" => (
+                    if old.is_some() {
+                        "Connection restored"
+                    } else {
+                        "Connected to station"
+                    },
+                    Severity::Success,
+                ),
+                "reconnecting" | "backoff" => ("Reconnecting to station", Severity::Warning),
+                "scanning" => ("Searching for station", Severity::Info),
+                "connecting" => ("Connecting to station", Severity::Info),
+                "paused" => ("Station connection paused", Severity::Info),
+                "waiting_for_telemetry" => ("Waiting for station data", Severity::Info),
+                _ => ("Waiting for station connection", Severity::Info),
+            };
+            self.feedback = Some(Feedback::new(message, severity));
+        } else if old.is_some_and(|old| old.telemetry.state != status.telemetry.state) {
+            let (message, severity) = if status.telemetry.state == "live" {
+                ("Station data restored", Severity::Success)
+            } else {
+                ("Station data unavailable", Severity::Warning)
+            };
+            self.feedback = Some(Feedback::new(message, severity));
+        } else if old
+            .is_some_and(|old| old.logging["effective_level"] != status.logging["effective_level"])
+            && let Some(level) = status.logging["effective_level"].as_str()
+            && ["DEBUG", "INFO", "WARNING", "ERROR"].contains(&level)
+        {
+            self.feedback = Some(Feedback::new(
+                format!("Log level changed to {level}"),
+                Severity::Info,
+            ));
         }
     }
 
@@ -220,6 +325,14 @@ impl App {
         if !self.allowed() {
             self.notice =
                 "Controls unavailable: fresh data and no pending command required.".into();
+            self.feedback = Some(Feedback::new(
+                if !self.live() {
+                    "Controls unavailable: fresh station data required"
+                } else {
+                    "Controls unavailable: another command is pending"
+                },
+                Severity::Warning,
+            ));
             return Effect::None;
         }
         let snapshot = self.status.as_ref().unwrap().clone();
@@ -232,6 +345,14 @@ impl App {
             if enabled { "ON" } else { "OFF" }
         ));
         self.notice = format!("Pending {}", self.pending.as_ref().unwrap());
+        self.feedback = Some(Feedback::new(
+            format!(
+                "Waiting for {} {} confirmation...",
+                output_name(output),
+                if enabled { "ON" } else { "OFF" }
+            ),
+            Severity::Info,
+        ));
         Effect::Request(Intent::Output {
             output,
             enabled,
@@ -243,6 +364,10 @@ impl App {
     fn operation(&mut self, key: char) -> Effect {
         if !self.connected || self.pending.is_some() {
             self.notice = "Daemon unavailable or operation pending.".into();
+            self.feedback = Some(Feedback::new(
+                "Daemon unavailable or operation pending",
+                Severity::Warning,
+            ));
             return Effect::None;
         }
         let status = self.status.as_ref().unwrap();
@@ -253,6 +378,7 @@ impl App {
             _ => unreachable!(),
         };
         self.pending = Some("daemon request".into());
+        self.feedback = Some(Feedback::new("Sending request...", Severity::Info));
         Effect::Request(intent)
     }
 

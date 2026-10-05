@@ -1,6 +1,7 @@
 use crate::{
     app::{App, Effect, View},
-    model::Status,
+    feedback::{Feedback, Severity},
+    model::{Command, Status},
     network::{ClipboardTarget, Event, Intent},
     ui,
 };
@@ -76,7 +77,10 @@ fn commands_capture_revision_without_optimistic_state_changes_or_replay() {
     app.update(Event::Disconnected("Lost".into()));
     app.update(Event::Status(Box::new(status())));
     assert!(matches!(app.toggle(1), Effect::None));
-    app.update(Event::Finished("Outcome uncertain".into()));
+    app.update(Event::Finished(
+        "Outcome uncertain".into(),
+        Feedback::new("Command outcome uncertain", Severity::Warning),
+    ));
     assert!(
         !app.status
             .as_ref()
@@ -109,7 +113,7 @@ fn freshness_is_monotonic_and_busy_unknown_and_stale_states_disable_controls() {
 
 #[test]
 fn layouts_preserve_inline_values_two_row_graphs_and_unknown_values() {
-    for (width, height) in [(60, 18), (80, 24), (94, 24), (94, 28), (120, 40)] {
+    for (width, height) in [(60, 19), (80, 24), (94, 24), (94, 28), (120, 40)] {
         let mut app = app();
         let buffer = render(&mut app, width, height);
         let screen = text(&buffer);
@@ -140,8 +144,150 @@ fn layouts_preserve_inline_values_two_row_graphs_and_unknown_values() {
     let screen = text(&render(&mut unknown, 80, 24));
     assert!(screen.contains("--%") && screen.contains("--h --m"));
     assert!(!screen.contains("OFF "));
-    render(&mut unknown, 59, 18);
+    render(&mut unknown, 59, 19);
     assert!(unknown.title.is_empty());
+}
+
+#[test]
+fn status_strip_is_outside_border_fades_and_leaves_no_reassuring_noise() {
+    let mut app = app();
+    let mut colors = Vec::new();
+    for seconds in [0, 2, 4, 6, 8] {
+        let mut feedback = Feedback::new("AC ON confirmed", Severity::Success);
+        feedback.started -= Duration::from_secs(seconds);
+        app.feedback = Some(feedback);
+        let buffer = render(&mut app, 94, 29);
+        let row: String = (0..94).map(|x| buffer[(x, 28)].symbol()).collect();
+        assert_eq!(buffer[(0, 27)].symbol(), "╰");
+        assert!(text(&buffer).lines().nth(27).unwrap().contains("q quit"));
+        if seconds < 8 {
+            assert!(row.starts_with("AC ON confirmed"));
+            assert!(row["AC ON confirmed".len()..].trim().is_empty());
+            colors.push(buffer[(0, 28)].fg);
+        } else {
+            assert!(row.trim().is_empty());
+        }
+        assert!(!text(&buffer).contains("Age "));
+        assert!(!text(&buffer).contains("History ok"));
+        assert!(!text(&buffer).contains("hci0"));
+        assert!(!text(&buffer).contains("Log INFO"));
+    }
+    assert!(colors.windows(2).all(|pair| pair[0] != pair[1]));
+    app.feedback = Some(Feedback::new("New message", Severity::Info));
+    assert!(
+        text(&render(&mut app, 60, 19))
+            .ends_with("New message                                                 ")
+    );
+    render(&mut app, 60, 18);
+    assert!(app.title.is_empty());
+}
+
+#[test]
+fn status_strip_reserves_right_indicators_and_ellipsizes_unicode_feedback() {
+    use ratatui::{
+        layout::Rect,
+        style::{Color, Style},
+        text::{Line, Span},
+    };
+    let mut terminal = Terminal::new(TestBackend::new(30, 1)).unwrap();
+    let feedback = Feedback::new("Station connected 🔋 more text to truncate", Severity::Info);
+    let indicators = Line::from(vec![
+        Span::styled("warn:2", Style::default().fg(Color::Yellow)),
+        Span::raw(" • "),
+        Span::styled("err:1", Style::default().fg(Color::Red)),
+    ]);
+    terminal
+        .draw(|frame| {
+            ui::status_line(
+                frame,
+                Rect::new(0, 0, 30, 1),
+                Some(&feedback),
+                indicators.clone(),
+            )
+        })
+        .unwrap();
+    let buffer = terminal.backend().buffer();
+    assert_eq!(text(buffer), "Station connec… warn:2 • err:1");
+    assert_eq!(buffer[(15, 0)].symbol(), " ");
+    assert_eq!(buffer[(16, 0)].fg, Color::Yellow);
+    assert_eq!(buffer[(29, 0)].fg, Color::Red);
+    let feedback = Feedback::new("🔋🔋🔋🔋🔋", Severity::Success);
+    terminal
+        .draw(|frame| {
+            ui::status_line(
+                frame,
+                Rect::new(0, 0, 5, 1),
+                Some(&feedback),
+                Line::default(),
+            )
+        })
+        .unwrap();
+    assert_eq!(terminal.backend().buffer()[(4, 0)].symbol(), "…");
+}
+
+#[test]
+fn operational_feedback_ignores_debug_old_logs_and_repeated_telemetry() {
+    let mut app = app();
+    app.feedback = Some(Feedback::new("AC ON confirmed", Severity::Success));
+    let started = app.feedback.as_ref().unwrap().started;
+    app.update(Event::Status(Box::new(status())));
+    assert_eq!(app.feedback.as_ref().unwrap().started, started);
+    for (sequence, level, timestamp) in [
+        (1, "DEBUG", chrono::Utc::now()),
+        (2, "INFO", chrono::Utc::now() - chrono::Duration::minutes(1)),
+    ] {
+        app.update(Event::Log(json!({
+            "server_instance_id":"88767477-2a2a-481f-843b-30d56a5e3f10",
+            "sequence":sequence, "level":level, "timestamp":timestamp.to_rfc3339(),
+            "message":"Must remain only in Logs",
+        })));
+    }
+    assert_eq!(app.feedback.as_ref().unwrap().started, started);
+    assert_eq!(app.logs.records.len(), 0);
+    let record = json!({
+        "server_instance_id":"88767477-2a2a-481f-843b-30d56a5e3f10",
+        "sequence":3,"level":"INFO", "timestamp":chrono::Utc::now().to_rfc3339(),
+        "event":"log_level_changed", "message":"Runtime log level changed.",
+        "context":{"effective":"DEBUG"},
+    });
+    app.update(Event::Log(record.clone()));
+    assert_eq!(
+        app.feedback.as_ref().unwrap().message,
+        "Log level changed to DEBUG"
+    );
+    assert_eq!(app.feedback.as_ref().unwrap().severity, Severity::Info);
+    let changed = app.feedback.as_ref().unwrap().started;
+    app.update(Event::Log(record));
+    assert_eq!(app.feedback.as_ref().unwrap().started, changed);
+    assert_eq!(app.logs.unseen, 3);
+}
+
+#[test]
+fn command_feedback_is_human_readable_and_repeated_events_do_not_restart_fade() {
+    let mut app = app();
+    let mut command: Command = serde_json::from_value(json!({
+        "schema_version":1, "command_id":"88767477-2a2a-481f-843b-30d56a5e3f10",
+        "status":"confirmed","output":"light","requested_enabled":true,
+        "reason_code":null,
+    }))
+    .unwrap();
+    app.update(Event::Command(command.clone()));
+    assert_eq!(app.feedback.as_ref().unwrap().message, "Lamps ON confirmed");
+    assert_eq!(app.feedback.as_ref().unwrap().severity, Severity::Success);
+    let started = app.feedback.as_ref().unwrap().started;
+    app.update(Event::Command(command.clone()));
+    assert_eq!(app.feedback.as_ref().unwrap().started, started);
+    command.status = "rejected".into();
+    command.reason_code = Some("telemetry_unavailable".into());
+    app.update(Event::Command(command));
+    assert_eq!(
+        app.feedback.as_ref().unwrap().message,
+        "Lamps ON failed: telemetry unavailable"
+    );
+    let screen = text(&render(&mut app, 94, 29));
+    assert!(!screen.contains("88767477"));
+    assert!(!screen.contains("telemetry_unavailable"));
+    assert!(screen.contains("Lamps ON failed: telemetry unavailable"));
 }
 
 #[test]
@@ -149,7 +295,7 @@ fn dashboard_and_log_modal_stop_growing_at_their_defined_sizes() {
     let mut app = app();
     let dashboard = render(&mut app, 120, 40);
     let x = (120 - ui::DASHBOARD_WIDTH) / 2;
-    let y = (40 - ui::DASHBOARD_HEIGHT) / 2;
+    let y = (40u16 - (ui::DASHBOARD_HEIGHT + 1)).div_ceil(2);
     assert_eq!(dashboard[(x, y)].symbol(), "╭");
     assert_eq!(
         dashboard[(x + ui::DASHBOARD_WIDTH - 1, y + ui::DASHBOARD_HEIGHT - 1)].symbol(),
@@ -204,7 +350,7 @@ fn log_scrollbar_tracks_overflow_scroll_filter_and_resize() {
             "message": format!("Record {sequence:03}"),
         })));
     }
-    let bottom = render(&mut app, 60, 18);
+    let bottom = render(&mut app, 60, 19);
     let thumb_rows = |buffer: &Buffer| {
         (0..buffer.area.height)
             .filter(|&y| (0..buffer.area.width).any(|x| buffer[(x, y)].symbol() == "█"))
@@ -218,20 +364,28 @@ fn log_scrollbar_tracks_overflow_scroll_filter_and_resize() {
         row: 10,
         modifiers: KeyModifiers::NONE,
     });
-    assert!(!text(&render(&mut app, 60, 18)).contains("Record 079"));
+    assert!(
+        !text(&render(&mut app, 60, 19))
+            .lines()
+            .any(|line| line.starts_with("│") && line.contains("Record 079"))
+    );
     app.logs.offset = 0;
-    let top = render(&mut app, 60, 18);
+    let top = render(&mut app, 60, 19);
     assert!(text(&top).contains("Record 000"));
-    assert!(!text(&top).contains("Record 079"));
+    assert!(
+        !text(&top)
+            .lines()
+            .any(|line| line.starts_with("│") && line.contains("Record 079"))
+    );
     assert!(thumb_rows(&top)[0] < thumb_rows(&bottom)[0]);
     app.logs.follow = true;
-    assert!(text(&render(&mut app, 60, 18)).contains("Record 079"));
+    assert!(text(&render(&mut app, 60, 19)).contains("Record 079"));
     app.logs.follow = false;
     app.logs.offset = 1000;
     render(&mut app, 120, 40);
     assert_eq!(app.logs.offset, 80 - app.logs.viewport);
     app.logs.records.truncate(4);
-    assert!(thumb_rows(&render(&mut app, 60, 18)).is_empty());
+    assert!(thumb_rows(&render(&mut app, 60, 19)).is_empty());
 }
 
 #[test]
@@ -375,7 +529,7 @@ fn archived_logs_stay_still_during_live_arrivals_and_scrollbar_drag() {
     let content = |screen: &str| {
         screen
             .lines()
-            .filter(|line| line.contains("Record"))
+            .filter(|line| line.starts_with("│") && line.contains("Record"))
             .map(str::to_owned)
             .collect::<Vec<_>>()
     };
@@ -488,7 +642,10 @@ fn click_activates_once_on_release_and_resize_or_revision_discards_old_press() {
         app.mouse(event(MouseEventKind::Up(MouseButton::Left))),
         Effect::None
     ));
-    app.update(Event::Finished("Done".into()));
+    app.update(Event::Finished(
+        "Done".into(),
+        Feedback::new("AC ON confirmed", Severity::Success),
+    ));
     app.mouse(event(MouseEventKind::Down(MouseButton::Left)));
     app.resize();
     render(&mut app, 80, 24);
@@ -538,14 +695,25 @@ fn trends_use_timestamps_have_gap_columns_and_bounded_real_samples() {
 }
 
 #[test]
-fn stream_errors_do_not_erase_user_command_feedback() {
+fn stream_errors_keep_command_details_for_logs_but_replace_transient_feedback() {
     let mut app = app();
     app.update(Event::Finished(
         "Do not replay. Outcome uncertain | command-id".into(),
+        Feedback::new(
+            "Command outcome uncertain; check station",
+            Severity::Warning,
+        ),
     ));
     app.update(Event::Disconnected("Disconnected".into()));
     app.update(Event::Notice("Logs unavailable".into()));
-    assert!(app.display_notice().contains("Outcome uncertain"));
+    assert!(app.notice.contains("Outcome uncertain"));
+    assert!(
+        app.feedback
+            .as_ref()
+            .unwrap()
+            .message
+            .contains("Connection lost")
+    );
     assert!(!app.connected);
 }
 
@@ -555,13 +723,16 @@ fn concurrent_log_page_does_not_erase_runtime_action_feedback() {
     let Effect::Logs(request) = app.key(KeyEvent::new(KeyCode::F(3), KeyModifiers::NONE)) else {
         panic!("Expected log request");
     };
-    app.update(Event::Finished("Runtime log level updated.".into()));
+    app.update(Event::Finished(
+        "Runtime log level updated.".into(),
+        Feedback::new("Log level changed to DEBUG", Severity::Info),
+    ));
     let page = serde_json::from_value(json!({
         "schema_version":1,"items":[],"previous_cursor":null,"next_cursor":null,
         "has_more_before":false,"has_more_after":false,"source":"files","gap":false,"skipped_lines":0,
     })).unwrap();
     app.update(Event::LogPage(request, Ok(page)));
-    assert!(text(&render(&mut app, 60, 18)).contains("Runtime log level updated."));
+    assert!(text(&render(&mut app, 60, 19)).contains("Runtime log level updated."));
     app.key(KeyEvent::new(KeyCode::Char('r'), KeyModifiers::NONE));
     assert!(app.logs.action.is_none());
 }

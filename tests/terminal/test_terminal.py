@@ -152,7 +152,7 @@ def test_native_controls_logs_paste_resize_and_restoration(
             size(session.slave, 50, 15)
             os.kill(session.process.pid, signal.SIGWINCH)
             session.read(b"Terminal too small")
-            size(session.slave, 60, 18)
+            size(session.slave, 60, 19)
             os.kill(session.process.pid, signal.SIGWINCH)
             session.read(b"INPUT")
             session.write(b"\x1bOR")  # F3
@@ -179,6 +179,40 @@ def test_native_controls_logs_paste_resize_and_restoration(
         restored = session.read(b"\x1b[?2004l")
         assert b"\x1b[?1006l" in restored
         assert session.process.wait(timeout=3) == 0
+    finally:
+        session.close()
+
+
+def test_status_strip_confirmations_fade_and_debug_does_not_keep_it_alive(
+    daemon_process, tui_binary, tmp_path
+):
+    _, url, env = daemon_process
+    session = Session(tui_binary, tmp_path, env, "--server", url)
+    try:
+        session.read(b"LIVE")
+        session.write(b"a")
+        session.read(b"AC ON confirmed")
+        border = next(index for index, row in enumerate(session.screen.display) if "q quit" in row)
+        assert session.screen.display[border].startswith("╰")
+        assert session.screen.display[border + 1].strip() == "AC ON confirmed"
+        assert not any(
+            value in "\n".join(session.screen.display)
+            for value in ["Age ", "History ok", "hci", "Log INFO"]
+        )
+        with httpx.Client(base_url=url, trust_env=False) as client:
+            wait_state(client, "ac", True)
+            client.put("/api/v1/runtime/log-level", json={"level": "DEBUG"}).raise_for_status()
+            session.read(b"Log level changed to DEBUG")
+            page = client.get("/api/v1/logs", params={"tail": 100}).json()
+            audit = [row for row in page["items"] if row.get("event") == "log_level_changed"]
+            assert audit and audit[-1]["level"] == "INFO"
+        time.sleep(8.5)
+        session.read(b"LIVE")
+        assert session.screen.display[border + 1].strip() == ""
+        assert session.process.poll() is None
+        session.write(b"d")
+        session.read(b"DC ON confirmed")
+        assert session.screen.display[border + 1].strip() == "DC ON confirmed"
     finally:
         session.close()
 
@@ -316,6 +350,7 @@ def test_unreachable_unknown_values_exit_and_non_tty(tui_binary, tmp_path):
     try:
         session.read(b"DAEMON OFFLINE")
         session.read(b"--h --m")
+        session.read(b"TLS")  # Wait for the first failed connection attempt before acting.
         text = "\n".join(session.screen.display)
         assert "--%" in text and "--h --m" in text
         session.write(b"a")

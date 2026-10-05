@@ -112,6 +112,10 @@ impl Logs {
         local_date(Utc::now(), self.timezone)
     }
 
+    pub fn generation(&self) -> u64 {
+        self.generation
+    }
+
     pub fn zone_name(&self) -> String {
         self.timezone
             .map(|zone| zone.name().to_owned())
@@ -292,9 +296,9 @@ impl Logs {
         self.offset = self.max_offset();
     }
 
-    pub fn record(&mut self, record: Value) {
+    pub fn record(&mut self, record: Value) -> bool {
         if self.recent.iter().any(|old| same_record(old, &record)) {
-            return;
+            return false;
         }
         self.recent.push_back(record.clone());
         while self.recent.len() > 1000 {
@@ -305,6 +309,7 @@ impl Logs {
         } else if self.matches(&record) {
             self.unseen += 1;
         }
+        true
     }
 
     pub fn max_offset(&self) -> usize {
