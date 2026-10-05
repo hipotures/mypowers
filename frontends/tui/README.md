@@ -2,7 +2,7 @@
 
 This is the working Rust TUI. Its visual design follows `prototypes/ratatui-ui`,
 with a rounded composition, battery gradient, inline independent INPUT/OUTPUT
-readings, two-row sparklines or a shared chart with seven plot rows, and unboxed AC/DC/lamps controls.
+readings, two-row sparklines or a shared chart with seven plot rows, and unboxed AC/DC/light controls.
 There is no Python/Rich TUI implementation or rendering fallback.
 
 ## Run
@@ -47,7 +47,7 @@ uv run mypowers tui
 | Esc | Close a modal/help and return to the dashboard; no action on the dashboard |
 | q | Open quit confirmation; Enter confirms, Esc cancels |
 | Ctrl-Q | Quit immediately and restore the terminal |
-| a / d / l on dashboard | Request AC / DC / lamps ON or OFF from the displayed snapshot |
+| a / d / l on dashboard | Request AC / DC / light ON or OFF from the displayed snapshot |
 | Tab / Shift-Tab on dashboard | Focus an output |
 | Enter / Space on dashboard | Activate the focused output |
 | Left click, released over the same dashboard control | Activate that output |

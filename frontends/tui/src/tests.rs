@@ -823,7 +823,7 @@ fn command_feedback_is_human_readable_and_repeated_events_do_not_restart_fade() 
     }))
     .unwrap();
     app.update(Event::Command(command.clone()));
-    assert_eq!(app.feedback.as_ref().unwrap().message, "Lamps ON confirmed");
+    assert_eq!(app.feedback.as_ref().unwrap().message, "Light ON confirmed");
     assert_eq!(app.feedback.as_ref().unwrap().severity, Severity::Success);
     let started = app.feedback.as_ref().unwrap().started;
     app.update(Event::Command(command.clone()));
@@ -833,12 +833,12 @@ fn command_feedback_is_human_readable_and_repeated_events_do_not_restart_fade() 
     app.update(Event::Command(command));
     assert_eq!(
         app.feedback.as_ref().unwrap().message,
-        "Lamps ON failed: telemetry unavailable"
+        "Light ON failed: telemetry unavailable"
     );
     let screen = text(&render(&mut app, 94, 29));
     assert!(!screen.contains("88767477"));
     assert!(!screen.contains("telemetry_unavailable"));
-    assert!(screen.contains("Lamps ON failed: telemetry unavailable"));
+    assert!(screen.contains("Light ON failed: telemetry unavailable"));
 }
 
 #[test]

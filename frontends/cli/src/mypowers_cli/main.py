@@ -153,7 +153,7 @@ def emit(data: dict[str, Any], args: argparse.Namespace, config: ClientConfig) -
             console.print(
                 f"AC {'On' if sample['ac_enabled'] else 'Off'}"
                 f"   DC {'On' if sample['dc_enabled'] else 'Off'}"
-                f"   Lamps {'On' if sample['light_enabled'] else 'Off'}"
+                f"   Light {'On' if sample['light_enabled'] else 'Off'}"
             )
             age = data["telemetry"]["age_seconds"]
             console.print(

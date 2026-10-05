@@ -96,7 +96,7 @@ pub fn output_name(output: &str) -> &'static str {
     match output {
         "ac" => "AC",
         "dc" => "DC",
-        "light" => "Lamps",
+        "light" => "Light",
         _ => "Output",
     }
 }
