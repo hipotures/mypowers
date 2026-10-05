@@ -670,6 +670,33 @@ All 28 terminal-suite cases passed in 84.72 seconds against isolated simulated
 services. Built the release frontend and updated the local installed binary;
 existing application processes were not restarted.
 
+### 23. Verify cleanup after a production render-output failure
+
+Reviewed the [advanced widget implementation example](https://ratatui.rs/examples/apps/advanced-widget-impl/)
+and [tracing recipe](https://ratatui.rs/recipes/apps/log-with-tracing/). The battery
+widget holds only cheap, ephemeral draw inputs, so consuming it during rendering
+is appropriate; there is no retained widget state to clone or move into a boxed
+widget. The renderer already updates mouse hitboxes from its actual layout. The
+logging recipe avoids direct terminal writes by using a file writer. MyPowers
+already obtains application logs from its daemon and reports frontend errors
+after cleanup, so adding a second logger or log destination is not justified.
+
+The existing guard tests cover normal exit, main/worker/task panics, setup-write
+failure, and input bursts. Added a test for the production main loop losing its
+output after successfully rendering a frame. It runs the actual client with two
+PTYs: an independently inspectable controlling input terminal and a separate
+output terminal. Both network workers connect only to an isolated, silent local
+listener. After the MYPOWERS frame appears and raw input mode is confirmed, the
+test closes the output PTY master and sends Tab to the input PTY. The client exits
+with code 2, restores the original input termios exactly, and reports the existing
+I/O cleanup diagnostic without panicking. No production change was necessary.
+
+The new regression and six existing guard tests passed in 0.73 seconds. Ruff
+format/check and diff checks passed. All 15 SVGs pass `--check`; regenerated SVGs
+and daemon-offline PNG bytes match the before set exactly. Inspected that scene
+before and after. Cycle 22's full Rust/native suite and installed release binary
+remain current because this cycle only adds a test and documentation.
+
 ## Remaining review
 
 - Review remaining applicable application examples and tutorial integration details.

@@ -529,6 +529,59 @@ def test_unreachable_unknown_values_exit_and_non_tty(tui_binary, tmp_path):
     assert result.returncode == 2 and "requires a terminal" in result.stderr
 
 
+def test_render_output_failure_restores_the_independent_input_terminal(tui_binary, tmp_path):
+    input_master, input_slave = pty.openpty()
+    output_master, output_slave = pty.openpty()
+    original = termios.tcgetattr(input_slave)
+    size(input_slave, 94, 24)
+    size(output_slave, 94, 24)
+    process = None
+
+    def controlling_terminal():
+        os.setsid()
+        fcntl.ioctl(input_slave, termios.TIOCSCTTY, 0)
+
+    try:
+        # Keep both network workers on an isolated listener that never sends data.
+        with socket.socket() as listener:
+            listener.bind(("127.0.0.1", 0))
+            listener.listen()
+            process = subprocess.Popen(
+                [
+                    str(tui_binary),
+                    "--server",
+                    f"http://127.0.0.1:{listener.getsockname()[1]}",
+                ],
+                cwd=tmp_path,
+                stdin=input_slave,
+                stdout=output_slave,
+                stderr=input_slave,
+                env={"PATH": os.defpath, "TERM": "xterm-256color"},
+                preexec_fn=controlling_terminal,
+            )
+            captured = read_until(output_master, b"MYPOWERS", budget=3)
+            assert b"\x1b[?1049h" in captured
+            assert process.poll() is None
+            assert termios.tcgetattr(input_slave)[3] & (termios.ECHO | termios.ICANON) == 0
+
+            # Fail only stdout after a real production frame; stdin stays inspectable.
+            os.close(output_master)
+            output_master = None
+            os.write(input_master, b"\t")
+            assert process.wait(timeout=3) == 2
+            assert termios.tcgetattr(input_slave) == original
+            diagnostic = read_until(input_master, b"terminal settings restored.", budget=1)
+            assert b"TUI stopped after an I/O error" in diagnostic
+            assert b"panicked at" not in diagnostic
+    finally:
+        if process is not None and process.poll() is None:
+            process.kill()
+            process.wait(timeout=3)
+        for descriptor in [input_master, input_slave, output_master, output_slave]:
+            if descriptor is not None:
+                os.close(descriptor)
+
+
 @pytest.mark.parametrize(
     "source,expected",
     [
