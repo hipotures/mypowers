@@ -70,6 +70,7 @@ pub struct Logs {
     drag: Option<u16>,
     pages: VecDeque<CachedPage>,
     title_click: Option<(Instant, Position)>,
+    retry_after: Option<Instant>,
 }
 
 struct CachedPage {
@@ -110,6 +111,7 @@ impl Logs {
             drag: None,
             pages: VecDeque::new(),
             title_click: None,
+            retry_after: None,
         }
     }
 
@@ -136,6 +138,8 @@ impl Logs {
     }
 
     fn load(&mut self, kind: Load) -> Option<Request> {
+        // Explicit navigation remains immediate, including End after a failed refresh.
+        self.retry_after = None;
         self.generation += 1;
         self.loading = false;
         self.drag = None;
@@ -177,9 +181,11 @@ impl Logs {
             Ok(page) => page,
             Err(error) => {
                 self.message = error;
+                self.retry_after = Some(Instant::now() + Duration::from_secs(2));
                 return;
             }
         };
+        self.retry_after = None;
         self.initialized = true;
         let count = page.items.len();
         let boundary = CachedPage {
@@ -353,6 +359,9 @@ impl Logs {
     pub fn maintenance(&mut self) -> Option<Request> {
         if self.follow
             && !self.loading
+            && self
+                .retry_after
+                .is_none_or(|deadline| Instant::now() >= deadline)
             && (self.records.len() > self.page_size * MAX_CACHED_PAGES || self.day != self.today())
         {
             if self.day != self.today() {
@@ -622,4 +631,44 @@ pub fn day_bounds(
         .and_then(|next| boundary(next, timezone))
         .ok_or("Cannot determine the next day boundary.")?;
     Ok((start.to_rfc3339(), end.to_rfc3339()))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn automatic_refresh_resumes_after_delay_and_stale_errors_cannot_delay_it() {
+        let mut logs = Logs::new(Some(chrono_tz::UTC));
+        logs.page_size = 50;
+        logs.follow = true;
+        logs.records.resize(251, Value::Null);
+        let failed = logs.maintenance().unwrap();
+        logs.accept(&failed, Err("HTTP temporarily unavailable".into()));
+        assert!(logs.maintenance().is_none());
+        logs.retry_after = Some(Instant::now() - Duration::from_secs(1));
+        let retry = logs
+            .maintenance()
+            .expect("Expired delay must allow a retry");
+        logs.accept(&failed, Err("Obsolete failure".into()));
+        assert!(logs.loading);
+        assert!(logs.retry_after.is_none());
+        logs.accept(
+            &retry,
+            Ok(Page {
+                schema_version: 1,
+                items: vec![],
+                previous_cursor: None,
+                next_cursor: None,
+                has_more_before: false,
+                has_more_after: false,
+                source: "files".into(),
+                gap: false,
+                skipped_lines: 0,
+            }),
+        );
+        assert!(logs.retry_after.is_none());
+        assert!(!logs.loading);
+        assert!(logs.follow && logs.records.is_empty());
+    }
 }

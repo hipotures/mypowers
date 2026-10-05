@@ -457,7 +457,8 @@ def test_wide_station_names_clear_in_the_actual_terminal_stream(
                         assert cell.bold == anchor.bold and cell.italics == anchor.italics
                     assert not any(character in rows[row] for character in "電源界")
             session.write(b"\x11")
-            session.read(b"\x1b[?1049l", budget=2)
+            # Cleanup is an ANSI-stream assertion; Pyte's wide-cell display is unsupported here.
+            read_until(session.master, b"\x1b[?1049l", budget=2)
             assert session.process.wait(timeout=2) == 0
             assert termios.tcgetattr(session.slave) == session.original
         finally:
@@ -683,6 +684,138 @@ def test_day_archive_lazy_pages_drag_and_live_resume(daemon_process, tui_binary,
         assert session.process.poll() is None
     finally:
         session.close()
+
+
+def test_failed_live_archive_refresh_is_throttled_and_end_still_retries_immediately(
+    daemon_process, tui_binary, tmp_path
+):
+    from websockets.exceptions import ConnectionClosed
+    from websockets.sync.server import serve
+
+    _, url, env = daemon_process
+    with httpx.Client(base_url=url, trust_env=False) as client:
+        snapshot = client.get("/api/v1/status").json()
+    stopped = threading.Event()
+    emit_logs = threading.Event()
+    queries = []
+
+    def envelope(sequence, kind, data):
+        return json.dumps(
+            {
+                "schema_version": 1,
+                "server_instance_id": snapshot["server_instance_id"],
+                "server_time": datetime.now(UTC).isoformat(),
+                "stream_sequence": sequence,
+                "type": kind,
+                "data": data,
+            }
+        )
+
+    def record(sequence, message):
+        return {
+            "sequence": sequence,
+            "timestamp": datetime.now(UTC).isoformat(),
+            "server_instance_id": snapshot["server_instance_id"],
+            "level": "DEBUG",
+            "message": message,
+        }
+
+    def http(connection, request):
+        if request.path.startswith("/api/v1/logs?"):
+            queries.append(time.monotonic())
+            if len(queries) > 2:
+                return connection.respond(503, '{"error":{"code":"temporarily_unavailable"}}')
+            page = {
+                "schema_version": 1,
+                "items": [record(0, "Initial archive" if len(queries) == 1 else "Live baseline")],
+                "previous_cursor": None,
+                "next_cursor": None,
+                "has_more_before": False,
+                "has_more_after": False,
+                "source": "files",
+                "gap": False,
+                "skipped_lines": 0,
+            }
+            return connection.respond(200, json.dumps(page))
+        return None
+
+    def stream(connection):
+        logs = connection.request.path.startswith("/api/v1/logs/stream")
+        current = json.loads(json.dumps(snapshot))
+        sequence = 1
+        try:
+            connection.send(envelope(sequence, "snapshot", current))
+            if logs:
+                while not stopped.is_set() and not emit_logs.wait(0.05):
+                    pass
+                for index in range(600):
+                    if stopped.is_set():
+                        return
+                    sequence += 1
+                    connection.send(envelope(sequence, "log", record(index + 1, "Live history")))
+            while not stopped.wait(0.05):
+                sequence += 1
+                current["server_time"] = datetime.now(UTC).isoformat()
+                current["telemetry"]["sample"].update(
+                    sequence=sequence, received_at=current["server_time"]
+                )
+                connection.send(envelope(sequence, "heartbeat" if logs else "state", current))
+        except ConnectionClosed:
+            pass
+
+    with serve(
+        stream, "127.0.0.1", 0, process_request=http, compression=None, close_timeout=1
+    ) as server:
+        worker = threading.Thread(target=server.serve_forever)
+        worker.start()
+        session = None
+        try:
+            origin = f"http://127.0.0.1:{server.socket.getsockname()[1]}"
+            session = Session(tui_binary, tmp_path, env, "--server", origin, "--utc")
+            session.read(b"CONNECTED")
+            session.write(b"\x1bOR")
+            session.read(b"Initial archive")
+            session.write(b"\x1b[F")
+            session.read(b"Live baseline")
+            emit_logs.set()
+            session.read(b"Could not load logs")
+            assert len(queries) == 3
+            # Even a busy input loop must not turn a failed automatic query into a retry storm.
+            session.write(b"\t" * 2048 + b"?")
+            session.read("HELP — LOGS".encode(), budget=2)
+            deadline = time.monotonic() + 0.7
+            while time.monotonic() < deadline:
+                if select.select([session.master], [], [], 0.05)[0]:
+                    session.stream.feed(session.decoder.decode(os.read(session.master, 65536)))
+            assert len(queries) == 3
+            deadline = time.monotonic() + 3
+            while len(queries) == 3 and time.monotonic() < deadline:
+                if select.select([session.master], [], [], 0.05)[0]:
+                    session.stream.feed(session.decoder.decode(os.read(session.master, 65536)))
+            assert len(queries) == 4, "Automatic refresh must eventually retry"
+            assert queries[3] - queries[2] >= 2
+            # Esc returns to the dashboard; reopening Logs preserves its current range.
+            session.write(b"\x1b")
+            session.read(b"F3 logs")
+            session.write(b"\x1bOR")
+            session.read(b"LIVE | UTC")
+            session.write(b"\x1b[F")
+            deadline = time.monotonic() + 1
+            while len(queries) < 5 and time.monotonic() < deadline:
+                if select.select([session.master], [], [], 0.05)[0]:
+                    session.stream.feed(session.decoder.decode(os.read(session.master, 65536)))
+            assert len(queries) == 5, "End must retry without waiting for the automatic delay"
+            assert queries[4] - queries[3] < 1.5
+            session.write(b"\x11")
+            session.read(b"\x1b[?1049l", budget=2)
+            assert session.process.wait(timeout=2) == 0
+        finally:
+            stopped.set()
+            if session is not None:
+                session.close()
+            server.shutdown()
+            worker.join(timeout=2)
+            assert not worker.is_alive()
 
 
 def test_three_clients_share_state_and_do_not_stop_daemon(daemon_process, tui_binary, tmp_path):

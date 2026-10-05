@@ -980,6 +980,41 @@ fn failed_log_refresh_within_the_same_range_preserves_loaded_pagination() {
 }
 
 #[test]
+fn failed_automatic_log_refresh_waits_before_retrying_but_end_remains_immediate() {
+    let mut logs = crate::logs::Logs::new(Some(chrono_tz::UTC));
+    logs.page_size = 50;
+    let initial = logs.key(KeyCode::End).unwrap();
+    let stamp = chrono::Utc::now().to_rfc3339();
+    let page = serde_json::from_value(json!({
+        "schema_version": 1, "items": [], "previous_cursor": null, "next_cursor": null,
+        "has_more_before": false, "has_more_after": false,
+        "source": "files", "gap": false, "skipped_lines": 0
+    }))
+    .unwrap();
+    logs.accept(&initial, Ok(page));
+    for sequence in 0..251 {
+        logs.record(json!({
+            "sequence": sequence, "timestamp": stamp,
+            "server_instance_id": "88767477-2a2a-481f-843b-30d56a5e3f10",
+            "level": "DEBUG", "message": "Live record"
+        }));
+    }
+    let automatic = logs.maintenance().unwrap();
+    logs.accept(&automatic, Err("HTTP temporarily unavailable".into()));
+    for _ in 0..1000 {
+        assert!(
+            logs.maintenance().is_none(),
+            "Failed refresh retried in a busy loop"
+        );
+    }
+    let manual = logs
+        .key(KeyCode::End)
+        .expect("End must bypass automatic retry delay");
+    assert!(manual.generation > automatic.generation);
+    assert_eq!(manual.kind, crate::logs::Load::Latest);
+}
+
+#[test]
 fn live_log_cache_stays_bounded_when_page_refresh_fails_and_recovers_from_the_server() {
     let stamp = chrono::Utc::now().to_rfc3339();
     let mut logs = crate::logs::Logs::new(Some(chrono_tz::UTC));
@@ -1021,10 +1056,10 @@ fn live_log_cache_stays_bounded_when_page_refresh_fails_and_recovers_from_the_se
         assert_eq!(logs.offset, logs.max_offset());
     }
     let retained = logs.clipboard_text();
-    let retry = logs.maintenance().unwrap();
+    let retry = logs.key(KeyCode::End).unwrap();
     logs.accept(&retry, Err("HTTP temporarily unavailable".into()));
     assert_eq!(logs.clipboard_text(), retained);
-    let recovered = logs.maintenance().unwrap();
+    let recovered = logs.key(KeyCode::End).unwrap();
     assert!(logs.record(record(3050)));
     logs.accept(&recovered, Ok(page(3000)));
     assert_eq!(logs.records.len(), 51);

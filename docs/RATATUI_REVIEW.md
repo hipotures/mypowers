@@ -1247,3 +1247,37 @@ The remaining practical limits are terminal-dependent font/Unicode behavior,
 TestBackend/Pyte emulation gaps described above, and platform coverage limited to
 this Linux environment. Existing oversized archive lines retain the scanner's
 explicit skipped-line handling. Nothing in this review claims production readiness.
+
+## One-hour continuation
+
+Continuation started 2026-10-05 08:11 UTC, with the same internal-correctness and
+visual-preservation scope. Rechecked the documentation map and relevant event
+handling, application architecture, testing, popup and scrollbar sections before
+selecting further changes. Work remains root-only.
+
+### 42. Throttle failed automatic archive refreshes
+
+The event-handler review identified a live-follow retry loop: after an HTTP page
+refresh failed, `maintenance()` immediately requested another page as long as the
+cache exceeded its refresh threshold. An offline regression failed on the first
+of 1,000 immediate maintenance calls. A real PTY/loopback fixture also failed
+against the previous immutable release while valid status/log streams remained
+available and the archive endpoint returned 503.
+
+Added a two-second monotonic delay after a current page failure, checked only by
+automatic maintenance. Explicit navigation, including End, still starts a query
+immediately. Success clears the delay and obsolete results cannot introduce it.
+There is no blocking sleep, UI layout change, new configuration or dependency.
+The real-process test covers 600 live records, 2,048 keyboard events, contextual
+Help, eventual automatic retry and immediate manual retry.
+
+All 63 Rust tests passed in 35.09 seconds, nine xtask tests in 0.29 seconds,
+and all 33 native terminal tests, including isolated HTTPS/WSS, passed in 97.19
+seconds. The full terminal run also exposed a timing-dependent Pyte limitation
+in the earlier Unicode test's final cleanup check. It now checks the actual
+alternate-screen-exit ANSI bytes without invoking Pyte's unsupported wide-cell
+display property; no terminal renderer was changed for this emulator issue.
+Formatting, lint, Clippy with warnings denied and diff checks passed. All 15 SVGs
+pass `--check` and match the saved before set exactly; the Logs PNG is byte-identical
+and was inspected before and after. The updated installed release matches the
+immutable terminal-tested copy; existing processes were not restarted.
