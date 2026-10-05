@@ -36,28 +36,30 @@ fn run() -> Result<(), String> {
         .enable_all()
         .build()
         .map_err(|_| "Cannot start network runtime.")?;
+    // Register signals before raw mode; install cleanup before spawning workers.
+    let (mut term, mut interrupt) = {
+        use tokio::signal::unix::{SignalKind, signal};
+        let _scope = runtime.enter();
+        (
+            signal(SignalKind::terminate()).map_err(|_| "Cannot register termination signal.")?,
+            signal(SignalKind::interrupt()).map_err(|_| "Cannot register interrupt signal.")?,
+        )
+    };
     let (events, mut incoming) = mpsc::channel(256);
     let (requests, operations) = mpsc::channel(8);
     let (log_requests, log_operations) = tokio::sync::watch::channel(None);
+    let mut app = App::new(config.no_color, config.timezone);
+    let session =
+        terminal::Session::enter(!config.no_mouse).map_err(|_| "Cannot initialize terminal.")?;
     runtime.spawn(api.clone().stream(false, events.clone()));
     runtime.spawn(api.clone().stream(true, events.clone()));
     runtime.spawn(api.clone().log_pages(log_operations, events.clone()));
     runtime.spawn(api.operations(operations, events.clone()));
     let signal_events = events.clone();
     runtime.spawn(async move {
-        use tokio::signal::unix::{SignalKind, signal};
-        let (Ok(mut term), Ok(mut interrupt)) = (
-            signal(SignalKind::terminate()),
-            signal(SignalKind::interrupt()),
-        ) else {
-            return;
-        };
         tokio::select! { _ = term.recv() => {}, _ = interrupt.recv() => {} }
         let _ = signal_events.send(Event::Exit).await;
     });
-    let mut app = App::new(config.no_color, config.timezone);
-    let session =
-        terminal::Session::enter(!config.no_mouse).map_err(|_| "Cannot initialize terminal.")?;
     let result = (|| -> io::Result<()> {
         let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
         let mut next_frame = std::time::Instant::now();

@@ -108,10 +108,37 @@ target directory: 9 xtask tests passed, formatting and Clippy passed, and all 15
 scenes matched. Before/after SVG hashes and Logs PNG bytes match exactly. Remote
 GitHub Actions execution has not been claimed or triggered.
 
+### 4. Stop safely after worker panics
+
+Reviewed the [panic-hook recipe](https://ratatui.rs/recipes/apps/panic-hooks/),
+[Counter error handling](https://ratatui.rs/tutorials/counter-app/error-handling/),
+and Tokio's [task panic behavior](https://docs.rs/tokio/latest/tokio/task/struct.JoinHandle.html).
+A production-guard subprocess fixture reproduced a failure for both a native
+worker panic and a Tokio task panic: terminal restoration ran, but execution
+continued and the process exited successfully (0). Catching a worker's panic
+must not leave the TUI running after restoration. The existing panic hook now
+restores the terminal, calls the previous diagnostic hook, and exits with 101.
+
+Registered SIGINT/SIGTERM listeners synchronously within the runtime context,
+before entering raw mode. Registration errors now stop startup rather than
+silently dropping the signal task. Install the terminal guard before spawning
+network workers so they cannot panic before cleanup has been installed.
+Tokio documents [signal registration](https://docs.rs/tokio/latest/tokio/signal/unix/fn.signal.html)
+and [entering the runtime context](https://docs.rs/tokio/latest/tokio/runtime/struct.Runtime.html#method.enter).
+
+Validation: 18 isolated PTY tests passed, including five new cleanup cases:
+normal exit, main-thread panic, worker panic, async-task panic, and a broken-pipe
+write during setup. They verify original termios restoration; panic cases also
+verify mouse/alternate-screen/cursor cleanup and exit 101. Existing signal,
+controls, paste, resize, multi-client, log, and TLS tests passed against simulated
+daemons. All 30 Rust tests, Clippy with warnings denied, formatting, and Ruff
+passed. All 15 SVGs pass `--check` and regenerated hashes match the before set;
+live dashboard PNGs match byte-for-byte and the after image was inspected.
+
 ## Remaining review
 
 - Finish Counter error-handling and JSON Editor tutorial details; review applicable examples.
-- Terminal setup failures, panic cleanup, signal handling, and task lifetime.
+- Further task lifetime/cancellation checks; terminal cleanup and signals now have PTY coverage.
 - Key/mouse routing, resize handling, input bursts, and operation responsiveness.
 - Production widgets: Block, Paragraph, Sparkline, Scrollbar, and custom battery Buffer writes.
 - Unicode widths, control-character sanitation, and status-line truncation.

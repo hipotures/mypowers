@@ -95,6 +95,12 @@ reconnection. Full command details remain in the API and structured log records;
 the status strip shows only concise feedback.
 Quitting leaves daemon collection and outputs running.
 
+Terminal cleanup also runs on I/O errors and panics. A panic on the UI thread,
+a worker thread, or an async task restores the terminal, reports the panic, and
+exits with code 101. The client cannot continue rendering after a worker panic
+has restored cooked mode. Signal listeners are registered before raw mode;
+registration errors stop startup instead of silently disabling signal cleanup.
+
 Several clients can read the same daemon. Other clients' output changes and
 command events appear live; the daemon admits only one output operation at once.
 No client opens BLE or SQLite or launches/stops the daemon.
@@ -210,3 +216,6 @@ uv run pytest tests/terminal -q
 PTY tests use an isolated simulated daemon, not the physical station. Xvfb
 screenshots do not affect the user's desktop. Visual checks against real data
 are observational; they do not activate output controls.
+The `terminal_cleanup` example is a subprocess fixture for PTY tests of the
+production terminal guard: normal exit, main/worker/task panics, and setup writes
+to a broken pipe. It does not connect to a daemon or render a separate UI.

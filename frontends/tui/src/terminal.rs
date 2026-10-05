@@ -16,6 +16,8 @@ impl Session {
         std::panic::set_hook(Box::new(move |info| {
             restore();
             previous_hook(info);
+            // Worker/task panics must not leave the UI running in a restored terminal.
+            std::process::exit(101);
         }));
         enable_raw_mode()?;
         let session = Self;
