@@ -369,6 +369,47 @@ def test_stream_bursts_do_not_starve_modal_resize_or_quit(
             assert not worker.is_alive()
 
 
+def test_native_pause_resume_retry_and_runtime_logging_receipts(
+    daemon_process, tui_binary, tmp_path
+):
+    _, url, env = daemon_process
+    session = Session(tui_binary, tmp_path, env, "--server", url, "--utc")
+    try:
+        session.read(b"CONNECTED")
+        with httpx.Client(base_url=url, trust_env=False) as client:
+            initial = client.get("/api/v1/status").json()
+            for key, message in [
+                (b"p", b"LAST KNOWN"),
+                (b"r", b"Reconnecting to station"),
+                (b"p", b"CONNECTED"),
+            ]:
+                session.write(key)
+                captured = session.read(message)
+                assert b"Request failed" not in captured
+                desired = "running" if message == b"CONNECTED" else "paused"
+                assert client.get("/api/v1/status").json()["connection"]["desired"] == desired
+            session.write(b"s")
+            session.read(b"SETTINGS")
+            session.read(b"Log: INFO")
+            for level in ["DEBUG", "INFO"]:
+                session.write(b"b")
+                captured = session.read(f"Log level changed to {level}".encode())
+                assert b"Request failed" not in captured
+                session.read(f"Log: {level}".encode())
+                health = client.get("/api/v1/status").json()["logging"]
+                assert health["effective_level"] == level
+                assert health["override_expires_at"] is None
+            final = client.get("/api/v1/status").json()
+            assert final["server_instance_id"] == initial["server_instance_id"]
+            assert final["connection"]["desired"] == "running"
+            for output in ["ac_enabled", "dc_enabled", "light_enabled"]:
+                assert (
+                    final["telemetry"]["sample"][output] == initial["telemetry"]["sample"][output]
+                )
+    finally:
+        session.close()
+
+
 def test_status_strip_confirmations_fade_and_debug_does_not_keep_it_alive(
     daemon_process, tui_binary, tmp_path
 ):

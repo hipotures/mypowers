@@ -1055,6 +1055,44 @@ exactly; the Logs PNG is byte-identical and was inspected before and after.
 The updated release build also passed the native day/archive/live-navigation
 case. Updated the installed local frontend without restarting existing processes.
 
+### 36. Validate daemon action receipts before reporting success
+
+Revisited the [asynchronous application example](https://ratatui.rs/examples/apps/async-github/)
+and cross-checked production API contracts for connection intent, retry, and
+runtime log-level changes. The existing ownership/message-passing approach keeps
+network I/O out of rendering; no shared widget lock or new async framework is
+needed. These action endpoints return connection/logging objects rather than
+telemetry envelopes, so validation must follow their actual server shapes.
+
+A real isolated HTTP regression reproduced ordinary success feedback after an
+empty JSON object. Retry/pause/resume now decode the current Connection structure,
+require its running/paused desired state, and match a pause/resume receipt to the
+captured intention. The same desired-state validation also rejects a malformed
+WS status before it can enable controls. Log-level receipts require recognized
+configured/effective levels, the requested DEBUG or restored configured level,
+and the explicit null expiry returned for these duration-free requests. Removed
+the generic success fallback for malformed logging objects.
+
+The 21-case HTTP matrix covers valid, missing, unknown, and contradictory data,
+including a configured DEBUG baseline when deleting an override. It asserts no
+replayed action, no command event, cleared pending state, and unchanged complete
+telemetry/status snapshots. Added a native regression exercising pause, retry
+while paused, resume, and DEBUG enable/reset against the actual simulated daemon;
+station outputs remain unchanged. Retry still respects the server's paused
+intention. The initial terminal expectations were corrected to the actual
+LAST KNOWN label and stable CONNECTED state: a later connection-restored message
+may supersede a transient resume acknowledgement before a frame is drawn. No UI
+change was made to force every intermediate message to appear.
+
+The HTTP matrix passed in 5.45 seconds; all 60 Rust tests passed in 35.06 seconds.
+The new terminal regression passed in 3.63 seconds, and the complete 31-case native
+suite passed against an immutable copy of the updated release in 90.67 seconds.
+Rust formatting, Clippy with warnings denied, Python formatting/lint, and diff
+checks passed. All 15 SVGs pass `--check` and match the saved before set exactly;
+the Settings PNG is byte-identical and was inspected before and after. The
+standard release binary matches the terminal-tested copy byte-for-byte. Updated
+the installed local frontend without restarting existing application processes.
+
 ## Remaining review
 
 - Review remaining applicable application examples and tutorial integration details.

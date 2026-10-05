@@ -1,7 +1,7 @@
 use crate::{
     config::Config,
     feedback::{Feedback, Severity},
-    model::{Command, Status, StreamMessage, safe},
+    model::{Command, Connection, Status, StreamMessage, safe},
 };
 use futures_util::{SinkExt, StreamExt};
 use serde_json::{Value, json};
@@ -164,6 +164,15 @@ impl Api {
         Ok(command)
     }
 
+    fn connection_response(value: Value) -> Result<Connection, String> {
+        let connection: Connection =
+            serde_json::from_value(value).map_err(|_| "Invalid connection response.")?;
+        if !connection.valid() {
+            return Err("Invalid connection response.".into());
+        }
+        Ok(connection)
+    }
+
     async fn perform(&self, intent: Intent, events: &mpsc::Sender<Event>) -> Feedback {
         match intent {
             Intent::Output {
@@ -229,6 +238,7 @@ impl Api {
                     None,
                 )
                 .await
+                .and_then(Self::connection_response)
                 .map(|_| Feedback::new("Reconnecting to station", Severity::Info))
                 .unwrap_or_else(|error| Feedback::request_error(&error)),
             Intent::Connection(running) => self
@@ -239,15 +249,19 @@ impl Api {
                     None,
                 )
                 .await
-                .map(|_| {
-                    Feedback::new(
+                .and_then(Self::connection_response)
+                .and_then(|connection| {
+                    if (connection.desired == "running") != running {
+                        return Err("Invalid connection response.".into());
+                    }
+                    Ok(Feedback::new(
                         if running {
                             "Station connection resumed"
                         } else {
                             "Station connection paused"
                         },
                         Severity::Info,
-                    )
+                    ))
                 })
                 .unwrap_or_else(|error| Feedback::request_error(&error)),
             Intent::Debug(enabled) => self
@@ -262,14 +276,24 @@ impl Api {
                     None,
                 )
                 .await
-                .map(|value| {
+                .and_then(|value| {
+                    let configured = value["configured_level"]
+                        .as_str()
+                        .filter(|level| crate::logs::LEVELS.contains(level))
+                        .ok_or("Invalid log level response.")?;
                     let level = value["effective_level"]
                         .as_str()
-                        .filter(|level| ["DEBUG", "INFO", "WARNING", "ERROR"].contains(level));
-                    let message = level
-                        .map(|level| format!("Log level changed to {level}"))
-                        .unwrap_or_else(|| "Log level updated".into());
-                    Feedback::new(message, Severity::Info)
+                        .filter(|level| crate::logs::LEVELS.contains(level))
+                        .ok_or("Invalid log level response.")?;
+                    if level != if enabled { "DEBUG" } else { configured }
+                        || !value.get("override_expires_at").is_some_and(Value::is_null)
+                    {
+                        return Err("Invalid log level response.".into());
+                    }
+                    Ok(Feedback::new(
+                        format!("Log level changed to {level}"),
+                        Severity::Info,
+                    ))
                 })
                 .unwrap_or_else(|error| Feedback::request_error(&error)),
         }
@@ -742,6 +766,11 @@ mod tests {
             (
                 "/data/telemetry/sample/battery_percent",
                 json!(101),
+                "Invalid API status schema.",
+            ),
+            (
+                "/data/connection/desired",
+                json!("invalid"),
                 "Invalid API status schema.",
             ),
             (
@@ -1249,6 +1278,138 @@ mod tests {
             .unwrap()
             .unwrap();
         assert!(incoming.recv().await.is_none());
+    }
+
+    #[tokio::test]
+    async fn daemon_actions_require_valid_receipts_before_reporting_success() {
+        let connection = |desired| {
+            let mut value = serde_json::to_value(crate::tests::status().connection).unwrap();
+            value["desired"] = json!(desired);
+            value["adapter_address"] = json!("AA:BB:CC:DD:EE:FF");
+            value
+        };
+        let logging = |configured, effective| {
+            json!({
+                "configured_level": configured, "effective_level": effective,
+                "override_expires_at": null
+            })
+        };
+        for (action, response, message) in [
+            (
+                "retry",
+                connection("running"),
+                Some("Reconnecting to station"),
+            ),
+            (
+                "retry",
+                connection("paused"),
+                Some("Reconnecting to station"),
+            ),
+            ("retry", json!({}), None),
+            ("retry", connection("invalid"), None),
+            ("retry", json!({"desired":"running"}), None),
+            (
+                "pause",
+                connection("paused"),
+                Some("Station connection paused"),
+            ),
+            ("pause", connection("running"), None),
+            ("pause", json!({}), None),
+            (
+                "resume",
+                connection("running"),
+                Some("Station connection resumed"),
+            ),
+            ("resume", connection("paused"), None),
+            ("resume", json!({}), None),
+            (
+                "debug-on",
+                logging("ERROR", "DEBUG"),
+                Some("Log level changed to DEBUG"),
+            ),
+            ("debug-on", logging("INFO", "INFO"), None),
+            ("debug-on", logging("INFO", "TRACE"), None),
+            ("debug-on", json!({}), None),
+            ("debug-on", json!({"effective_level":"DEBUG"}), None),
+            (
+                "debug-off",
+                logging("WARNING", "WARNING"),
+                Some("Log level changed to WARNING"),
+            ),
+            (
+                "debug-off",
+                logging("DEBUG", "DEBUG"),
+                Some("Log level changed to DEBUG"),
+            ),
+            ("debug-off", logging("INFO", "DEBUG"), None),
+            ("debug-off", json!({}), None),
+            (
+                "debug-off",
+                json!({"configured_level":"INFO", "effective_level":"INFO", "override_expires_at":"2030-01-01T00:00:00Z"}),
+                None,
+            ),
+        ] {
+            let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+            let api = api_for(&listener);
+            let (intent, path) = match action {
+                "retry" => (Intent::Retry, "POST /api/v1/connection/retry HTTP/1.1"),
+                "pause" => (Intent::Connection(false), "PUT /api/v1/connection HTTP/1.1"),
+                "resume" => (Intent::Connection(true), "PUT /api/v1/connection HTTP/1.1"),
+                "debug-on" => (
+                    Intent::Debug(true),
+                    "PUT /api/v1/runtime/log-level HTTP/1.1",
+                ),
+                "debug-off" => (
+                    Intent::Debug(false),
+                    "DELETE /api/v1/runtime/log-level HTTP/1.1",
+                ),
+                _ => unreachable!(),
+            };
+            let server = tokio::spawn(async move {
+                let (mut socket, request) = accept_http_request(&listener).await;
+                assert!(request.starts_with(path));
+                let body = response.to_string();
+                socket.write_all(format!(
+                    "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+                    body.len()
+                ).as_bytes()).await.unwrap();
+                assert!(
+                    timeout(Duration::from_millis(200), listener.accept())
+                        .await
+                        .is_err(),
+                    "An invalid receipt must not replay the action"
+                );
+            });
+            let (events, mut incoming) = mpsc::channel(4);
+            let mut app = crate::app::App::new(false, Some(chrono_tz::UTC));
+            app.update(Event::Status(Box::new(crate::tests::status())));
+            let original = serde_json::to_value(app.status.as_ref().unwrap()).unwrap();
+            app.pending = Some("daemon request".into());
+            let feedback = timeout(Duration::from_secs(3), api.perform(intent, &events)).await;
+            timeout(Duration::from_secs(3), server)
+                .await
+                .unwrap()
+                .unwrap();
+            let feedback = feedback.unwrap();
+            if let Some(message) = message {
+                assert_eq!(feedback.message, message, "action={action}");
+                assert_eq!(feedback.severity, Severity::Info);
+            } else {
+                assert_eq!(
+                    feedback.severity,
+                    Severity::Error,
+                    "action={action}, feedback={}",
+                    feedback.message
+                );
+            }
+            assert!(incoming.try_recv().is_err());
+            app.update(Event::Finished(feedback));
+            assert!(app.pending.is_none());
+            assert_eq!(
+                serde_json::to_value(app.status.as_ref().unwrap()).unwrap(),
+                original
+            );
+        }
     }
 
     #[tokio::test]

@@ -26,6 +26,12 @@ pub struct Connection {
     pub adapter_id: Option<String>,
 }
 
+impl Connection {
+    pub fn valid(&self) -> bool {
+        matches!(self.desired.as_str(), "running" | "paused")
+    }
+}
+
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct Telemetry {
     pub state: String,
@@ -58,6 +64,7 @@ pub struct Status {
 impl Status {
     pub fn valid(&self) -> bool {
         self.schema_version == 1
+            && self.connection.valid()
             && chrono::DateTime::parse_from_rfc3339(&self.server_time).is_ok()
             && uuid::Uuid::parse_str(&self.server_instance_id).is_ok()
             && matches!(
