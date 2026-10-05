@@ -2177,12 +2177,12 @@ fn graph_switch_is_contextual_session_local_and_preserves_loaded_averages() {
     let screen = text(&render(&mut app, 94, 29));
     assert!(screen.contains("g spark") && screen.contains("0–200 W"));
     assert_eq!(
-        app.graph.width, 90,
-        "The shared chart uses the full content width"
+        app.graph.width, 83,
+        "The shared chart excludes the reserved Y-axis columns"
     );
     let expanded = app.history_request().unwrap();
     assert!(expanded.generation > first.generation);
-    assert_eq!(expanded.width, 90);
+    assert_eq!(expanded.width, 83);
     app.key(KeyEvent::new(KeyCode::Char('g'), KeyModifiers::NONE));
     assert_eq!(app.graph.visualization, Visualization::Sparkline);
     render(&mut app, 94, 29);
@@ -2279,9 +2279,27 @@ fn shared_chart_uses_four_rows_two_colors_common_scale_and_safe_minimum_layout()
         assert!(
             app.controls
                 .iter()
-                .all(|rect| rect.y >= row + 6 && rect.bottom() < height)
+                .all(|rect| rect.y >= row + 8 && rect.bottom() < height)
         );
         assert!(screen.contains("q quit"));
+        assert!(
+            screen.contains("   400│") && screen.contains("   200│") && screen.contains("     0│")
+        );
+        assert!(
+            screen
+                .lines()
+                .nth(usize::from(row + 6))
+                .unwrap()
+                .contains("└──")
+        );
+        assert!(
+            screen
+                .lines()
+                .nth(usize::from(row + 7))
+                .unwrap()
+                .contains("12:00:00")
+        );
+        assert_eq!(app.graph.width, width.min(94) - 11);
     }
     app.connected = false;
     let buffer = render(&mut app, 120, 30);
@@ -2328,4 +2346,156 @@ fn shared_chart_idle_waits_for_both_histories_and_returns_on_fractional_power() 
     assert_eq!(text(&render(&mut app, 94, 29)).matches('○').count(), 1);
     app.connected = false;
     assert!(!text(&render(&mut app, 94, 29)).contains('○'));
+}
+
+#[test]
+fn chart_time_axis_tracks_visible_utc_buckets_and_selected_timezone() {
+    let now = "2026-10-05T12:00:00Z"
+        .parse::<chrono::DateTime<chrono::Utc>>()
+        .unwrap()
+        .timestamp_millis();
+    for (resolution, expected) in [
+        (Resolution::TenSeconds, ["11:46:20", "11:53:10", "12:00:00"]),
+        (Resolution::Minute, ["10:38", "11:19", "12:00"]),
+        (Resolution::Hour, ["10-02 02h", "10-03 19h", "10-05 12h"]),
+    ] {
+        assert_eq!(
+            ui::chart_time_labels(now + 750, resolution, 83, Some(chrono_tz::UTC)),
+            expected
+        );
+    }
+    assert_eq!(
+        ui::chart_time_labels(now, Resolution::Minute, 3, Some(chrono_tz::Europe::Warsaw)),
+        ["13:58", "13:59", "14:00"]
+    );
+    let dst = "2026-10-25T01:00:00Z"
+        .parse::<chrono::DateTime<chrono::Utc>>()
+        .unwrap()
+        .timestamp_millis();
+    assert_eq!(
+        ui::chart_time_labels(dst, Resolution::Minute, 3, Some(chrono_tz::Europe::Warsaw)),
+        ["02:58", "02:59", "02:00"]
+    );
+}
+
+#[test]
+fn stable_separated_chart_series_do_not_drop_columns_and_missing_buckets_align() {
+    use crate::history::Visualization;
+    use ratatui::style::Color;
+    for missing in [false, true] {
+        let mut app = fixed_graph_app();
+        app.graph.visualization = Visualization::Chart;
+        let sample = app
+            .status
+            .as_mut()
+            .unwrap()
+            .telemetry
+            .sample
+            .as_mut()
+            .unwrap();
+        sample.input_power_w = 51;
+        sample.output_power_w = 28;
+        let now = app.timeline_now_ms();
+        app.graph.points = (0..83)
+            .filter(|i| !missing || (!(20..30).contains(i) && *i != 55))
+            .map(|i| Point {
+                bucket_start_ms: now - (82 - i) * 10_000,
+                input_power_w: 51.0,
+                output_power_w: 28.0,
+                sample_count: 1,
+            })
+            .collect();
+        let buffer = render(&mut app, 94, 29);
+        let row = text(&buffer)
+            .lines()
+            .position(|line| line.contains("INPUT"))
+            .unwrap() as u16
+            + 2;
+        for column in 0..83 {
+            let expected = !missing || (!(20..30).contains(&column) && column != 55);
+            for color in [Color::Rgb(118, 203, 137), Color::Rgb(92, 181, 204)] {
+                let visible = (row..row + 4).any(|y| {
+                    buffer[(9 + column, y)].fg == color
+                        && buffer[(9 + column, y)]
+                            .symbol()
+                            .chars()
+                            .any(|c| ('\u{2801}'..='\u{28ff}').contains(&c))
+                });
+                assert_eq!(
+                    visible, expected,
+                    "Same gap mask for both separated series at column {column}"
+                );
+            }
+        }
+    }
+}
+
+#[test]
+fn shared_chart_unions_braille_patterns_when_input_crosses_a_cell_boundary() {
+    use crate::history::Visualization;
+    use ratatui::style::Color;
+    let draw = |show_input: bool, show_output: bool| {
+        let mut app = fixed_graph_app();
+        app.graph.visualization = Visualization::Chart;
+        let sample = app
+            .status
+            .as_mut()
+            .unwrap()
+            .telemetry
+            .sample
+            .as_mut()
+            .unwrap();
+        sample.input_power_w = 51;
+        sample.output_power_w = 28;
+        let now = app.timeline_now_ms();
+        app.graph.points = (0..83)
+            .map(|i| Point {
+                bucket_start_ms: now - (82 - i) * 10_000,
+                input_power_w: if show_input {
+                    if i % 2 == 0 { 49.0 } else { 51.0 }
+                } else {
+                    0.0
+                },
+                output_power_w: if show_output { 28.0 } else { 0.0 },
+                sample_count: 1,
+            })
+            .collect();
+        render(&mut app, 94, 29)
+    };
+    let input = draw(true, false);
+    let output = draw(false, true);
+    let both = draw(true, true);
+    let row = text(&both)
+        .lines()
+        .position(|line| line.contains("INPUT"))
+        .unwrap() as u16
+        + 2;
+    let pattern = |cell: &ratatui::buffer::Cell| {
+        cell.symbol()
+            .chars()
+            .next()
+            .filter(|c| ('\u{2801}'..='\u{28ff}').contains(c))
+            .map_or(0, |c| c as u32 - 0x2800)
+    };
+    let mut shared = 0;
+    for x in 9..92 {
+        // Rows 1 and 2 contain 49/51 W and 28 W; the dummy zero lines are on row 3.
+        for y in row + 1..row + 3 {
+            let a = pattern(&input[(x, y)]);
+            let b = pattern(&output[(x, y)]);
+            assert_eq!(
+                pattern(&both[(x, y)]),
+                a | b,
+                "Neither series may erase the other's dots"
+            );
+            if a > 0 && b > 0 {
+                shared += 1;
+                assert_eq!(both[(x, y)].fg, Color::Rgb(224, 232, 236));
+            }
+        }
+    }
+    assert!(
+        shared > 30,
+        "Exercise the actual 49/51 W versus 28 W collision"
+    );
 }

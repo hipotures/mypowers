@@ -242,6 +242,9 @@ def test_startup_backfills_the_live_graph_window_from_server_history(
         else:
             pytest.fail("Shared chart did not render persisted averages\n" + "\n".join(rows))
         assert sum(row.count("0–100 W") for row in rows) == 1
+        assert "   100│" in "\n".join(rows) and "    50│" in "\n".join(rows)
+        assert "     0│" in "\n".join(rows) and "└──" in rows[label_row + 6]
+        assert rows[label_row + 7].count(":") >= 4
         assert "INPUT 0 W" in rows[label_row] and "OUTPUT 0 W" in rows[label_row]
         session.write(b"g")
         session.read(b"g chart")

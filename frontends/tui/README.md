@@ -2,7 +2,7 @@
 
 This is the working Rust TUI. Its visual design follows `prototypes/ratatui-ui`,
 with a rounded composition, battery gradient, inline independent INPUT/OUTPUT
-readings, two-row sparklines or a shared four-row chart, and unboxed AC/DC/lamps controls.
+readings, two-row sparklines or a shared chart with four plot rows, and unboxed AC/DC/lamps controls.
 There is no Python/Rich TUI implementation or rendering fallback.
 
 ## Run
@@ -111,14 +111,19 @@ Graphs use server-computed SQLite averages from `GET /api/v1/history/aggregates`
 Press `t` on the dashboard to cycle **10s → 60s → 1h per bar**; the footer shows the
 selected interval. INPUT/OUTPUT numeric labels always show current telemetry,
 independently of historical averages. Selection is local to each TUI session.
-Sparkline is the default. Press `g` to switch to a shared, four-row built-in
+Sparkline is the default. Press `g` to switch to a shared built-in
 Ratatui `Chart` with Braille line datasets: INPUT green, OUTPUT cyan. Colored
 INPUT/OUTPUT labels identify the series without a boxed legend. A terminal cell
-has one foreground color, so overlapping lines in the same cell take the OUTPUT
-color. Recording gaps
-break each line; measured zeros remain points on the baseline. The chart uses
-the full content width, so it requests more buckets than either half-width
-sparkline. When both channels are idle it shows one shared idle marker.
+has one foreground color. Each series uses the built-in Chart renderer; a
+small Buffer compositor unions their Braille patterns, so neither line erases
+the other. Cells shared by both series use a neutral foreground. Recording gaps break each line; measured zeros remain points on the baseline. The chart uses
+the full content width, with seven columns reserved for the power axis; each
+remaining plot column requests one aggregate bucket. The vertical axis shows
+zero, half-scale and maximum, in W. Four plot rows remain above two additional
+rows for the horizontal axis and time labels. Time labels follow the selected
+timezone: HH:MM:SS for 10s buckets, HH:MM for 60s, and month-day/hour for 1h.
+The endpoint labels identify the oldest and latest bucket starts, not the time
+of the last observation. Axes remain visible during idle. When both channels are idle it shows one shared idle marker.
 Visualization selection is local to the current process; no settings API,
 database persistence or config-file writes are introduced.
 

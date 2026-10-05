@@ -22,6 +22,8 @@ pub const MIN_WIDTH: u16 = 60;
 pub const MIN_HEIGHT: u16 = 19;
 pub const DASHBOARD_WIDTH: u16 = 94;
 pub const DASHBOARD_HEIGHT: u16 = 28;
+// Six numeric columns cover the largest power scale (102400), plus the Y axis.
+const CHART_AXIS_WIDTH: u16 = 7;
 const BACKGROUND: Color = Color::Rgb(16, 21, 27);
 const TEXT: Color = Color::Rgb(224, 232, 236);
 const MUTED: Color = Color::Rgb(119, 144, 153);
@@ -417,7 +419,7 @@ fn dashboard(frame: &mut Frame, content: Rect, app: &mut App) {
     ])
     .split(rows[6]);
     app.set_graph_width(if chart {
-        rows[6].width
+        rows[6].width.saturating_sub(CHART_AXIS_WIDTH)
     } else {
         power[0].width.max(power[2].width)
     });
@@ -536,33 +538,52 @@ fn dashboard(frame: &mut Frame, content: Rect, app: &mut App) {
     }
     if chart {
         let area = Rect::new(rows[6].x, rows[6].y + 2, rows[6].width, graph_height);
-        if live
+        let idle = live
             && sample.is_some_and(|s| s.input_power_w == 0 && s.output_power_w == 0)
             && !app.has_power_history(false)
-            && !app.has_power_history(true)
-        {
+            && !app.has_power_history(true);
+        let plot_width = area.width.saturating_sub(CHART_AXIS_WIDTH);
+        let input = app.graph.columns(app.timeline_now_ms(), plot_width, false);
+        let output = app.graph.columns(app.timeline_now_ms(), plot_width, true);
+        let maximum = power_scale(
+            input.iter().chain(&output).flatten().copied().chain(
+                sample
+                    .into_iter()
+                    .flat_map(|s| [s.input_power_w as f64, s.output_power_w as f64]),
+            ),
+        );
+        frame.render_widget(
+            Paragraph::new(format!("0–{maximum} W"))
+                .alignment(Alignment::Right)
+                .style(Style::default().fg(DIM)),
+            Rect::new(rows[6].x, rows[6].y + 1, rows[6].width, 1),
+        );
+        let time_labels = chart_time_labels(
+            app.timeline_now_ms(),
+            app.graph.resolution,
+            plot_width,
+            app.timezone,
+        );
+        power_chart(
+            frame,
+            area,
+            if idle { &[] } else { &input },
+            if idle { &[] } else { &output },
+            maximum,
+            live,
+            time_labels,
+        );
+        if idle {
             idle_graph(
                 frame,
-                area,
+                Rect::new(
+                    area.x + CHART_AXIS_WIDTH,
+                    area.y,
+                    plot_width,
+                    area.height - 2,
+                ),
                 app.clock.animation_elapsed(app.animation_started),
             );
-        } else {
-            let input = app.graph.columns(app.timeline_now_ms(), area.width, false);
-            let output = app.graph.columns(app.timeline_now_ms(), area.width, true);
-            let maximum = power_scale(
-                input.iter().chain(&output).flatten().copied().chain(
-                    sample
-                        .into_iter()
-                        .flat_map(|s| [s.input_power_w as f64, s.output_power_w as f64]),
-                ),
-            );
-            frame.render_widget(
-                Paragraph::new(format!("0–{maximum} W"))
-                    .alignment(Alignment::Right)
-                    .style(Style::default().fg(DIM)),
-                Rect::new(rows[6].x, rows[6].y + 1, rows[6].width, 1),
-            );
-            power_chart(frame, area, &input, &output, maximum, live);
         }
     }
     let controls = Layout::horizontal([Constraint::Ratio(1, 3); 3]).split(rows[8]);
@@ -626,29 +647,114 @@ fn power_chart(
     output: &[Option<f64>],
     maximum: u64,
     live: bool,
+    time_labels: [String; 3],
 ) {
     let input_runs = chart_runs(input);
     let output_runs = chart_runs(output);
-    let datasets = input_runs
+    let input_datasets = input_runs
         .iter()
-        .map(|run| (run, GREEN))
-        .chain(output_runs.iter().map(|run| (run, CYAN)))
-        .map(|(run, color)| {
+        .map(|run| {
             Dataset::default()
                 .marker(Marker::Braille)
                 .graph_type(GraphType::Line)
-                .style(Style::default().fg(if live { color } else { DIM }))
+                .style(Style::default().fg(if live { GREEN } else { DIM }))
                 .data(run)
         })
         .collect();
-    frame.render_widget(
+    let output_datasets = output_runs
+        .iter()
+        .map(|run| {
+            Dataset::default()
+                .marker(Marker::Braille)
+                .graph_type(GraphType::Line)
+                .style(Style::default().fg(if live { CYAN } else { DIM }))
+                .data(run)
+        })
+        .collect();
+    let chart = |datasets| {
         Chart::new(datasets)
             .legend_position(None)
-            .x_axis(Axis::default().bounds([0.0, f64::from(area.width.saturating_sub(1).max(1))]))
-            .y_axis(Axis::default().bounds([0.0, maximum as f64]))
-            .style(Style::default().bg(BACKGROUND)),
-        area,
-    );
+            .x_axis(
+                Axis::default()
+                    .bounds([
+                        0.0,
+                        f64::from(area.width.saturating_sub(CHART_AXIS_WIDTH + 1).max(1)),
+                    ])
+                    .labels(
+                        time_labels
+                            .iter()
+                            .cloned()
+                            .map(|label| Line::from(label).style(Style::default().fg(MUTED))),
+                    )
+                    .labels_alignment(Alignment::Center)
+                    .style(Style::default().fg(BORDER)),
+            )
+            .y_axis(
+                Axis::default()
+                    .bounds([0.0, maximum as f64])
+                    .labels([0, maximum / 2, maximum].map(|value| {
+                        Line::from(format!("{value:>6}")).style(Style::default().fg(MUTED))
+                    }))
+                    .labels_alignment(Alignment::Right)
+                    .style(Style::default().fg(BORDER)),
+            )
+            .style(Style::default().bg(BACKGROUND))
+    };
+    frame.render_widget(chart(input_datasets), area);
+    // Chart layers replace whole Braille cells. Merge patterns rather than erasing a series.
+    let mut overlay = Buffer::empty(area);
+    chart(output_datasets).render(area, &mut overlay);
+    for (position, cell) in overlay.content.iter().enumerate() {
+        let Some(output) = braille_pattern(cell.symbol()) else {
+            continue;
+        };
+        let x = area.x + (position % usize::from(area.width)) as u16;
+        let y = area.y + (position / usize::from(area.width)) as u16;
+        let target = &mut frame.buffer_mut()[(x, y)];
+        if let Some(input) = braille_pattern(target.symbol()) {
+            target.set_char(char::from_u32(0x2800 + (input | output)).unwrap());
+            target.set_fg(if live { TEXT } else { DIM });
+        } else {
+            *target = cell.clone();
+        }
+    }
+}
+
+fn braille_pattern(symbol: &str) -> Option<u32> {
+    symbol
+        .chars()
+        .next()
+        .filter(|c| ('\u{2801}'..='\u{28ff}').contains(c))
+        .map(|c| c as u32 - 0x2800)
+}
+
+pub(crate) fn chart_time_labels(
+    now_ms: i64,
+    resolution: crate::history::Resolution,
+    width: u16,
+    timezone: Option<chrono_tz::Tz>,
+) -> [String; 3] {
+    let span = resolution.seconds() * 1000;
+    let latest = now_ms.div_euclid(span) * span;
+    let duration = i64::from(width.saturating_sub(1)) * span;
+    let format = match resolution {
+        crate::history::Resolution::TenSeconds => "%H:%M:%S",
+        crate::history::Resolution::Minute => "%H:%M",
+        crate::history::Resolution::Hour => "%m-%d %Hh",
+    };
+    [latest - duration, latest - duration / 2, latest].map(|time| {
+        chrono::DateTime::from_timestamp_millis(time)
+            .map(|time| {
+                if let Some(zone) = timezone {
+                    time.with_timezone(&zone).format(format).to_string()
+                } else {
+                    time.with_timezone(&chrono::Local)
+                        .format(format)
+                        .to_string()
+                }
+            })
+            .unwrap_or_else(|| "--".into())
+    })
 }
 
 fn idle_graph(frame: &mut Frame, area: Rect, elapsed: std::time::Duration) {

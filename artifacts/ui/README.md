@@ -53,9 +53,15 @@ of graph history, and positive fractional averages remain visible.
 `dashboard-chart.svg` shows the production four-row shared Chart widget with
 Braille line datasets: INPUT green and OUTPUT cyan, one common auto scale starting
 at 100 W and doubling as needed. The additional chart scenes cover 80x24, 60x19,
-recording gaps, idle, low load and daemon loss. `g` switches the visualization
+recording gaps, idle, low load and daemon loss. The 60s and 1h chart scenes
+exercise time-axis formats. Axes use the real Chart/Axis widgets: power labels
+on the left, and timezone-aware bucket times below four plot rows. The plot
+width excludes the seven reserved vertical-axis columns. `g` switches the visualization
 locally without writing settings. The full-width chart requests one aggregate
 bucket per column, and missing buckets break lines instead of becoming zero.
+The production compositor unions overlapping Braille patterns from two renders
+of the same Chart widget; shared cells use a neutral color instead of losing
+one series. `dashboard-chart-nearby.svg` covers INPUT 49/51 W and OUTPUT 28 W.
 
 SVG is canonical. Each cell is 10x20 SVG units. Background rectangles cover every
 cell without gaps. Text preserves Unicode, RGB/ANSI colors, bold, and foreground

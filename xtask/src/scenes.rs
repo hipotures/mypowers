@@ -18,6 +18,9 @@ pub enum Scene {
     LiveMinute,
     LiveHour,
     Chart,
+    ChartMinute,
+    ChartHour,
+    ChartNearby,
     ChartGaps,
     ChartIdle,
     ChartLowLoad,
@@ -42,6 +45,9 @@ pub const SCENES: &[(&str, Scene, u16, u16)] = &[
     ("dashboard-live-80x24.svg", Scene::Live, 80, 24),
     ("dashboard-live-60x19.svg", Scene::Live, 60, 19),
     ("dashboard-chart.svg", Scene::Chart, 120, 30),
+    ("dashboard-chart-nearby.svg", Scene::ChartNearby, 120, 30),
+    ("dashboard-chart-60s.svg", Scene::ChartMinute, 120, 30),
+    ("dashboard-chart-1h.svg", Scene::ChartHour, 120, 30),
     ("dashboard-chart-80x24.svg", Scene::Chart, 80, 24),
     ("dashboard-chart-60x19.svg", Scene::Chart, 60, 19),
     ("dashboard-chart-gaps.svg", Scene::ChartGaps, 120, 30),
@@ -123,6 +129,12 @@ fn app(scene: Scene) -> Result<App, String> {
     app.selected = None;
     app.feedback = Some(Feedback::new("AC ON confirmed", Severity::Success));
     match scene {
+        Scene::ChartNearby => {
+            let sample = status.telemetry.sample.as_mut().unwrap();
+            sample.input_power_w = 51;
+            sample.output_power_w = 28;
+            app.feedback = None;
+        }
         Scene::LowLoad | Scene::ChartLowLoad => {
             let sample = status.telemetry.sample.as_mut().unwrap();
             sample.input_power_w = 35;
@@ -240,12 +252,15 @@ fn app(scene: Scene) -> Result<App, String> {
             app.feedback = None;
         }
         Scene::Live | Scene::Chart | Scene::ChartGaps => {}
-        Scene::LiveMinute => app.graph.resolution = Resolution::Minute,
-        Scene::LiveHour => app.graph.resolution = Resolution::Hour,
+        Scene::LiveMinute | Scene::ChartMinute => app.graph.resolution = Resolution::Minute,
+        Scene::LiveHour | Scene::ChartHour => app.graph.resolution = Resolution::Hour,
     }
     if matches!(
         scene,
         Scene::Chart
+            | Scene::ChartMinute
+            | Scene::ChartHour
+            | Scene::ChartNearby
             | Scene::ChartGaps
             | Scene::ChartIdle
             | Scene::ChartLowLoad
@@ -276,12 +291,16 @@ fn app(scene: Scene) -> Result<App, String> {
             );
             app.graph.points.push(Point {
                 bucket_start_ms: timestamp.timestamp_millis(),
-                input_power_w: if flat {
+                input_power_w: if matches!(scene, Scene::ChartNearby) {
+                    if index % 2 == 0 { 49.0 } else { 51.0 }
+                } else if flat {
                     sample.input_power_w as f64
                 } else {
                     input[index as usize % input.len()] as f64
                 },
-                output_power_w: if flat {
+                output_power_w: if matches!(scene, Scene::ChartNearby) {
+                    28.0
+                } else if flat {
                     sample.output_power_w as f64
                 } else {
                     output[index as usize % output.len()] as f64
