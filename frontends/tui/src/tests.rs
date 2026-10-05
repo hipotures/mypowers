@@ -48,6 +48,40 @@ fn text(buffer: &Buffer) -> String {
 }
 
 #[test]
+fn safe_text_borrows_clean_input_and_preserves_sanitization_limits() {
+    use crate::model::safe;
+    use std::borrow::Cow;
+
+    for clean in ["", "AC ON confirmed", "╭ ● ▁█ 界 e\u{0301} 🇵🇱 👨‍👩‍👧‍👦"]
+    {
+        let cleaned = safe(clean);
+        assert!(matches!(cleaned, Cow::Borrowed(_)));
+        assert_eq!(cleaned, clean);
+        assert_eq!(cleaned.as_ptr(), clean.as_ptr());
+    }
+    for (input, expected) in [
+        ("AC\nON\r\t\0OFF", "ACONOFF"),
+        ("\x1b[31mWarning\x1b[0m", "[31mWarning[0m"),
+        ("\x1b]52;c;payload\x07", "]52;c;payload"),
+        ("A\u{0085}\u{009b}B\u{007f}", "AB"),
+    ] {
+        let cleaned = safe(input);
+        assert!(matches!(cleaned, Cow::Owned(_)));
+        assert_eq!(cleaned, expected);
+        assert!(cleaned.chars().all(|character| !character.is_control()));
+    }
+    // The cap counts Unicode scalar values, not UTF-8 bytes or filtered controls.
+    let boundary = "界".repeat(2000);
+    assert!(matches!(safe(&boundary), Cow::Borrowed(_)));
+    for input in [format!("{boundary}界"), format!("\0\n{boundary}\u{009b}界")] {
+        let cleaned = safe(&input);
+        assert!(matches!(cleaned, Cow::Owned(_)));
+        assert_eq!(cleaned, boundary);
+        assert_eq!(cleaned.chars().count(), 2000);
+    }
+}
+
+#[test]
 fn commands_capture_revision_without_optimistic_state_changes_or_replay() {
     let mut app = app();
     let Effect::Request(Intent::Output {

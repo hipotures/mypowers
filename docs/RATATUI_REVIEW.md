@@ -401,6 +401,45 @@ passed with unchanged production code. Ruff checks/formatting and diff checks
 passed. All 15 SVGs pass `--check`; regenerated SVG hashes and Help PNG bytes
 match the before set exactly. Inspected Help before and after.
 
+### 14. Borrow sanitized display text instead of allocating every frame
+
+Reviewed [text primitives](https://ratatui.rs/recipes/render/display-text/),
+[Paragraph rendering](https://ratatui.rs/recipes/widgets/paragraph/), and the
+installed Span API. Ratatui accepts borrowed `Cow<str>` content; the sanitizer
+previously allocated a fresh String for every display value, even when it had
+no controls and already fit the 2,000-scalar limit.
+
+The sanitizer now returns borrowed text for that common case and allocates only
+when filtering or truncation is needed. Feedback and the Settings row builder
+explicitly own values that must outlive their source strings. Control removal
+and the scalar limit remain unchanged. No cache, additional dependency, widget
+replacement, or layout change was added.
+
+Extended the offline rendering benchmark with a System allocator wrapper that
+counts allocation/reallocation calls in 100 warmed frames. Counting is disabled
+during the five timing rounds; the wrapper itself is benchmark-only. These are
+whole TestBackend-frame counts, not peak memory measurements or daemon metrics.
+
+| Scene | Calls/frame before → after | Median µs/frame before → after |
+| --- | --- | --- |
+| Dashboard live | 94 → 90 | 130.35 → 126.24 |
+| Dashboard idle | 98 → 94 | 125.93 → 121.93 |
+| Logs modal | 378 → 294 | 266.45 → 260.48 |
+
+The log frame makes 84 fewer allocation/reallocation calls (about 22%). Timing
+differences are small; overlapping ranges do not support a strong claim about
+end-to-end speed. The renderer's refresh interval remains 250 ms.
+
+All 40 Rust tests, 9 xtask tests and 24 native PTY cases passed, including
+live/archive logs, simulated controls, stream/input bursts, copying, TLS,
+signals, panic cleanup and terminal restoration. A new sanitizer regression
+covers borrowed UTF-8 input, C0/C1 controls, terminal escape sequences, and
+2,000-scalar boundaries with multibyte characters. Formatting, Clippy with
+warnings denied, and diff checks passed. All 15 SVGs pass `--check`; regenerated
+SVG hashes and Logs PNG bytes match the before set exactly. Inspected Logs
+before and after. Built the release binary and updated the local installed
+frontend; existing processes were not restarted.
+
 ## Remaining review
 
 - Review remaining applicable application examples and tutorial integration details.

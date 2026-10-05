@@ -754,7 +754,7 @@ fn settings(frame: &mut Frame, area: Rect, app: &App) {
     let row = |label: &str, value: String| {
         Line::from(vec![
             Span::styled(format!("{label:<20}"), Style::default().fg(MUTED)),
-            Span::styled(safe(&value), Style::default().fg(TEXT)),
+            Span::styled(safe(&value).into_owned(), Style::default().fg(TEXT)),
         ])
     };
     let heading = |title: &'static str| {

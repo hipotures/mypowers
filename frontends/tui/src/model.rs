@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use std::borrow::Cow;
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct Sample {
@@ -123,10 +124,17 @@ pub struct StreamMessage {
     pub data: Option<Value>,
 }
 
-pub fn safe(value: &str) -> String {
-    value
-        .chars()
-        .filter(|c| !c.is_control())
-        .take(2000)
-        .collect()
+pub fn safe(value: &str) -> Cow<'_, str> {
+    for (index, character) in value.chars().enumerate() {
+        if index == 2000 || character.is_control() {
+            return Cow::Owned(
+                value
+                    .chars()
+                    .filter(|c| !c.is_control())
+                    .take(2000)
+                    .collect(),
+            );
+        }
+    }
+    Cow::Borrowed(value)
 }

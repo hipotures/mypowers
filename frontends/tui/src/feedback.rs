@@ -19,7 +19,7 @@ pub struct Feedback {
 impl Feedback {
     pub fn new(message: impl Into<String>, severity: Severity) -> Self {
         Self {
-            message: safe(&message.into()),
+            message: safe(&message.into()).into_owned(),
             severity,
             started: Instant::now(),
         }
