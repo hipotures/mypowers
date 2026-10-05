@@ -209,7 +209,11 @@ impl Api {
                     )
                     .await;
                     match next {
-                        Ok(Ok(next)) => command = next,
+                        Ok(Ok(next))
+                            if next.output == output && next.requested_enabled == enabled =>
+                        {
+                            command = next;
+                        }
                         _ => {
                             return outcome_uncertain();
                         }
@@ -1245,6 +1249,117 @@ mod tests {
             .unwrap()
             .unwrap();
         assert!(incoming.recv().await.is_none());
+    }
+
+    #[tokio::test]
+    async fn command_polling_preserves_the_admitted_output_intention() {
+        const ID: &str = "6147f85c-53ef-42f4-b3f2-c15b071320a5";
+        for (output, enabled, status, id, valid) in [
+            ("ac", true, "confirmed", ID, true),
+            ("dc", true, "confirmed", ID, false),
+            ("light", true, "confirmed", ID, false),
+            ("ac", false, "confirmed", ID, false),
+            ("dc", true, "sent", ID, false),
+            ("ac", false, "sent", ID, false),
+            (
+                "ac",
+                true,
+                "confirmed",
+                "69be0c88-45b3-479b-a6e2-867579f98e73",
+                false,
+            ),
+        ] {
+            let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+            let api = api_for(&listener);
+            let mut app = crate::app::App::new(false, Some(chrono_tz::UTC));
+            app.update(Event::Status(Box::new(crate::tests::status())));
+            let crate::app::Effect::Request(intent) = app.toggle(0) else {
+                panic!("Expected an AC ON command");
+            };
+            let server = tokio::spawn(async move {
+                for (path, response) in [
+                    (
+                        "PUT /api/v1/outputs/ac HTTP/1.1".to_owned(),
+                        json!({
+                            "schema_version": 1, "command_id": ID, "status": "accepted",
+                            "output": "ac", "requested_enabled": true, "reason_code": null
+                        }),
+                    ),
+                    (
+                        format!("GET /api/v1/commands/{ID} HTTP/1.1"),
+                        json!({
+                            "schema_version": 1, "command_id": id, "status": status,
+                            "output": output, "requested_enabled": enabled, "reason_code": null
+                        }),
+                    ),
+                ] {
+                    let (mut socket, request) = accept_http_request(&listener).await;
+                    assert!(request.starts_with(&path));
+                    let body = response.to_string();
+                    socket
+                        .write_all(
+                            format!(
+                                "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+                                body.len()
+                            )
+                            .as_bytes(),
+                        )
+                        .await
+                        .unwrap();
+                }
+                assert!(
+                    timeout(Duration::from_millis(300), listener.accept())
+                        .await
+                        .is_err(),
+                    "A contradictory result must not be followed or replayed"
+                );
+            });
+            let (events, mut incoming) = mpsc::channel(4);
+            let feedback = timeout(Duration::from_secs(3), api.perform(intent, &events)).await;
+            timeout(Duration::from_secs(3), server)
+                .await
+                .unwrap()
+                .unwrap();
+            let feedback = feedback.unwrap();
+            assert_eq!(
+                feedback.message,
+                if valid {
+                    "AC ON confirmed"
+                } else {
+                    "Command outcome uncertain; check station before retrying"
+                },
+                "poll output={output}, enabled={enabled}, status={status}, id={id}"
+            );
+            assert_eq!(
+                feedback.severity,
+                if valid {
+                    Severity::Success
+                } else {
+                    Severity::Warning
+                }
+            );
+            let Event::Command(admitted) = incoming.try_recv().unwrap() else {
+                panic!("Expected only the valid admission event");
+            };
+            assert_eq!(admitted.command_id, ID);
+            assert_eq!(admitted.output, "ac");
+            assert!(admitted.requested_enabled);
+            assert!(incoming.try_recv().is_err());
+            app.update(Event::Command(admitted));
+            app.update(Event::Finished(feedback));
+            assert!(app.pending.is_none());
+            assert!(
+                !app.status
+                    .as_ref()
+                    .unwrap()
+                    .telemetry
+                    .sample
+                    .as_ref()
+                    .unwrap()
+                    .ac_enabled,
+                "Command feedback must never replace station telemetry"
+            );
+        }
     }
 
     #[tokio::test]

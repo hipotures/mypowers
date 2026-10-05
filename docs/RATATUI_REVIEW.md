@@ -805,6 +805,35 @@ regenerated SVGs and daemon-offline PNG bytes match the before set exactly.
 Inspected that scene before and after. Built the release frontend and updated
 the installed local binary without restarting existing application processes.
 
+### 28. Preserve command identity through result polling
+
+Completed the Counter tutorial's [application state](https://ratatui.rs/tutorials/counter-app/_multiple-files/app/)
+and [UI rendering](https://ratatui.rs/tutorials/counter-app/_multiple-files/ui/)
+sections. Production already separates state transitions, effects, and rendering;
+the examples do not warrant another application framework or layout rewrite.
+Reviewed the boundary between network results and those state transitions.
+The server retains each command's output and requested value while updating its
+status. The frontend checked those immutable fields on admission, but later GET
+responses checked only the UUID and general DTO validity. A contradictory result
+with the same UUID could therefore display confirmation of another intention.
+
+A real loopback regression reproduced AC ON being reported as DC ON confirmed.
+Result polling now requires both the original output and requested value, in
+addition to its existing UUID validation. Contradictions return the existing
+uncertain-outcome warning immediately and never retry the output operation.
+The regression covers seven replies: valid confirmation, changed DC/Lamps output,
+changed requested value, contradictory intermediate status, and another UUID.
+It also checks that only the valid admission becomes a command event, pending
+state clears, and feedback never replaces actual station telemetry.
+
+The targeted regression passed in 3.93 seconds and all 54 Rust tests passed in
+35.11 seconds. Formatting, Clippy with warnings denied, and diff checks passed.
+All 15 SVGs pass `--check`; regenerated SVGs and command-pending PNG bytes match
+the before set exactly. Inspected that scene before and after.
+All 29 terminal-suite cases passed in 84.55 seconds against isolated services.
+Built the release frontend and updated the installed local binary without
+restarting existing application processes.
+
 ## Remaining review
 
 - Review remaining applicable application examples and tutorial integration details.
