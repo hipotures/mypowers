@@ -6,6 +6,46 @@ use std::time::Instant;
 pub const MAX_BUCKETS: u16 = 256;
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum Visualization {
+    #[default]
+    Sparkline,
+    Chart,
+}
+
+impl Visualization {
+    pub fn next(self) -> Self {
+        match self {
+            Self::Sparkline => Self::Chart,
+            Self::Chart => Self::Sparkline,
+        }
+    }
+
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::Sparkline => "Sparkline",
+            Self::Chart => "Chart",
+        }
+    }
+
+    pub fn height(self) -> u16 {
+        match self {
+            Self::Sparkline => 2,
+            Self::Chart => 4,
+        }
+    }
+}
+
+/// Start at 100 W and double until every visible value fits.
+pub fn power_scale(values: impl IntoIterator<Item = f64>) -> u64 {
+    let peak = values.into_iter().fold(0.0_f64, f64::max);
+    let mut maximum = 100;
+    while peak > maximum as f64 {
+        maximum *= 2;
+    }
+    maximum
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum Resolution {
     #[default]
     TenSeconds,
@@ -111,6 +151,7 @@ pub struct Response {
 }
 
 pub struct Graph {
+    pub visualization: Visualization,
     pub resolution: Resolution,
     pub width: u16,
     pub points: Vec<Point>,
@@ -119,6 +160,7 @@ pub struct Graph {
 impl Default for Graph {
     fn default() -> Self {
         Self {
+            visualization: Visualization::default(),
             resolution: Resolution::default(),
             width: 43,
             points: Vec::new(),
@@ -128,7 +170,15 @@ impl Default for Graph {
 
 impl Graph {
     pub fn data(&self, now_ms: i64, width: u16, output: bool) -> Vec<f64> {
-        let mut values = vec![0.0; usize::from(width)];
+        self.columns(now_ms, width, output)
+            .into_iter()
+            .map(|value| value.unwrap_or(0.0))
+            .collect()
+    }
+
+    /// Keep missing buckets distinct from measured zeros for line-chart breaks.
+    pub fn columns(&self, now_ms: i64, width: u16, output: bool) -> Vec<Option<f64>> {
+        let mut values = vec![None; usize::from(width)];
         let first = now_ms.div_euclid(self.resolution.seconds() * 1000) - i64::from(width) + 1;
         for point in &self.points {
             let column = point
@@ -136,11 +186,11 @@ impl Graph {
                 .div_euclid(self.resolution.seconds() * 1000)
                 - first;
             if (0..i64::from(width)).contains(&column) {
-                values[column as usize] = if output {
+                values[column as usize] = Some(if output {
                     point.output_power_w
                 } else {
                     point.input_power_w
-                };
+                });
             }
         }
         values

@@ -1846,7 +1846,7 @@ fn help_lists_only_the_context_that_opened_it() {
 }
 
 #[test]
-fn positive_power_samples_draw_at_least_one_tick_without_changing_fixed_scales() {
+fn positive_power_samples_draw_at_least_one_tick_with_doubling_scales() {
     let symbols = [" ", "▁", "▂", "▃", "▄", "▅", "▆", "▇", "█"];
     for (width, height) in [(60, 19), (80, 24), (120, 30)] {
         for value in [
@@ -1867,7 +1867,8 @@ fn positive_power_samples_draw_at_least_one_tick_without_changing_fixed_scales()
                 .lines()
                 .position(|line| line.contains("INPUT"))
                 .unwrap() as u16;
-            for (start, end, maximum) in [(0, width / 2, 100), (width / 2, width, 300)] {
+            let maximum = crate::history::power_scale([value as f64]);
+            for (start, end) in [(0, width / 2), (width / 2, width)] {
                 let bars: Vec<_> = (start..end)
                     .filter(|&x| {
                         (power_row + 2..=power_row + 3).any(|y| {
@@ -2128,4 +2129,203 @@ fn persistent_status_indicators_include_only_nonzero_counts() {
         let screen = text(&render(&mut app, 94, 29));
         assert_eq!(screen.lines().last().unwrap().trim(), expected);
     }
+}
+
+#[test]
+fn graph_scales_start_at_100_and_double_only_when_exceeded() {
+    use crate::history::power_scale;
+    for (peak, expected) in [
+        (0.0, 100),
+        (0.05, 100),
+        (100.0, 100),
+        (100.01, 200),
+        (200.0, 200),
+        (200.01, 400),
+        (800.0, 800),
+        (65535.0, 102400),
+    ] {
+        assert_eq!(power_scale([0.0, peak]), expected);
+    }
+    assert_eq!(power_scale([]), 100);
+}
+
+#[test]
+fn graph_switch_is_contextual_session_local_and_preserves_loaded_averages() {
+    use crate::history::Visualization;
+    let mut app = fixed_graph_app();
+    seed_current_graph(&mut app);
+    let before = serde_json::to_value(app.status.as_ref().unwrap()).unwrap();
+    let point = app.graph.points[0].clone();
+    let first = app.history_request().unwrap();
+    for view in [View::Logs, View::Settings, View::Help, View::Quit] {
+        app.view = view;
+        assert!(matches!(
+            app.key(KeyEvent::new(KeyCode::Char('g'), KeyModifiers::NONE)),
+            Effect::None
+        ));
+        assert_eq!(app.graph.visualization, Visualization::Sparkline);
+    }
+    app.view = View::Dashboard;
+    for modifier in [KeyModifiers::CONTROL, KeyModifiers::ALT] {
+        app.key(KeyEvent::new(KeyCode::Char('g'), modifier));
+        assert_eq!(app.graph.visualization, Visualization::Sparkline);
+    }
+    app.key(KeyEvent::new(KeyCode::Char('g'), KeyModifiers::NONE));
+    assert_eq!(app.graph.visualization, Visualization::Chart);
+    assert_eq!(app.graph.points[0].bucket_start_ms, point.bucket_start_ms);
+    assert_eq!(app.graph.points[0].input_power_w, point.input_power_w);
+    let screen = text(&render(&mut app, 94, 29));
+    assert!(screen.contains("g spark") && screen.contains("0–200 W"));
+    assert_eq!(
+        app.graph.width, 90,
+        "The shared chart uses the full content width"
+    );
+    let expanded = app.history_request().unwrap();
+    assert!(expanded.generation > first.generation);
+    assert_eq!(expanded.width, 90);
+    app.key(KeyEvent::new(KeyCode::Char('g'), KeyModifiers::NONE));
+    assert_eq!(app.graph.visualization, Visualization::Sparkline);
+    render(&mut app, 94, 29);
+    assert_eq!(app.graph.width, 43);
+    assert_eq!(
+        serde_json::to_value(app.status.as_ref().unwrap()).unwrap(),
+        before
+    );
+    assert_eq!(
+        App::new(false, None).graph.visualization,
+        Visualization::Sparkline
+    );
+}
+
+#[test]
+fn chart_lines_preserve_zero_buckets_and_break_across_missing_observations() {
+    let mut app = fixed_graph_app();
+    let now = app.timeline_now_ms();
+    app.graph.points = vec![
+        Point {
+            bucket_start_ms: now - 40_000,
+            input_power_w: 0.0,
+            output_power_w: 3.0,
+            sample_count: 1,
+        },
+        Point {
+            bucket_start_ms: now - 30_000,
+            input_power_w: 0.5,
+            output_power_w: 2.0,
+            sample_count: 2,
+        },
+        Point {
+            bucket_start_ms: now,
+            input_power_w: 63.0,
+            output_power_w: 181.0,
+            sample_count: 1,
+        },
+    ];
+    let columns = app.graph.columns(now, 6, false);
+    assert_eq!(
+        columns,
+        vec![None, Some(0.0), Some(0.5), None, None, Some(63.0)]
+    );
+    assert_eq!(
+        ui::chart_runs(&columns),
+        vec![vec![(1.0, 0.0), (2.0, 0.5)], vec![(5.0, 63.0)]]
+    );
+    assert!(ui::chart_runs(&[None, None]).is_empty());
+    assert!(app.graph.columns(now, 0, false).is_empty());
+}
+
+#[test]
+fn shared_chart_uses_four_rows_two_colors_common_scale_and_safe_minimum_layout() {
+    use crate::history::Visualization;
+    use ratatui::style::Color;
+    let green = Color::Rgb(118, 203, 137);
+    let cyan = Color::Rgb(92, 181, 204);
+    let mut app = fixed_graph_app();
+    app.graph.visualization = Visualization::Chart;
+    let now = app.timeline_now_ms();
+    app.graph.points = (0..90)
+        .map(|i| Point {
+            bucket_start_ms: now - (89 - i) * 10_000,
+            input_power_w: (i % 10 + 1) as f64 * 8.0,
+            output_power_w: (i % 10 + 1) as f64 * 30.0,
+            sample_count: 1,
+        })
+        .collect();
+    for (width, height) in [(60, 19), (80, 24), (120, 30)] {
+        let buffer = render(&mut app, width, height);
+        let screen = text(&buffer);
+        assert!(screen.contains("INPUT 63 W") && screen.contains("OUTPUT 181 W"));
+        assert_eq!(screen.matches("0–400 W").count(), 1, "One common scale");
+        let row = screen
+            .lines()
+            .position(|line| line.contains("INPUT"))
+            .unwrap() as u16;
+        for color in [green, cyan] {
+            let cells: Vec<_> = (row + 2..row + 6)
+                .flat_map(|y| (0..width).map(move |x| (x, y)))
+                .filter(|&(x, y)| {
+                    buffer[(x, y)].fg == color
+                        && buffer[(x, y)]
+                            .symbol()
+                            .chars()
+                            .any(|c| ('\u{2801}'..='\u{28ff}').contains(&c))
+                })
+                .collect();
+            assert!(
+                !cells.is_empty(),
+                "Both datasets must render at {width}x{height}"
+            );
+        }
+        assert!(
+            app.controls
+                .iter()
+                .all(|rect| rect.y >= row + 6 && rect.bottom() < height)
+        );
+        assert!(screen.contains("q quit"));
+    }
+    app.connected = false;
+    let buffer = render(&mut app, 120, 30);
+    assert!(
+        buffer
+            .content
+            .iter()
+            .filter(|cell| cell
+                .symbol()
+                .chars()
+                .any(|c| ('\u{2801}'..='\u{28ff}').contains(&c)))
+            .all(|cell| cell.fg == Color::Rgb(79, 93, 102))
+    );
+    assert!(text(&buffer).contains("DAEMON OFFLINE"));
+    assert!(text(&render(&mut app, 50, 14)).contains("Terminal too small"));
+}
+
+#[test]
+fn shared_chart_idle_waits_for_both_histories_and_returns_on_fractional_power() {
+    use crate::history::Visualization;
+    let mut app = fixed_graph_app();
+    app.graph.visualization = Visualization::Chart;
+    let sample = app
+        .status
+        .as_mut()
+        .unwrap()
+        .telemetry
+        .sample
+        .as_mut()
+        .unwrap();
+    sample.input_power_w = 0;
+    sample.output_power_w = 0;
+    assert_eq!(text(&render(&mut app, 94, 29)).matches('○').count(), 1);
+    seed_current_graph(&mut app);
+    app.graph.points[0].output_power_w = 0.05;
+    let buffer = render(&mut app, 94, 29);
+    assert!(!text(&buffer).contains('○'));
+    assert!(buffer.content.iter().any(|cell| {
+        cell.symbol()
+            .chars()
+            .any(|c| ('\u{2801}'..='\u{28ff}').contains(&c))
+    }));
+    app.graph.points.clear();
+    assert_eq!(text(&render(&mut app, 94, 29)).matches('○').count(), 1);
+    app.connected = false;
+    assert!(!text(&render(&mut app, 94, 29)).contains('○'));
 }

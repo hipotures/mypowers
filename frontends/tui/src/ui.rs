@@ -1,6 +1,7 @@
 use crate::{
     app::{App, View},
     feedback::{Feedback, Severity},
+    history::{Visualization, power_scale},
     model::safe,
 };
 use ratatui::{
@@ -8,10 +9,11 @@ use ratatui::{
     buffer::Buffer,
     layout::{Alignment, Constraint, Flex, Layout, Rect},
     style::{Color, Modifier, Style},
+    symbols::Marker,
     text::{Line, Span},
     widgets::{
-        Block, BorderType, Borders, Clear, Paragraph, Scrollbar, ScrollbarOrientation,
-        ScrollbarState, Sparkline, SparklineBar, Widget,
+        Axis, Block, BorderType, Borders, Chart, Clear, Dataset, GraphType, Paragraph, Scrollbar,
+        ScrollbarOrientation, ScrollbarState, Sparkline, SparklineBar, Widget,
     },
 };
 use std::borrow::Cow;
@@ -27,6 +29,7 @@ const BORDER: Color = Color::Rgb(68, 94, 105);
 const DIM: Color = Color::Rgb(79, 93, 102);
 const TRACK: Color = Color::Rgb(34, 46, 54);
 const GREEN: Color = Color::Rgb(118, 203, 137);
+const CYAN: Color = Color::Rgb(92, 181, 204);
 const YELLOW: Color = Color::Rgb(220, 199, 111);
 const ORANGE: Color = Color::Rgb(227, 151, 91);
 const RED: Color = Color::Rgb(229, 101, 111);
@@ -68,7 +71,12 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
     if app.view == View::Dashboard {
         app.title = Rect::new(area.x + (area.width - 10) / 2 + 1, area.y, 8, 1);
     }
-    let footer = outer_footer(app.view, area.width, app.graph.resolution.label());
+    let footer = outer_footer(
+        app.view,
+        area.width,
+        app.graph.resolution.label(),
+        app.graph.visualization,
+    );
     let outer = Block::default()
         .borders(Borders::ALL)
         .border_type(BorderType::Rounded)
@@ -192,13 +200,18 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
     }
 }
 
-fn outer_footer(view: View, width: u16, interval: &str) -> String {
+fn outer_footer(view: View, width: u16, interval: &str, visualization: Visualization) -> String {
+    let alternate = if visualization == Visualization::Sparkline {
+        "chart"
+    } else {
+        "spark"
+    };
     match view {
         View::Dashboard if width >= 80 => format!(
-            " a AC  d DC  l lamps  F3 logs  s settings  t {interval}  r retry  p pause  ? help  q quit "
+            " a AC d DC l lamps F3 logs s settings t {interval} g {alternate} r retry p pause ? help q quit "
         ),
         View::Dashboard => {
-            format!(" a/d/l outputs  F3 logs  s settings  t {interval}  ? help  q quit ")
+            format!(" a/d/l outputs F3 logs s settings t {interval} g view ? q quit ")
         }
         View::Logs => " Esc close  ? help  q quit  Ctrl-Q quit now ".into(),
         View::Settings => " b DEBUG  Esc close  ? help  q quit  Ctrl-Q quit now ".into(),
@@ -350,6 +363,8 @@ fn dim_background(frame: &mut Frame) {
 
 fn dashboard(frame: &mut Frame, content: Rect, app: &mut App) {
     let live = app.live();
+    let chart = app.graph.visualization == Visualization::Chart;
+    let graph_height = app.graph.visualization.height();
     let rows = Layout::vertical([
         Constraint::Length(1),
         Constraint::Fill(1),
@@ -357,7 +372,7 @@ fn dashboard(frame: &mut Frame, content: Rect, app: &mut App) {
         Constraint::Length(1),
         Constraint::Length(1),
         Constraint::Fill(1),
-        Constraint::Length(4),
+        Constraint::Length(2 + graph_height),
         Constraint::Fill(1),
         Constraint::Length(2),
         Constraint::Fill(1),
@@ -401,7 +416,11 @@ fn dashboard(frame: &mut Frame, content: Rect, app: &mut App) {
         Constraint::Fill(1),
     ])
     .split(rows[6]);
-    app.set_graph_width(power[0].width.max(power[2].width));
+    app.set_graph_width(if chart {
+        rows[6].width
+    } else {
+        power[0].width.max(power[2].width)
+    });
     let sample = app
         .status
         .as_ref()
@@ -439,31 +458,26 @@ fn dashboard(frame: &mut Frame, content: Rect, app: &mut App) {
         .style(Style::default().fg(MUTED)),
         rows[4],
     );
-    for (rect, label, value, output, maximum) in [
-        (
-            power[0],
-            "INPUT",
-            sample.map(|s| s.input_power_w),
-            false,
-            100_u64,
-        ),
-        (
-            power[2],
-            "OUTPUT",
-            sample.map(|s| s.output_power_w),
-            true,
-            300_u64,
-        ),
+    for (rect, label, value, output) in [
+        (power[0], "INPUT", sample.map(|s| s.input_power_w), false),
+        (power[2], "OUTPUT", sample.map(|s| s.output_power_w), true),
     ] {
         let parts = Layout::vertical([
             Constraint::Length(1),
             Constraint::Length(1),
-            Constraint::Length(2),
+            Constraint::Length(graph_height),
         ])
         .split(rect);
         frame.render_widget(
             Paragraph::new(Line::from(vec![
-                Span::styled(format!("{label} "), Style::default().fg(MUTED)),
+                Span::styled(
+                    format!("{label} "),
+                    Style::default().fg(if chart && live {
+                        if output { CYAN } else { GREEN }
+                    } else {
+                        MUTED
+                    }),
+                ),
                 Span::styled(
                     value.map(|v| v.to_string()).unwrap_or_else(|| "--".into()),
                     Style::default().fg(TEXT).add_modifier(Modifier::BOLD),
@@ -473,6 +487,9 @@ fn dashboard(frame: &mut Frame, content: Rect, app: &mut App) {
             .alignment(Alignment::Center),
             parts[0],
         );
+        if chart {
+            continue;
+        }
         if live && value == Some(0) && !app.has_power_history(output) {
             idle_graph(
                 frame,
@@ -481,12 +498,28 @@ fn dashboard(frame: &mut Frame, content: Rect, app: &mut App) {
             );
             continue;
         }
-        // Sparkline floors to eighth-cell ticks; keep positive readings visible at fixed scales.
+        let columns = app
+            .graph
+            .columns(app.timeline_now_ms(), parts[2].width, output);
+        let maximum = power_scale(
+            columns
+                .iter()
+                .flatten()
+                .copied()
+                .chain(value.map(|v| v as f64)),
+        );
+        frame.render_widget(
+            Paragraph::new(format!("0–{maximum} W"))
+                .alignment(Alignment::Right)
+                .style(Style::default().fg(DIM)),
+            parts[1],
+        );
+        // Sparkline floors to eighth-cell ticks; keep positive readings visible at the selected scale.
         let scale = maximum * 1000;
         let minimum = scale.div_ceil(8 * u64::from(parts[2].height.max(1)));
-        let data = app
-            .graph_data(parts[2].width, output)
+        let data = columns
             .into_iter()
+            .map(|value| value.unwrap_or(0.0))
             .map(|value| {
                 let visible = if value == 0.0 {
                     0
@@ -500,6 +533,37 @@ fn dashboard(frame: &mut Frame, content: Rect, app: &mut App) {
                 }))
             });
         frame.render_widget(Sparkline::default().data(data).max(scale), parts[2]);
+    }
+    if chart {
+        let area = Rect::new(rows[6].x, rows[6].y + 2, rows[6].width, graph_height);
+        if live
+            && sample.is_some_and(|s| s.input_power_w == 0 && s.output_power_w == 0)
+            && !app.has_power_history(false)
+            && !app.has_power_history(true)
+        {
+            idle_graph(
+                frame,
+                area,
+                app.clock.animation_elapsed(app.animation_started),
+            );
+        } else {
+            let input = app.graph.columns(app.timeline_now_ms(), area.width, false);
+            let output = app.graph.columns(app.timeline_now_ms(), area.width, true);
+            let maximum = power_scale(
+                input.iter().chain(&output).flatten().copied().chain(
+                    sample
+                        .into_iter()
+                        .flat_map(|s| [s.input_power_w as f64, s.output_power_w as f64]),
+                ),
+            );
+            frame.render_widget(
+                Paragraph::new(format!("0–{maximum} W"))
+                    .alignment(Alignment::Right)
+                    .style(Style::default().fg(DIM)),
+                Rect::new(rows[6].x, rows[6].y + 1, rows[6].width, 1),
+            );
+            power_chart(frame, area, &input, &output, maximum, live);
+        }
     }
     let controls = Layout::horizontal([Constraint::Ratio(1, 3); 3]).split(rows[8]);
     for (index, label) in ["AC", "DC", "LAMPS"].iter().enumerate() {
@@ -536,6 +600,55 @@ fn dashboard(frame: &mut Frame, content: Rect, app: &mut App) {
             rect,
         );
     }
+}
+
+/// Separate datasets prevent the built-in line renderer from bridging recording gaps.
+pub(crate) fn chart_runs(columns: &[Option<f64>]) -> Vec<Vec<(f64, f64)>> {
+    let mut runs = Vec::new();
+    let mut run = Vec::new();
+    for (column, value) in columns.iter().enumerate() {
+        match value {
+            Some(value) => run.push((column as f64, *value)),
+            None if !run.is_empty() => runs.push(std::mem::take(&mut run)),
+            None => {}
+        }
+    }
+    if !run.is_empty() {
+        runs.push(run);
+    }
+    runs
+}
+
+fn power_chart(
+    frame: &mut Frame,
+    area: Rect,
+    input: &[Option<f64>],
+    output: &[Option<f64>],
+    maximum: u64,
+    live: bool,
+) {
+    let input_runs = chart_runs(input);
+    let output_runs = chart_runs(output);
+    let datasets = input_runs
+        .iter()
+        .map(|run| (run, GREEN))
+        .chain(output_runs.iter().map(|run| (run, CYAN)))
+        .map(|(run, color)| {
+            Dataset::default()
+                .marker(Marker::Braille)
+                .graph_type(GraphType::Line)
+                .style(Style::default().fg(if live { color } else { DIM }))
+                .data(run)
+        })
+        .collect();
+    frame.render_widget(
+        Chart::new(datasets)
+            .legend_position(None)
+            .x_axis(Axis::default().bounds([0.0, f64::from(area.width.saturating_sub(1).max(1))]))
+            .y_axis(Axis::default().bounds([0.0, maximum as f64]))
+            .style(Style::default().bg(BACKGROUND)),
+        area,
+    );
 }
 
 fn idle_graph(frame: &mut Frame, area: Rect, elapsed: std::time::Duration) {
@@ -833,7 +946,7 @@ fn help(frame: &mut Frame, area: Rect, context: View) {
     } else if context == View::Logs {
         "HELP — LOGS\n\nUp/Down, PageUp/PageDown   Scroll records\nMouse wheel / scrollbar   Scroll or drag\nLeft/Right or [ / ]       Previous/next day\nf                        Change minimum log level\n+ / -                    Change page size\nHome                     Beginning of selected day\nEnd                      Today: latest records and live follow\nb                        Toggle runtime DEBUG override\nDouble-click LOGS        Copy all loaded records\n\nEsc close   q confirm quit   Ctrl-Q quit immediately"
     } else {
-        "HELP — DASHBOARD\n\na / d / l                Request AC / DC / lamps ON/OFF\nTab / Shift-Tab          Focus output control\nEnter / Space            Activate focused output\nF3                       Open Logs\ns                        Open Settings / Diagnostics\nt                        Cycle average per bar: 10s / 60s / 1h\nr                        Retry station connection\np                        Pause/resume station connection\nF1 / ?                   Help for the active window\nDouble-click MYPOWERS    Copy current API snapshot\n\nEsc close   q confirm quit   Ctrl-Q quit immediately"
+        "HELP — DASHBOARD\n\na / d / l                Request AC / DC / lamps ON/OFF\nTab / Shift-Tab          Focus output control\nEnter / Space            Activate focused output\nF3                       Open Logs\ns                        Open Settings / Diagnostics\nt                        Cycle average per bar: 10s / 60s / 1h\ng                        Switch Sparkline / Chart (session only)\nr                        Retry station connection\np                        Pause/resume station connection\nF1 / ?                   Help for the active window\nDouble-click MYPOWERS    Copy current API snapshot\n\nEsc close   q confirm quit   Ctrl-Q quit immediately"
     };
     frame.render_widget(Paragraph::new(text).style(Style::default().fg(MUTED)), area);
 }

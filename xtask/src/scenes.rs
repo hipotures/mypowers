@@ -4,7 +4,7 @@ use mypowers_tui::{
     app::{App, View},
     clock::Clock,
     feedback::{Feedback, Severity},
-    history::{Point, Resolution},
+    history::{Point, Resolution, Visualization},
     model::Status,
     ui,
 };
@@ -17,6 +17,11 @@ pub enum Scene {
     Live,
     LiveMinute,
     LiveHour,
+    Chart,
+    ChartGaps,
+    ChartIdle,
+    ChartLowLoad,
+    ChartOffline,
     LowLoad,
     Idle,
     Reconnecting,
@@ -36,6 +41,13 @@ pub const SCENES: &[(&str, Scene, u16, u16)] = &[
     ("dashboard-live-1h.svg", Scene::LiveHour, 120, 30),
     ("dashboard-live-80x24.svg", Scene::Live, 80, 24),
     ("dashboard-live-60x19.svg", Scene::Live, 60, 19),
+    ("dashboard-chart.svg", Scene::Chart, 120, 30),
+    ("dashboard-chart-80x24.svg", Scene::Chart, 80, 24),
+    ("dashboard-chart-60x19.svg", Scene::Chart, 60, 19),
+    ("dashboard-chart-gaps.svg", Scene::ChartGaps, 120, 30),
+    ("dashboard-chart-idle.svg", Scene::ChartIdle, 120, 30),
+    ("dashboard-chart-low-load.svg", Scene::ChartLowLoad, 120, 30),
+    ("dashboard-chart-offline.svg", Scene::ChartOffline, 120, 30),
     ("dashboard-low-load.svg", Scene::LowLoad, 120, 30),
     ("dashboard-idle.svg", Scene::Idle, 120, 30),
     ("dashboard-reconnecting.svg", Scene::Reconnecting, 120, 30),
@@ -111,13 +123,13 @@ fn app(scene: Scene) -> Result<App, String> {
     app.selected = None;
     app.feedback = Some(Feedback::new("AC ON confirmed", Severity::Success));
     match scene {
-        Scene::LowLoad => {
+        Scene::LowLoad | Scene::ChartLowLoad => {
             let sample = status.telemetry.sample.as_mut().unwrap();
             sample.input_power_w = 35;
             sample.output_power_w = 3;
             app.feedback = None;
         }
-        Scene::Idle => {
+        Scene::Idle | Scene::ChartIdle => {
             let sample = status.telemetry.sample.as_mut().unwrap();
             sample.input_power_w = 0;
             sample.output_power_w = 0;
@@ -156,7 +168,7 @@ fn app(scene: Scene) -> Result<App, String> {
                 },
             ));
         }
-        Scene::DaemonOffline => {
+        Scene::DaemonOffline | Scene::ChartOffline => {
             app.connected = false;
             status.telemetry.state = "stale".into();
             status.telemetry.age_seconds = Some(45.0);
@@ -227,9 +239,19 @@ fn app(scene: Scene) -> Result<App, String> {
             app.view = View::Quit;
             app.feedback = None;
         }
-        Scene::Live => {}
+        Scene::Live | Scene::Chart | Scene::ChartGaps => {}
         Scene::LiveMinute => app.graph.resolution = Resolution::Minute,
         Scene::LiveHour => app.graph.resolution = Resolution::Hour,
+    }
+    if matches!(
+        scene,
+        Scene::Chart
+            | Scene::ChartGaps
+            | Scene::ChartIdle
+            | Scene::ChartLowLoad
+            | Scene::ChartOffline
+    ) {
+        app.graph.visualization = Visualization::Chart;
     }
     if !status.valid() {
         return Err("Invalid snapshot status fixture".into());
@@ -237,9 +259,21 @@ fn app(scene: Scene) -> Result<App, String> {
     if let Some(sample) = &status.telemetry.sample {
         let input = [12, 18, 32, 48, 67, 83, 72, 57, 41, 29, 20, 16];
         let output = [38, 52, 84, 113, 164, 218, 256, 229, 197, 146, 97, 63];
-        for index in 0..44 {
-            let timestamp = now - TimeDelta::seconds((43 - index) * app.graph.resolution.seconds());
-            let flat = matches!(scene, Scene::Idle | Scene::LowLoad);
+        let count = if app.graph.visualization == Visualization::Chart {
+            90
+        } else {
+            44
+        };
+        for index in 0..count {
+            let timestamp =
+                now - TimeDelta::seconds((count - 1 - index) * app.graph.resolution.seconds());
+            if matches!(scene, Scene::ChartGaps) && (index < 30 || (50..60).contains(&index)) {
+                continue;
+            }
+            let flat = matches!(
+                scene,
+                Scene::Idle | Scene::LowLoad | Scene::ChartIdle | Scene::ChartLowLoad
+            );
             app.graph.points.push(Point {
                 bucket_start_ms: timestamp.timestamp_millis(),
                 input_power_w: if flat {
@@ -315,6 +349,27 @@ mod tests {
             live.contains("71%") && live.contains("INPUT 63 W") && live.contains("OUTPUT 181 W")
         );
         assert!(live.contains("CONNECTED") && live.contains("AC ON confirmed"));
+        let chart = render(Scene::Chart, 120, 30).unwrap();
+        let chart_text = text(&chart);
+        assert_eq!(chart_text.matches("0–400 W").count(), 1);
+        for color in [
+            ratatui::style::Color::Rgb(118, 203, 137),
+            ratatui::style::Color::Rgb(92, 181, 204),
+        ] {
+            assert!(chart.content.iter().any(|cell| {
+                cell.fg == color
+                    && cell
+                        .symbol()
+                        .chars()
+                        .any(|c| ('\u{2801}'..='\u{28ff}').contains(&c))
+            }));
+        }
+        assert_eq!(
+            text(&render(Scene::ChartIdle, 120, 30).unwrap())
+                .matches('○')
+                .count(),
+            1
+        );
         let reconnecting = text(&render(Scene::Reconnecting, 120, 30).unwrap());
         assert!(
             reconnecting.contains("--%")

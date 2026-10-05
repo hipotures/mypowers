@@ -503,6 +503,14 @@ impl App {
                         Severity::Info,
                     ));
                 }
+                KeyCode::Char('g') => {
+                    self.graph.visualization = self.graph.visualization.next();
+                    self.resize();
+                    self.feedback = Some(Feedback::new(
+                        format!("Graph view: {}", self.graph.visualization.label()),
+                        Severity::Info,
+                    ));
+                }
                 KeyCode::Char(key @ ('r' | 'p')) => return self.operation(key),
                 _ => {}
             },

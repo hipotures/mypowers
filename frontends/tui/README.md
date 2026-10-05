@@ -2,7 +2,7 @@
 
 This is the working Rust TUI. Its visual design follows `prototypes/ratatui-ui`,
 with a rounded composition, battery gradient, inline independent INPUT/OUTPUT
-readings, two-row fixed-scale sparklines, and unboxed AC/DC/lamps controls.
+readings, two-row sparklines or a shared four-row chart, and unboxed AC/DC/lamps controls.
 There is no Python/Rich TUI implementation or rendering fallback.
 
 ## Run
@@ -53,7 +53,8 @@ uv run mypowers tui
 | Left click, released over the same dashboard control | Activate that output |
 | F3 on dashboard | Open the logs modal |
 | s on dashboard | Open read-only Settings / Diagnostics |
-| t on dashboard | Cycle average per bar: 10 seconds, 60 seconds, 1 hour |
+| t on dashboard | Cycle average per bucket: 10 seconds, 60 seconds, 1 hour |
+| g on dashboard | Switch two sparklines / shared line chart (session only) |
 | F1 / ? on dashboard, in logs, or in settings | Help for the active context |
 | f in logs | Cycle minimum log level |
 | Up/Down / PageUp/PageDown / mouse wheel / scrollbar drag in logs | Scroll records; lazily load adjacent pages |
@@ -110,6 +111,17 @@ Graphs use server-computed SQLite averages from `GET /api/v1/history/aggregates`
 Press `t` on the dashboard to cycle **10s → 60s → 1h per bar**; the footer shows the
 selected interval. INPUT/OUTPUT numeric labels always show current telemetry,
 independently of historical averages. Selection is local to each TUI session.
+Sparkline is the default. Press `g` to switch to a shared, four-row built-in
+Ratatui `Chart` with Braille line datasets: INPUT green, OUTPUT cyan. Colored
+INPUT/OUTPUT labels identify the series without a boxed legend. A terminal cell
+has one foreground color, so overlapping lines in the same cell take the OUTPUT
+color. Recording gaps
+break each line; measured zeros remain points on the baseline. The chart uses
+the full content width, so it requests more buckets than either half-width
+sparkline. When both channels are idle it shows one shared idle marker.
+Visualization selection is local to the current process; no settings API,
+database persistence or config-file writes are introduced.
+
 For 43 columns, the visible history spans about 7 minutes, 43 minutes or 43 hours,
 including the unfinished current bucket. UTC epoch boundaries keep completed
 bars stable between redraws and shift the window by whole columns.
@@ -127,10 +139,12 @@ zeros participate in the mean; intervals without observations stay empty.
 Persisted samples follow the server's history interval (10 seconds by default).
 The current bucket's average can change as additional recorded samples arrive;
 no interpolation or invented history fills recording gaps. Fractional averages
-are retained, including positive values below 1 W. Scales remain 0–100 W input
-and 0–300 W output; larger readings are displayed numerically while the graph
-saturates. Positive averages occupy at least one eighth-cell tick; zero stays
-empty. Malformed, unordered, mismatched or oversized responses are rejected
+are retained, including positive values below 1 W. Both visualizations start at
+0–100 W and double the maximum until visible averages and current readings fit:
+100 → 200 → 400 W, etc. The scale returns to a smaller step when the peak leaves
+the window. Sparklines scale independently; the shared chart uses one maximum
+for INPUT and OUTPUT. The current range appears above each plot. Positive
+sparkline averages occupy at least one eighth-cell tick; zero stays empty. Malformed, unordered, mismatched or oversized responses are rejected
 as a complete request rather than partially displayed.
 Clipboard support is optional and
 requires `wl-copy` and an accessible Wayland session.

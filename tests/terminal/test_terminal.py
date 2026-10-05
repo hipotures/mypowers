@@ -226,6 +226,25 @@ def test_startup_backfills_the_live_graph_window_from_server_history(
             else:
                 pytest.fail(f"Unexpected {label} aggregate graph: {counts}")
             assert "INPUT 0 W" in rows[label_row] and "OUTPUT 0 W" in rows[label_row]
+        # The same real client switches to a full-width shared Braille Chart locally.
+        session.write(b"g")
+        session.read(b"g spark")
+        deadline = time.monotonic() + 5
+        while time.monotonic() < deadline:
+            if select.select([session.master], [], [], 0.1)[0]:
+                session.stream.feed(session.decoder.decode(os.read(session.master, 65536)))
+            rows = session.screen.display
+            label_row = next(i for i, row in enumerate(rows) if "INPUT" in row and "OUTPUT" in row)
+            graph = rows[label_row + 2 : label_row + 6]
+            dots = sum("\u2801" <= char <= "\u28ff" for row in graph for char in row)
+            if dots >= 30:
+                break
+        else:
+            pytest.fail("Shared chart did not render persisted averages\n" + "\n".join(rows))
+        assert sum(row.count("0–100 W") for row in rows) == 1
+        assert "INPUT 0 W" in rows[label_row] and "OUTPUT 0 W" in rows[label_row]
+        session.write(b"g")
+        session.read(b"g chart")
         session.write(b"\x11")
         session.process.wait(timeout=3)
         assert session.process.returncode == 0

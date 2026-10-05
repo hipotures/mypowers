@@ -37,9 +37,10 @@ limit. Additional scenes cover 80x24, 60x19, contextual Help, quit confirmation,
 and an undersized 50x14 terminal. Reconnecting/device-offline scenes deliberately
 have no telemetry sample; daemon-offline retains explicitly unavailable readings.
 `dashboard-low-load.svg` covers INPUT 35 W / OUTPUT 3 W. The production Sparkline
-keeps fixed 0–100 W / 0–300 W scales; positive samples below its first quantization
-step receive one visible eighth-cell tick, while zero stays empty. This is a
-visibility floor, not an independently autoscaled graph or a change to telemetry.
+starts each channel at 0–100 W and doubles its maximum to fit visible averages
+and current readings. Positive samples below its first quantization step receive
+one visible eighth-cell tick, while zero stays empty. This visibility floor does
+not change telemetry or historical averages.
 History uses server-computed averages in fixed UTC buckets: 10 seconds, 60 seconds
 or one hour per bar (`t` on the dashboard). `dashboard-live-60s.svg` and
 `dashboard-live-1h.svg` capture the additional selections. Fixtures supply fixed
@@ -47,7 +48,14 @@ averages and sample counts directly, without SQL or HTTP. Completed bars retain
 their values/colors between redraws and move left together at a bucket boundary.
 The current bucket can change as recorded samples arrive. Missing buckets stay
 empty; actual zeros participate in averages. Live numeric labels stay independent
-of graph history, and positive fractional averages remain visible at fixed scales.
+of graph history, and positive fractional averages remain visible.
+
+`dashboard-chart.svg` shows the production four-row shared Chart widget with
+Braille line datasets: INPUT green and OUTPUT cyan, one common auto scale starting
+at 100 W and doubling as needed. The additional chart scenes cover 80x24, 60x19,
+recording gaps, idle, low load and daemon loss. `g` switches the visualization
+locally without writing settings. The full-width chart requests one aggregate
+bucket per column, and missing buckets break lines instead of becoming zero.
 
 SVG is canonical. Each cell is 10x20 SVG units. Background rectangles cover every
 cell without gaps. Text preserves Unicode, RGB/ANSI colors, bold, and foreground

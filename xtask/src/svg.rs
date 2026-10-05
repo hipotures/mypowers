@@ -201,8 +201,8 @@ mod tests {
                 .unwrap()
                 .contains("&lt;&amp;&gt;&quot;&apos;�")
         );
-        let symbols = "╭╮╰╯▁▂▃▄▅▆▇█●";
-        let mut buffer = Buffer::empty(Rect::new(0, 0, 13, 1));
+        let symbols = "╭╮╰╯▁▂▃▄▅▆▇█●⠁⠤⣀⣿";
+        let mut buffer = Buffer::empty(Rect::new(0, 0, symbols.chars().count() as u16, 1));
         for (index, symbol) in symbols.chars().enumerate() {
             buffer[(index as u16, 0)].set_symbol(&symbol.to_string());
         }
