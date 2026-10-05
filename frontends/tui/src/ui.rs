@@ -367,15 +367,22 @@ fn dashboard(frame: &mut Frame, content: Rect, app: &mut App) {
     let live = app.live();
     let chart = app.graph.visualization == Visualization::Chart;
     let graph_height = app.graph.visualization.height();
+    // Keep the taller chart compact above the battery and on either side of the plot.
+    // Remaining space stays below the controls; small terminals can use zero gaps.
+    let gap = if chart {
+        Constraint::Length(content.height.saturating_sub(8 + graph_height) / 4)
+    } else {
+        Constraint::Fill(1)
+    };
     let rows = Layout::vertical([
         Constraint::Length(1),
-        Constraint::Fill(1),
+        gap,
         Constraint::Length(1),
         Constraint::Length(1),
         Constraint::Length(1),
-        Constraint::Fill(1),
+        gap,
         Constraint::Length(2 + graph_height),
-        Constraint::Fill(1),
+        gap,
         Constraint::Length(2),
         Constraint::Fill(1),
     ])

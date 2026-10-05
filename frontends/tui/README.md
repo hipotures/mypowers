@@ -2,7 +2,7 @@
 
 This is the working Rust TUI. Its visual design follows `prototypes/ratatui-ui`,
 with a rounded composition, battery gradient, inline independent INPUT/OUTPUT
-readings, two-row sparklines or a shared chart with four plot rows, and unboxed AC/DC/lamps controls.
+readings, two-row sparklines or a shared chart with six plot rows, and unboxed AC/DC/lamps controls.
 There is no Python/Rich TUI implementation or rendering fallback.
 
 ## Run
@@ -120,7 +120,7 @@ the other. Cells shared by both series use a neutral foreground. Recording gaps 
 the full content width, with seven columns reserved for the power axis; each
 remaining plot column requests one aggregate bucket. The vertical axis shows
 zero at the axes’ intersection, half-scale and maximum, in W. The chart does
-not repeat this range above the plot. Four plot rows remain above two additional
+not repeat this range above the plot. Six plot rows remain above two additional
 rows for the horizontal axis and time labels. Equally spaced ticks are anchored
 to UTC intervals at full minutes (10s/60s buckets) or hours (1h buckets). Labels
 use the selected timezone: HH:MM or month-day/hour. Ticks move with the history

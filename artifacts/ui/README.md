@@ -55,7 +55,7 @@ Braille line datasets: INPUT green and OUTPUT cyan, one common auto scale starti
 at 100 W and doubling as needed. The additional chart scenes cover 80x24, 60x19,
 recording gaps, idle, low load and daemon loss. The 60s and 1h chart scenes
 exercise time-axis formats. Axes use the real Chart/Axis widgets: power labels
-on the left, and timezone-aware bucket times below four plot rows. The plot
+on the left, and timezone-aware bucket times below six plot rows. The plot
 width excludes the seven reserved vertical-axis columns. `g` switches the visualization
 locally without writing settings. The full-width chart requests one aggregate
 bucket per column, and missing buckets break lines instead of becoming zero.

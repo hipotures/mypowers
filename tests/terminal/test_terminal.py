@@ -235,7 +235,7 @@ def test_startup_backfills_the_live_graph_window_from_server_history(
                 session.stream.feed(session.decoder.decode(os.read(session.master, 65536)))
             rows = session.screen.display
             label_row = next(i for i, row in enumerate(rows) if "INPUT" in row and "OUTPUT" in row)
-            graph = rows[label_row + 2 : label_row + 6]
+            graph = rows[label_row + 2 : label_row + 8]
             dots = sum("\u2801" <= char <= "\u28ff" for row in graph for char in row)
             if dots >= 30:
                 break
@@ -243,8 +243,8 @@ def test_startup_backfills_the_live_graph_window_from_server_history(
             pytest.fail("Shared chart did not render persisted averages\n" + "\n".join(rows))
         assert "0–100 W" not in "\n".join(rows)
         assert "   100│" in "\n".join(rows) and "    50│" in "\n".join(rows)
-        assert "     0└" in rows[label_row + 6]
-        assert rows[label_row + 7].count(":") >= 2
+        assert "     0└" in rows[label_row + 8]
+        assert rows[label_row + 9].count(":") >= 2
         assert "INPUT 0 W" in rows[label_row] and "OUTPUT 0 W" in rows[label_row]
         session.write(b"g")
         session.read(b"g chart")

@@ -2235,7 +2235,7 @@ fn chart_lines_preserve_zero_buckets_and_break_across_missing_observations() {
 }
 
 #[test]
-fn shared_chart_uses_four_rows_two_colors_common_scale_and_safe_minimum_layout() {
+fn shared_chart_uses_six_rows_two_colors_common_scale_and_safe_minimum_layout() {
     use crate::history::Visualization;
     use ratatui::style::Color;
     let green = Color::Rgb(118, 203, 137);
@@ -2264,7 +2264,7 @@ fn shared_chart_uses_four_rows_two_colors_common_scale_and_safe_minimum_layout()
             .position(|line| line.contains("INPUT"))
             .unwrap() as u16;
         for color in [green, cyan] {
-            let cells: Vec<_> = (row + 2..row + 6)
+            let cells: Vec<_> = (row + 2..row + 8)
                 .flat_map(|y| (0..width).map(move |x| (x, y)))
                 .filter(|&(x, y)| {
                     buffer[(x, y)].fg == color
@@ -2282,7 +2282,7 @@ fn shared_chart_uses_four_rows_two_colors_common_scale_and_safe_minimum_layout()
         assert!(
             app.controls
                 .iter()
-                .all(|rect| rect.y >= row + 8 && rect.bottom() < height)
+                .all(|rect| rect.y >= row + 10 && rect.bottom() < height)
         );
         assert!(screen.contains("q quit"));
         assert!(
@@ -2291,7 +2291,7 @@ fn shared_chart_uses_four_rows_two_colors_common_scale_and_safe_minimum_layout()
         assert!(
             screen
                 .lines()
-                .nth(usize::from(row + 6))
+                .nth(usize::from(row + 8))
                 .unwrap()
                 .contains("     0└")
         );
@@ -2299,7 +2299,7 @@ fn shared_chart_uses_four_rows_two_colors_common_scale_and_safe_minimum_layout()
         assert!(
             screen
                 .lines()
-                .nth(usize::from(row + 7))
+                .nth(usize::from(row + 9))
                 .unwrap()
                 .contains("12:00")
         );
@@ -2446,7 +2446,7 @@ fn stable_separated_chart_series_do_not_drop_columns_and_missing_buckets_align()
         for column in 0..83 {
             let expected = !missing || (!(20..30).contains(&column) && column != 55);
             for color in [Color::Rgb(118, 203, 137), Color::Rgb(92, 181, 204)] {
-                let visible = (row..row + 4).any(|y| {
+                let visible = (row..row + 6).any(|y| {
                     buffer[(9 + column, y)].fg == color
                         && buffer[(9 + column, y)]
                             .symbol()
@@ -2477,14 +2477,14 @@ fn shared_chart_unions_braille_patterns_when_input_crosses_a_cell_boundary() {
             .sample
             .as_mut()
             .unwrap();
-        sample.input_power_w = 51;
+        sample.input_power_w = 33;
         sample.output_power_w = 28;
         let now = app.timeline_now_ms();
         app.graph.points = (0..83)
             .map(|i| Point {
                 bucket_start_ms: now - (82 - i) * 10_000,
                 input_power_w: if show_input {
-                    if i % 2 == 0 { 49.0 } else { 51.0 }
+                    if i % 2 == 0 { 31.0 } else { 33.0 }
                 } else {
                     0.0
                 },
@@ -2511,8 +2511,8 @@ fn shared_chart_unions_braille_patterns_when_input_crosses_a_cell_boundary() {
     };
     let mut shared = 0;
     for x in 9..92 {
-        // Rows 1 and 2 contain 49/51 W and 28 W; the dummy zero lines are on row 3.
-        for y in row + 1..row + 3 {
+        // Exclude the dummy zero lines on the last plot row.
+        for y in row..row + 5 {
             let a = pattern(&input[(x, y)]);
             let b = pattern(&output[(x, y)]);
             assert_eq!(
@@ -2528,6 +2528,6 @@ fn shared_chart_unions_braille_patterns_when_input_crosses_a_cell_boundary() {
     }
     assert!(
         shared > 30,
-        "Exercise the actual 49/51 W versus 28 W collision"
+        "Exercise the actual 31/33 W versus 28 W collision"
     );
 }
