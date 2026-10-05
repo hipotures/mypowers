@@ -518,6 +518,43 @@ and reconnecting PNG bytes match the before set exactly. Inspected the
 reconnecting PNG before and after. The installed frontend remains current
 because this cycle changes only tests and documentation.
 
+### 18. Bound live log growth during failed page refreshes
+
+Reviewed [text display](https://ratatui.rs/recipes/render/display-text/),
+[styles](https://ratatui.rs/recipes/render/style-text/), and
+[widget-state debugging](https://ratatui.rs/recipes/testing/debug-widget-state/).
+The production renderer and SVG exporter already handle terminal-cell widths
+and styles; existing Unicode regressions cover their use. No alternate text
+layout or visual change was needed. Following the data path beyond rendering
+exposed a cache issue that bounded network channels alone cannot prevent.
+
+When HTTP page refreshes failed repeatedly but the live log stream kept working,
+each failure cleared the loading flag, allowing more rows to accumulate before
+the next refresh. A regression reproducing this condition exceeded the intended
+live cache budget after the seventh 200-record batch. The archive page-count
+limit did not bound records appended to a live page.
+
+Added an append limit of five page sizes plus the existing 1,000-record catch-up
+allowance. The separate recent-stream buffer remains limited to 1,000 records.
+Loaded rows and cursor metadata stay intact; automatic latest-page requests
+continue, and a successful response restores the current range and merges
+arrivals received during that request. Named the existing page/recent limits so
+their uses agree. This bounds retained record counts, not a measured RSS budget;
+HTTP response and WebSocket message size limits remain separate protections.
+
+The recovery regression also proved that a row received during the HTTP request
+was shown but still counted as unseen. Successful live catch-up now clears that
+count. Archive mode continues counting arrivals without moving its viewport.
+The regression checks 3,000 arrivals with repeated failures, clipboard stability,
+bounded retention, live recovery with an in-flight arrival, resumed appends,
+and the server-provided cursor for older records.
+
+All 45 Rust tests and 24 native PTY cases passed (35.10 and 83.91 seconds).
+Formatting, Clippy with warnings denied, and diff checks passed. All 15 SVGs
+pass `--check`; regenerated SVGs and Logs PNG bytes match the before set exactly.
+Inspected Logs before and after. Built the release frontend and updated the local
+installed binary without restarting existing processes.
+
 ## Remaining review
 
 - Review remaining applicable application examples and tutorial integration details.

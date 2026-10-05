@@ -8,6 +8,8 @@ use std::time::{Duration, Instant};
 
 pub const LEVELS: [&str; 4] = ["DEBUG", "INFO", "WARNING", "ERROR"];
 const PAGE_SIZES: [usize; 5] = [50, 100, 250, 500, 1000];
+const MAX_CACHED_PAGES: usize = 5;
+const RECENT_LIMIT: usize = 1000;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Load {
@@ -221,7 +223,7 @@ impl Logs {
                 }
                 self.previous_cursor = page.previous_cursor;
                 self.more_before = page.has_more_before;
-                while self.pages.len() > 5 {
+                while self.pages.len() > MAX_CACHED_PAGES {
                     let removed = self.pages.pop_back().unwrap();
                     self.records
                         .truncate(self.records.len().saturating_sub(removed.count));
@@ -236,7 +238,7 @@ impl Logs {
                 }
                 self.next_cursor = page.next_cursor;
                 self.more_after = page.has_more_after;
-                while self.pages.len() > 5 {
+                while self.pages.len() > MAX_CACHED_PAGES {
                     let removed = self.pages.pop_front().unwrap();
                     self.records.drain(..removed.count);
                     self.offset = self.offset.saturating_sub(removed.count);
@@ -258,6 +260,7 @@ impl Logs {
                 self.append_live(record);
             }
             self.offset = self.max_offset();
+            self.unseen = 0;
         }
     }
 
@@ -275,7 +278,12 @@ impl Logs {
     }
 
     fn append_live(&mut self, record: Value) {
-        if !self.matches(&record) || self.records.iter().any(|old| same_record(old, &record)) {
+        // Failed HTTP refreshes must not allow the live stream to grow this cache forever.
+        // Preserve loaded rows/cursors; maintenance fetches the latest page once HTTP recovers.
+        if self.records.len() >= self.page_size * MAX_CACHED_PAGES + RECENT_LIMIT
+            || !self.matches(&record)
+            || self.records.iter().any(|old| same_record(old, &record))
+        {
             return;
         }
         if self.records.back().is_some_and(|last| {
@@ -304,7 +312,7 @@ impl Logs {
             return false;
         }
         self.recent.push_back(record.clone());
-        while self.recent.len() > 1000 {
+        while self.recent.len() > RECENT_LIMIT {
             self.recent.pop_front();
         }
         if self.follow && self.day == self.today() && !self.loading {
@@ -332,7 +340,7 @@ impl Logs {
     pub fn maintenance(&mut self) -> Option<Request> {
         if self.follow
             && !self.loading
-            && (self.records.len() > self.page_size * 5 || self.day != self.today())
+            && (self.records.len() > self.page_size * MAX_CACHED_PAGES || self.day != self.today())
         {
             if self.day != self.today() {
                 self.records.clear();

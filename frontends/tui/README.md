@@ -160,6 +160,13 @@ pages and a separate bounded recent-stream buffer; discarded pages can be fetche
 again through opaque cursors. Page size is local to this session until server-side
 mutable settings are implemented.
 
+Live follow refreshes its cached page range as records accumulate. If HTTP
+refreshes keep failing while the log stream still works, loaded rows stop growing
+at five page sizes plus a 1,000-record catch-up allowance; the separate recent
+stream buffer also stays limited to 1,000 records. Loaded rows and opaque cursors
+remain intact. A successful latest-page refresh restores current records and
+merges arrivals received during that request.
+
 A vertical scrollbar appears when the cached records exceed the visible rows.
 Click its track or drag the thumb; Up/Down, PageUp/PageDown and the mouse wheel
 also scroll. At the first/last cached row, another scroll loads the adjacent page;

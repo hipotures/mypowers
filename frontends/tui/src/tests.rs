@@ -789,6 +789,67 @@ fn log_pages_ignore_old_responses_and_keep_cursor_edges_when_cache_is_bounded() 
 }
 
 #[test]
+fn live_log_cache_stays_bounded_when_page_refresh_fails_and_recovers_from_the_server() {
+    let stamp = chrono::Utc::now().to_rfc3339();
+    let mut logs = crate::logs::Logs::new(Some(chrono_tz::UTC));
+    logs.page_size = 50;
+    logs.layout(10);
+    let record = |sequence| {
+        json!({
+            "sequence": sequence, "timestamp": stamp,
+            "server_instance_id": "88767477-2a2a-481f-843b-30d56a5e3f10",
+            "level": "INFO", "message": format!("Record {sequence}")
+        })
+    };
+    let page = |start| {
+        serde_json::from_value::<crate::logs::Page>(json!({
+            "schema_version": 1,
+            "items": (start..start + 50).map(record).collect::<Vec<_>>(),
+            "previous_cursor": format!("before-{start}"), "next_cursor": null,
+            "has_more_before": true, "has_more_after": false,
+            "source": "files", "gap": false, "skipped_lines": 0
+        }))
+        .unwrap()
+    };
+    let initial = logs.key(KeyCode::End).unwrap();
+    logs.accept(&initial, Ok(page(0)));
+    for batch in 0..15 {
+        for sequence in 50 + batch * 200..50 + (batch + 1) * 200 {
+            assert!(logs.record(record(sequence)));
+        }
+        if let Some(refresh) = logs.maintenance() {
+            assert!(logs.loading);
+            logs.accept(&refresh, Err("HTTP temporarily unavailable".into()));
+        }
+        // Five loaded pages plus the existing 1,000-record live catch-up allowance.
+        assert!(
+            logs.records.len() <= 1250,
+            "Unbounded cache after batch {batch}"
+        );
+        assert!(logs.follow && !logs.loading);
+        assert_eq!(logs.offset, logs.max_offset());
+    }
+    let retained = logs.clipboard_text();
+    let retry = logs.maintenance().unwrap();
+    logs.accept(&retry, Err("HTTP temporarily unavailable".into()));
+    assert_eq!(logs.clipboard_text(), retained);
+    let recovered = logs.maintenance().unwrap();
+    assert!(logs.record(record(3050)));
+    logs.accept(&recovered, Ok(page(3000)));
+    assert_eq!(logs.records.len(), 51);
+    assert_eq!(logs.records.front().unwrap()["sequence"], 3000);
+    assert_eq!(logs.records.back().unwrap()["sequence"], 3050);
+    assert!(logs.follow);
+    assert_eq!(logs.offset, logs.max_offset());
+    assert_eq!(logs.unseen, 0, "Caught-up live rows are already visible");
+    assert!(logs.record(record(3051)));
+    assert_eq!(logs.records.back().unwrap()["sequence"], 3051);
+    logs.offset = 0;
+    let older = logs.scroll(false, 1).unwrap();
+    assert_eq!(older.cursor.as_deref(), Some("before-3000"));
+}
+
+#[test]
 fn log_day_bounds_use_iana_dst_transitions_and_midnight_offsets() {
     let zone = Some(chrono_tz::Europe::Warsaw);
     for (date, hours) in [("2026-03-29", 23), ("2026-10-25", 25), ("2026-10-05", 24)] {
