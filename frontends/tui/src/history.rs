@@ -30,8 +30,8 @@ impl Visualization {
     pub fn height(self) -> u16 {
         match self {
             Self::Sparkline => 2,
-            // Six plot rows plus the horizontal axis and its labels.
-            Self::Chart => 8,
+            // Seven plot rows plus the horizontal axis and its labels.
+            Self::Chart => 9,
         }
     }
 }

@@ -2,7 +2,7 @@
 
 This is the working Rust TUI. Its visual design follows `prototypes/ratatui-ui`,
 with a rounded composition, battery gradient, inline independent INPUT/OUTPUT
-readings, two-row sparklines or a shared chart with six plot rows, and unboxed AC/DC/lamps controls.
+readings, two-row sparklines or a shared chart with seven plot rows, and unboxed AC/DC/lamps controls.
 There is no Python/Rich TUI implementation or rendering fallback.
 
 ## Run
@@ -52,7 +52,7 @@ uv run mypowers tui
 | Enter / Space on dashboard | Activate the focused output |
 | Left click, released over the same dashboard control | Activate that output |
 | F3 on dashboard | Open the logs modal |
-| s on dashboard | Open read-only Settings / Diagnostics |
+| s on dashboard | Open Settings / Diagnostics |
 | t on dashboard | Cycle average per bucket: 10 seconds, 60 seconds, 1 hour |
 | g on dashboard | Switch two sparklines / shared line chart (session only) |
 | F1 / ? on dashboard, in logs, or in settings | Help for the active context |
@@ -62,8 +62,8 @@ uv run mypowers tui
 | + / - in logs | Change records per request: 50, 100, 250, 500, 1,000 |
 | Home in logs | Load the beginning of the selected day |
 | End in logs | Return to today and follow its live bottom |
-| r on dashboard | Request connection retry |
-| p on dashboard | Pause/resume daemon BLE acquisition |
+| r in settings | Request connection retry |
+| p in settings | Pause/resume daemon BLE acquisition |
 | b in logs or settings | Toggle runtime DEBUG override |
 | Double-click MYPOWERS | Copy current rendered API snapshot through Wayland `wl-copy` |
 | Double-click LOGS title | Copy every currently loaded log record, including rows outside the viewport |
@@ -83,6 +83,7 @@ modal dims the dashboard while telemetry updates continue underneath.
 Help and Settings are overlays using the same margins. Settings currently shows
 read-only timezone/page-size preferences and actual runtime diagnostics: daemon,
 station phase, BLE adapter, telemetry age/state, history, and effective logging.
+Connection retry and pause/resume are available only inside Settings (`r` / `p`).
 Resize invalidates old mouse presses and
 hitboxes. Bracketed paste never activates controls. Drawing is limited to 4 FPS;
 HTTP and the independent event/log streams run outside the input/render loop.
@@ -120,8 +121,9 @@ the other. Cells shared by both series use a neutral foreground. Recording gaps 
 the full content width, with seven columns reserved for the power axis; each
 remaining plot column requests one aggregate bucket. The vertical axis shows
 zero at the axes’ intersection, half-scale and maximum, in W. The chart does
-not repeat this range above the plot. Six plot rows remain above two additional
-rows for the horizontal axis and time labels. Equally spaced ticks are anchored
+not repeat this range above the plot. Seven plot rows (six at minimum terminal
+height) remain above two additional rows for the horizontal axis and time labels.
+Three or four equally spaced ticks are anchored
 to UTC intervals at full minutes (10s/60s buckets) or hours (1h buckets). Labels
 use the selected timezone: HH:MM or month-day/hour. Ticks move with the history
 window and remain at their actual timestamps, rather than relabeling fixed

@@ -22,6 +22,11 @@ GATT/name/subscription setup 25s, first valid sample 5s, stale/write cutoff 3s, 
 3s. Retry delays are 2/5/10/20/30s plus at most 10% jitter; infrastructure checks use a slower wait.
 These are application decisions, not measured firmware guarantees.
 
+History records the first fresh observation in each UTC interval selected by
+`history.interval_seconds`, rather than starting the next interval after a delayed
+write. Observation timestamps remain unchanged. Reconnection segments are recorded
+immediately; unavailable telemetry leaves genuine gaps instead of repeating cached values.
+
 | Variable | Meaning |
 |---|---|
 | `MYPOWERS_ENV` | `development` default or `production` |

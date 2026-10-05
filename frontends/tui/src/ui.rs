@@ -210,15 +210,15 @@ fn outer_footer(view: View, width: u16, interval: &str, visualization: Visualiza
     };
     match view {
         View::Dashboard if width >= 80 => format!(
-            " a AC d DC l lamps F3 logs s settings t {interval} g {alternate} r retry p pause ? help q quit "
+            " a AC d DC l lamps F3 logs s settings t {interval} g {alternate} ? help q quit "
         ),
         View::Dashboard => {
             format!(" a/d/l outputs F3 logs s settings t {interval} g view ? q quit ")
         }
-        View::Logs => " Esc close  ? help  q quit  Ctrl-Q quit now ".into(),
-        View::Settings => " b DEBUG  Esc close  ? help  q quit  Ctrl-Q quit now ".into(),
-        View::Help => " Esc close  q quit  Ctrl-Q quit now ".into(),
-        View::Quit => " Ctrl-Q quit now ".into(),
+        View::Logs => " Esc close  ? help  q quit ".into(),
+        View::Settings => " r retry  p pause  b DEBUG  Esc close  ? help  q quit ".into(),
+        View::Help => " Esc close  q quit ".into(),
+        View::Quit => String::new(),
     }
 }
 
@@ -366,7 +366,11 @@ fn dim_background(frame: &mut Frame) {
 fn dashboard(frame: &mut Frame, content: Rect, app: &mut App) {
     let live = app.live();
     let chart = app.graph.visualization == Visualization::Chart;
-    let graph_height = app.graph.visualization.height();
+    let graph_height = app
+        .graph
+        .visualization
+        .height()
+        .min(content.height.saturating_sub(8));
     // Keep the taller chart compact above the battery and on either side of the plot.
     // Remaining space stays below the controls; small terminals can use zero gaps.
     let gap = if chart {
@@ -768,7 +772,7 @@ pub(crate) fn chart_time_ticks(
         60_000
     };
     // Anchor equal intervals to UTC, so ticks move with the data instead of relabeling endpoints.
-    let step = (duration / 2 / unit).max(1) * unit;
+    let step = (duration / 3 / unit).max(1) * unit;
     let format = if resolution == crate::history::Resolution::Hour {
         "%m-%d %Hh"
     } else {
@@ -792,6 +796,9 @@ pub(crate) fn chart_time_ticks(
             ticks.push((((time - first) / span) as u16, label));
         }
         time += step;
+    }
+    if ticks.len() > 4 {
+        ticks.drain(..ticks.len() - 4);
     }
     ticks
 }
@@ -1087,11 +1094,11 @@ fn settings(frame: &mut Frame, area: Rect, app: &App) {
 
 fn help(frame: &mut Frame, area: Rect, context: View) {
     let text = if context == View::Settings {
-        "HELP — SETTINGS\n\nPreferences are read-only in this version.\nDebug / Diagnostics shows current daemon state.\nb                        Toggle runtime DEBUG override\n\nEsc                      Return to dashboard\nq                        Confirm quit\nCtrl-Q                   Quit immediately"
+        "HELP — SETTINGS\n\nPreferences are read-only in this version.\nDebug / Diagnostics shows current daemon state.\nr                        Retry station connection\np                        Pause/resume station connection\nb                        Toggle runtime DEBUG override\n\nEsc                      Return to dashboard\nq                        Confirm quit"
     } else if context == View::Logs {
-        "HELP — LOGS\n\nUp/Down, PageUp/PageDown   Scroll records\nMouse wheel / scrollbar   Scroll or drag\nLeft/Right or [ / ]       Previous/next day\nf                        Change minimum log level\n+ / -                    Change page size\nHome                     Beginning of selected day\nEnd                      Today: latest records and live follow\nb                        Toggle runtime DEBUG override\nDouble-click LOGS        Copy all loaded records\n\nEsc close   q confirm quit   Ctrl-Q quit immediately"
+        "HELP — LOGS\n\nUp/Down, PageUp/PageDown   Scroll records\nMouse wheel / scrollbar   Scroll or drag\nLeft/Right or [ / ]       Previous/next day\nf                        Change minimum log level\n+ / -                    Change page size\nHome                     Beginning of selected day\nEnd                      Today: latest records and live follow\nb                        Toggle runtime DEBUG override\nDouble-click LOGS        Copy all loaded records\n\nEsc close   q confirm quit"
     } else {
-        "HELP — DASHBOARD\n\na / d / l                Request AC / DC / lamps ON/OFF\nTab / Shift-Tab          Focus output control\nEnter / Space            Activate focused output\nF3                       Open Logs\ns                        Open Settings / Diagnostics\nt                        Cycle average per bar: 10s / 60s / 1h\ng                        Switch Sparkline / Chart (session only)\nr                        Retry station connection\np                        Pause/resume station connection\nF1 / ?                   Help for the active window\nDouble-click MYPOWERS    Copy current API snapshot\n\nEsc close   q confirm quit   Ctrl-Q quit immediately"
+        "HELP — DASHBOARD\n\na / d / l                Request AC / DC / lamps ON/OFF\nTab / Shift-Tab          Focus output control\nEnter / Space            Activate focused output\nF3                       Open Logs\ns                        Open Settings / Diagnostics\nt                        Cycle average per bar: 10s / 60s / 1h\ng                        Switch Sparkline / Chart (session only)\nF1 / ?                   Help for the active window\nDouble-click MYPOWERS    Copy current API snapshot\n\nEsc close   q confirm quit"
     };
     frame.render_widget(Paragraph::new(text).style(Style::default().fg(MUTED)), area);
 }

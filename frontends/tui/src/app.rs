@@ -511,7 +511,6 @@ impl App {
                         Severity::Info,
                     ));
                 }
-                KeyCode::Char(key @ ('r' | 'p')) => return self.operation(key),
                 _ => {}
             },
             View::Logs => match key.code {
@@ -525,7 +524,7 @@ impl App {
             },
             View::Settings => match key.code {
                 KeyCode::F(1) | KeyCode::Char('?') => self.open_help(),
-                KeyCode::Char('b') => return self.operation('b'),
+                KeyCode::Char(key @ ('r' | 'p' | 'b')) => return self.operation(key),
                 _ => {}
             },
             View::Help => {}

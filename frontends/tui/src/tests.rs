@@ -1711,8 +1711,6 @@ fn shortcuts_are_confined_to_the_active_context() {
             KeyCode::Char('a'),
             KeyCode::Char('d'),
             KeyCode::Char('l'),
-            KeyCode::Char('r'),
-            KeyCode::Char('p'),
             KeyCode::Char('s'),
             KeyCode::F(2),
             KeyCode::F(3),
@@ -1726,6 +1724,31 @@ fn shortcuts_are_confined_to_the_active_context() {
             ));
             assert!(app.view == view);
             assert!(app.pending.is_none());
+        }
+    }
+    for view in [View::Dashboard, View::Logs, View::Help, View::Quit] {
+        for code in [KeyCode::Char('r'), KeyCode::Char('p')] {
+            let mut app = app();
+            app.view = view;
+            assert!(matches!(
+                app.key(KeyEvent::new(code, KeyModifiers::NONE)),
+                Effect::None
+            ));
+            assert!(app.pending.is_none());
+        }
+    }
+    for desired in ["running", "paused"] {
+        for key in ['r', 'p'] {
+            let mut app = app();
+            app.view = View::Settings;
+            app.status.as_mut().unwrap().connection.desired = desired.into();
+            let effect = app.key(KeyEvent::new(KeyCode::Char(key), KeyModifiers::NONE));
+            assert!(match (key, effect) {
+                ('r', Effect::Request(Intent::Retry)) => true,
+                ('p', Effect::Request(Intent::Connection(running))) =>
+                    running == (desired == "paused"),
+                _ => false,
+            });
         }
     }
     for view in [View::Dashboard, View::Help, View::Quit] {
@@ -1831,14 +1854,17 @@ fn help_lists_only_the_context_that_opened_it() {
         assert!(app.view == View::Help && app.help_context == context);
         let screen = text(&render(&mut app, 94, 29));
         assert!(app.title.is_empty());
+        assert!(!screen.contains("Ctrl-Q"));
         if context == View::Logs {
             assert!(screen.contains("HELP — LOGS") && screen.contains("End"));
             assert!(!screen.contains("Request AC") && !screen.contains("F3"));
         } else if context == View::Settings {
             assert!(screen.contains("HELP — SETTINGS") && screen.contains("Toggle runtime DEBUG"));
+            assert!(screen.contains("Retry station") && screen.contains("Pause/resume station"));
             assert!(!screen.contains("Request AC") && !screen.contains("F3"));
         } else {
             assert!(screen.contains("F3") && !screen.contains("Toggle runtime DEBUG"));
+            assert!(!screen.contains("Retry station") && !screen.contains("Pause/resume station"));
         }
         app.key(KeyEvent::new(KeyCode::Esc, KeyModifiers::NONE));
         assert!(app.view == View::Dashboard);
@@ -2235,7 +2261,7 @@ fn chart_lines_preserve_zero_buckets_and_break_across_missing_observations() {
 }
 
 #[test]
-fn shared_chart_uses_six_rows_two_colors_common_scale_and_safe_minimum_layout() {
+fn shared_chart_uses_seven_rows_two_colors_common_scale_and_safe_minimum_layout() {
     use crate::history::Visualization;
     use ratatui::style::Color;
     let green = Color::Rgb(118, 203, 137);
@@ -2252,6 +2278,7 @@ fn shared_chart_uses_six_rows_two_colors_common_scale_and_safe_minimum_layout() 
         })
         .collect();
     for (width, height) in [(60, 19), (80, 24), (120, 30)] {
+        let plot_height = if height == 19 { 6 } else { 7 };
         let buffer = render(&mut app, width, height);
         let screen = text(&buffer);
         assert!(screen.contains("INPUT 63 W") && screen.contains("OUTPUT 181 W"));
@@ -2264,7 +2291,7 @@ fn shared_chart_uses_six_rows_two_colors_common_scale_and_safe_minimum_layout() 
             .position(|line| line.contains("INPUT"))
             .unwrap() as u16;
         for color in [green, cyan] {
-            let cells: Vec<_> = (row + 2..row + 8)
+            let cells: Vec<_> = (row + 2..row + 2 + plot_height)
                 .flat_map(|y| (0..width).map(move |x| (x, y)))
                 .filter(|&(x, y)| {
                     buffer[(x, y)].fg == color
@@ -2282,7 +2309,7 @@ fn shared_chart_uses_six_rows_two_colors_common_scale_and_safe_minimum_layout() 
         assert!(
             app.controls
                 .iter()
-                .all(|rect| rect.y >= row + 10 && rect.bottom() < height)
+                .all(|rect| rect.y >= row + plot_height + 4 && rect.bottom() < height)
         );
         assert!(screen.contains("q quit"));
         assert!(
@@ -2291,7 +2318,7 @@ fn shared_chart_uses_six_rows_two_colors_common_scale_and_safe_minimum_layout() 
         assert!(
             screen
                 .lines()
-                .nth(usize::from(row + 8))
+                .nth(usize::from(row + plot_height + 2))
                 .unwrap()
                 .contains("     0└")
         );
@@ -2299,7 +2326,7 @@ fn shared_chart_uses_six_rows_two_colors_common_scale_and_safe_minimum_layout() 
         assert!(
             screen
                 .lines()
-                .nth(usize::from(row + 9))
+                .nth(usize::from(row + plot_height + 3))
                 .unwrap()
                 .contains("12:00")
         );
@@ -2361,10 +2388,21 @@ fn chart_time_ticks_align_to_full_minutes_and_move_with_history() {
     for (resolution, expected) in [
         (
             Resolution::TenSeconds,
-            vec![(10, "11:48"), (46, "11:54"), (82, "12:00")],
+            vec![(10, "11:48"), (34, "11:52"), (58, "11:56"), (82, "12:00")],
         ),
-        (Resolution::Minute, vec![(11, "10:49"), (52, "11:30")]),
-        (Resolution::Hour, vec![(20, "10-02 22h"), (61, "10-04 15h")]),
+        (
+            Resolution::Minute,
+            vec![(1, "10:39"), (28, "11:06"), (55, "11:33"), (82, "12:00")],
+        ),
+        (
+            Resolution::Hour,
+            vec![
+                (1, "10-02 03h"),
+                (28, "10-03 06h"),
+                (55, "10-04 09h"),
+                (82, "10-05 12h"),
+            ],
+        ),
     ] {
         let actual = ui::chart_time_ticks(now + 750, resolution, 83, Some(chrono_tz::UTC));
         assert_eq!(
@@ -2387,6 +2425,23 @@ fn chart_time_ticks_align_to_full_minutes_and_move_with_history() {
                 .map(|(column, label)| (column - 1, label))
                 .collect::<Vec<_>>()
         );
+    }
+    for width in [49, 69, 83] {
+        for offset in 0..36 {
+            let ticks = ui::chart_time_ticks(
+                now + offset * 10_000,
+                Resolution::TenSeconds,
+                width,
+                Some(chrono_tz::UTC),
+            );
+            assert!(
+                (3..=4).contains(&ticks.len()),
+                "3–4 ticks at every phase of the window"
+            );
+            let distances: Vec<_> = ticks.windows(2).map(|pair| pair[1].0 - pair[0].0).collect();
+            assert!(distances.iter().all(|distance| *distance == distances[0]));
+            assert!(ticks.iter().all(|(_, label)| label.len() == 5));
+        }
     }
     assert_eq!(
         ui::chart_time_ticks(now, Resolution::Minute, 3, Some(chrono_tz::Europe::Warsaw)),
@@ -2446,7 +2501,7 @@ fn stable_separated_chart_series_do_not_drop_columns_and_missing_buckets_align()
         for column in 0..83 {
             let expected = !missing || (!(20..30).contains(&column) && column != 55);
             for color in [Color::Rgb(118, 203, 137), Color::Rgb(92, 181, 204)] {
-                let visible = (row..row + 6).any(|y| {
+                let visible = (row..row + 7).any(|y| {
                     buffer[(9 + column, y)].fg == color
                         && buffer[(9 + column, y)]
                             .symbol()
@@ -2477,18 +2532,18 @@ fn shared_chart_unions_braille_patterns_when_input_crosses_a_cell_boundary() {
             .sample
             .as_mut()
             .unwrap();
-        sample.input_power_w = 33;
-        sample.output_power_w = 28;
+        sample.input_power_w = 29;
+        sample.output_power_w = 25;
         let now = app.timeline_now_ms();
         app.graph.points = (0..83)
             .map(|i| Point {
                 bucket_start_ms: now - (82 - i) * 10_000,
                 input_power_w: if show_input {
-                    if i % 2 == 0 { 31.0 } else { 33.0 }
+                    if i % 2 == 0 { 27.0 } else { 29.0 }
                 } else {
                     0.0
                 },
-                output_power_w: if show_output { 28.0 } else { 0.0 },
+                output_power_w: if show_output { 25.0 } else { 0.0 },
                 sample_count: 1,
             })
             .collect();
@@ -2512,7 +2567,7 @@ fn shared_chart_unions_braille_patterns_when_input_crosses_a_cell_boundary() {
     let mut shared = 0;
     for x in 9..92 {
         // Exclude the dummy zero lines on the last plot row.
-        for y in row..row + 5 {
+        for y in row..row + 6 {
             let a = pattern(&input[(x, y)]);
             let b = pattern(&output[(x, y)]);
             assert_eq!(
@@ -2528,6 +2583,6 @@ fn shared_chart_unions_braille_patterns_when_input_crosses_a_cell_boundary() {
     }
     assert!(
         shared > 30,
-        "Exercise the actual 31/33 W versus 28 W collision"
+        "Exercise the actual 27/29 W versus 25 W collision"
     );
 }

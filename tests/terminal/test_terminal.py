@@ -235,7 +235,7 @@ def test_startup_backfills_the_live_graph_window_from_server_history(
                 session.stream.feed(session.decoder.decode(os.read(session.master, 65536)))
             rows = session.screen.display
             label_row = next(i for i, row in enumerate(rows) if "INPUT" in row and "OUTPUT" in row)
-            graph = rows[label_row + 2 : label_row + 8]
+            graph = rows[label_row + 2 : label_row + 9]
             dots = sum("\u2801" <= char <= "\u28ff" for row in graph for char in row)
             if dots >= 30:
                 break
@@ -243,8 +243,8 @@ def test_startup_backfills_the_live_graph_window_from_server_history(
             pytest.fail("Shared chart did not render persisted averages\n" + "\n".join(rows))
         assert "0–100 W" not in "\n".join(rows)
         assert "   100│" in "\n".join(rows) and "    50│" in "\n".join(rows)
-        assert "     0└" in rows[label_row + 8]
-        assert rows[label_row + 9].count(":") >= 2
+        assert "     0└" in rows[label_row + 9]
+        assert rows[label_row + 10].count(":") >= 3
         assert "INPUT 0 W" in rows[label_row] and "OUTPUT 0 W" in rows[label_row]
         session.write(b"g")
         session.read(b"g chart")
@@ -631,8 +631,10 @@ def test_native_pause_resume_retry_and_runtime_logging_receipts(
         session.read(b"CONNECTED")
         with httpx.Client(base_url=url, trust_env=False) as client:
             initial = client.get("/api/v1/status").json()
+            session.write(b"s")
+            session.read(b"SETTINGS")
             for key, message in [
-                (b"p", b"LAST KNOWN"),
+                (b"p", b"Station connection paused"),
                 (b"r", b"Reconnecting to station"),
                 (b"p", b"CONNECTED"),
             ]:
@@ -641,8 +643,6 @@ def test_native_pause_resume_retry_and_runtime_logging_receipts(
                 assert b"Request failed" not in captured
                 desired = "running" if message == b"CONNECTED" else "paused"
                 assert client.get("/api/v1/status").json()["connection"]["desired"] == desired
-            session.write(b"s")
-            session.read(b"SETTINGS")
             session.read(b"Log: INFO")
             for level in ["DEBUG", "INFO"]:
                 session.write(b"b")

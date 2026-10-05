@@ -5,6 +5,7 @@ import base64
 import hashlib
 import hmac
 import json
+import math
 import os
 import sqlite3
 import time
@@ -86,7 +87,7 @@ class HistoryStore:
         self.dropped = 0
         self.saved_sequence = 0
         self.last_segment: str | None = None
-        self.deadline = 0.0
+        self.last_bucket: int | None = None
         self.queue: asyncio.Queue[Observation] = asyncio.Queue(256)
         self.lock = asyncio.Lock()
         self.queries = 0
@@ -201,7 +202,6 @@ class HistoryStore:
 
     def schedule(self) -> None:
         latest = self.core.latest
-        now = self.core.clock.monotonic()
         if (
             not self.enabled
             or self.state != "ok"
@@ -210,7 +210,10 @@ class HistoryStore:
             or latest.sample.sequence <= self.saved_sequence
         ):
             return
-        if latest.sample.segment_id == self.last_segment and now < self.deadline:
+        # Persist the first fresh observation in each UTC interval. Relative deadlines
+        # accumulate polling delays and leave artificial holes in 10-second aggregates.
+        bucket = math.floor(latest.epoch / self.interval)
+        if latest.sample.segment_id == self.last_segment and bucket == self.last_bucket:
             return
         try:
             self.queue.put_nowait(latest)
@@ -219,7 +222,7 @@ class HistoryStore:
             self.core.segment = str(uuid4())
             return
         self.saved_sequence, self.last_segment = latest.sample.sequence, latest.sample.segment_id
-        self.deadline = now + self.interval
+        self.last_bucket = bucket
 
     async def run(self) -> None:
         retry = 0.0

@@ -68,6 +68,47 @@ async def test_periodic_new_samples_segments_and_no_restamping(core, tmp_path):
         await store.close()
 
 
+@pytest.mark.parametrize("seconds", [10, 60])
+async def test_periodic_history_fills_utc_buckets_without_scheduler_drift(core, tmp_path, seconds):
+    service, clock, _, session = core
+    store = HistoryStore(service, tmp_path, True, seconds)
+    await store.open()
+    start = int(clock.time() // seconds) * seconds
+    try:
+        for index in range(800):
+            service.receive(frame(input_w=12, output_w=25), session)
+            store.schedule()
+            while not store.queue.empty():
+                observation = store.queue.get_nowait()
+                await store.insert(observation)
+                store.queue.task_done()
+            clock.advance((0.7, 1.3, 1.9)[index % 3])
+        end = (int(service.latest.epoch // seconds) + 1) * seconds
+        page = await store.aggregates(timestamp(start), timestamp(end), seconds, 256)
+        assert [point.bucket_start_ms for point in page.items] == list(
+            range(start * 1000, end * 1000, seconds * 1000)
+        )
+        assert all(point.sample_count == 1 for point in page.items)
+        assert all(point.input_power_w == 12 and point.output_power_w == 25 for point in page.items)
+        # A real telemetry outage still leaves empty buckets; never fill cached samples.
+        clock.advance(seconds * 4)
+        store.schedule()
+        assert store.queue.empty()
+        service.receive(frame(input_w=0, output_w=0), session)
+        store.schedule()
+        assert store.queue.qsize() == 1
+        observation = store.queue.get_nowait()
+        await store.insert(observation)
+        store.queue.task_done()
+        new_end = (int(observation.epoch // seconds) + 1) * seconds
+        after = await store.aggregates(timestamp(end), timestamp(new_end), seconds, 8)
+        assert len(after.items) == 1
+        assert after.items[0].bucket_start_ms == int(observation.epoch // seconds) * seconds * 1000
+        assert after.items[0].input_power_w == after.items[0].output_power_w == 0
+    finally:
+        await store.close()
+
+
 async def test_stable_high_water_pagination_under_backwards_insertion(core, tmp_path):
     service, _, _, _ = core
     store = HistoryStore(service, tmp_path, True, 10)
