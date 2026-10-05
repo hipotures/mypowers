@@ -319,16 +319,7 @@ impl Api {
             || page.items.len() > request.limit
             || (page.has_more_before && page.previous_cursor.is_none())
             || (page.has_more_after && page.next_cursor.is_none())
-            || page.items.iter().any(|record| {
-                record["timestamp"]
-                    .as_str()
-                    .is_none_or(|stamp| chrono::DateTime::parse_from_rfc3339(stamp).is_err())
-                    || record["sequence"].as_u64().is_none()
-                    || record["server_instance_id"]
-                        .as_str()
-                        .is_none_or(|id| uuid::Uuid::parse_str(id).is_err())
-                    || record["message"].as_str().is_none()
-            })
+            || page.items.iter().any(|record| !valid_log_record(record))
         {
             return Err("Invalid log page schema or pagination.".into());
         }
@@ -469,8 +460,12 @@ impl Api {
                         .map_err(|_| "UI closed.")?;
                 }
                 "log" if logs => {
+                    let record = message.data.ok_or("Missing log record.")?;
+                    if !valid_log_record(&record) {
+                        return Err("Invalid log record.".into());
+                    }
                     events
-                        .send(Event::Log(message.data.ok_or("Missing log record.")?))
+                        .send(Event::Log(record))
                         .await
                         .map_err(|_| "UI closed.")?;
                 }
@@ -506,6 +501,17 @@ impl Api {
     }
 }
 
+fn valid_log_record(record: &Value) -> bool {
+    record["timestamp"]
+        .as_str()
+        .is_some_and(|stamp| chrono::DateTime::parse_from_rfc3339(stamp).is_ok())
+        && record["sequence"].as_u64().is_some()
+        && record["server_instance_id"]
+            .as_str()
+            .is_some_and(|id| uuid::Uuid::parse_str(id).is_ok())
+        && record["message"].as_str().is_some()
+}
+
 fn outcome_uncertain() -> Feedback {
     Feedback::new(
         "Command outcome uncertain; check station before retrying",
@@ -518,10 +524,8 @@ mod tests {
     use super::*;
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
-    #[tokio::test]
-    async fn uncertain_admission_is_one_put_with_captured_revision_and_key() {
-        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
-        let config = Config {
+    fn api_for(listener: &tokio::net::TcpListener) -> Api {
+        Api::new(&Config {
             server: format!("http://{}", listener.local_addr().unwrap())
                 .parse()
                 .unwrap(),
@@ -531,8 +535,97 @@ mod tests {
             no_color: false,
             no_mouse: true,
             timezone: None,
+        })
+        .unwrap()
+    }
+
+    async fn receive_stream_record(record: Value) -> (Result<(), String>, Option<Value>) {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let api = api_for(&listener);
+        let server = tokio::spawn(async move {
+            let (socket, _) = listener.accept().await.unwrap();
+            let mut socket = tokio_tungstenite::accept_async(socket).await.unwrap();
+            let status = crate::tests::status();
+            for (sequence, kind, data) in [
+                (1, "snapshot", serde_json::to_value(&status).unwrap()),
+                (2, "log", record),
+            ] {
+                socket
+                    .send(Message::Text(
+                        json!({
+                            "schema_version": 1, "server_instance_id": status.server_instance_id,
+                            "stream_sequence": sequence, "type": kind, "data": data
+                        })
+                        .to_string()
+                        .into(),
+                    ))
+                    .await
+                    .unwrap();
+            }
+            let _ = socket.close(None).await;
+        });
+        let (events, mut incoming) = mpsc::channel(4);
+        let result = timeout(Duration::from_secs(3), api.stream_once(true, &events))
+            .await
+            .unwrap();
+        server.await.unwrap();
+        let received = match incoming.try_recv() {
+            Ok(Event::Log(record)) => Some(record),
+            Err(mpsc::error::TryRecvError::Empty) => None,
+            _ => panic!("Unexpected event on log-only stream"),
         };
-        let api = Api::new(&config).unwrap();
+        assert!(incoming.try_recv().is_err());
+        (result, received)
+    }
+
+    #[tokio::test]
+    async fn log_stream_rejects_malformed_records_before_queueing() {
+        let valid = json!({
+            "timestamp": "2026-10-05T12:00:00Z", "sequence": 4,
+            "server_instance_id": "88767477-2a2a-481f-843b-30d56a5e3f10",
+            "level": "INFO", "message": "Station connected"
+        });
+        let mut records = vec![Value::Null, json!([]), json!("not a record")];
+        for (field, value) in [
+            ("timestamp", json!("invalid")),
+            ("sequence", json!(-1)),
+            ("server_instance_id", json!("invalid")),
+            ("message", json!(42)),
+        ] {
+            let mut record = valid.clone();
+            record[field] = value;
+            records.push(record);
+            let mut record = valid.clone();
+            record.as_object_mut().unwrap().remove(field);
+            records.push(record);
+        }
+        for record in records {
+            let expected = if record.is_null() {
+                "Missing log record."
+            } else {
+                "Invalid log record."
+            };
+            let (result, received) = receive_stream_record(record).await;
+            assert_eq!(result.unwrap_err(), expected);
+            assert!(received.is_none(), "Malformed data reached the UI");
+        }
+    }
+
+    #[tokio::test]
+    async fn log_stream_keeps_retained_records_from_previous_daemon_instances() {
+        let record = json!({
+            "timestamp": "2026-10-04T12:00:00Z", "sequence": 4,
+            "server_instance_id": "6147f85c-53ef-42f4-b3f2-c15b071320a5",
+            "level": "INFO", "message": "Previous daemon stopped"
+        });
+        let (_, received) = receive_stream_record(record.clone()).await;
+        assert_eq!(received, Some(record));
+    }
+
+    #[tokio::test]
+    async fn uncertain_admission_is_one_put_with_captured_revision_and_key() {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let api = api_for(&listener);
         let key = uuid::Uuid::new_v4().to_string();
         let expected_key = key.clone();
         let server = tokio::spawn(async move {

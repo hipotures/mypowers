@@ -31,7 +31,8 @@ platforms and showcase applications are context rather than implementation requi
   on a separate runtime. The existing structure does not require a new UI framework.
 - [Panic hooks](https://ratatui.rs/recipes/apps/panic-hooks/): the current terminal
   guard restores raw mode, mouse capture, paste mode, alternate screen, and cursor.
-  Failure-path and worker-panic behavior still need detailed verification.
+  Failure-path and worker/task-panic behavior is covered by subprocess PTY tests;
+  cycle 4 fixed continued execution after panic restoration.
 - [Snapshot testing](https://ratatui.rs/recipes/testing/snapshots/): the project
   already shares its production renderer with TestBackend snapshots. A non-writing
   comparison command closes the gap between generating previews and enforcing
@@ -134,6 +135,32 @@ controls, paste, resize, multi-client, log, and TLS tests passed against simulat
 daemons. All 30 Rust tests, Clippy with warnings denied, formatting, and Ruff
 passed. All 15 SVGs pass `--check` and regenerated hashes match the before set;
 live dashboard PNGs match byte-for-byte and the after image was inspected.
+
+### 5. Validate streamed logs before passing them to the UI
+
+The HTTP archive path checked record timestamps, unsigned sequences, UUID
+identities, and message strings, while the WebSocket path forwarded any non-null
+JSON value. A loopback WebSocket regression reproduced this discrepancy: an array
+reached the UI event channel instead of producing a log-schema error. Both paths
+now share the existing archive validation, and malformed stream records fail
+before queueing. Reconnection still belongs to the existing stream worker.
+Retained records may correctly identify a previous daemon instance; their UUID
+does not have to equal the current WebSocket envelope's instance.
+
+Validation: all 32 Rust tests passed, including two new WebSocket tests covering
+11 malformed/missing-data cases and an accepted retained record from a previous
+daemon instance. Targeted PTY archive/pagination/live-follow and status-feedback
+tests passed against simulated daemons (2 tests). Clippy with warnings denied,
+formatting, and diff checks passed. All 15 SVGs passed `--check`; regenerated
+hashes and Logs PNG bytes match the before set exactly. Inspected the after PNG.
+
+Reviewed the [layout concepts](https://ratatui.rs/concepts/layout/),
+[dynamic-layout recipe](https://ratatui.rs/recipes/layout/dynamic/),
+[Block recipe](https://ratatui.rs/recipes/widgets/block/),
+[Paragraph example](https://ratatui.rs/examples/widgets/paragraph/), and
+[Scrollbar example](https://ratatui.rs/examples/widgets/scrollbar/). The current
+layout uses bounded areas, integrated Block titles, Paragraph text, and the
+stateful Scrollbar as intended. No layout or cosmetic replacement is warranted.
 
 ## Remaining review
 
