@@ -306,6 +306,32 @@ Ratatui's thumb calculation adds that viewport to the maximum position. Using
 the total row count in its place would count the viewport twice. No replacement
 for the current pagination or scrollbar is warranted.
 
+### 10. Verify clipboard timeout and quit while copying
+
+Reviewed the [Ratatui panic example](https://ratatui.rs/examples/apps/panic/),
+Tokio's [bounded runtime shutdown](https://docs.rs/tokio/latest/tokio/runtime/struct.Runtime.html#method.shutdown_timeout),
+and [`Command::kill_on_drop`](https://docs.rs/tokio/latest/tokio/process/struct.Command.html#method.kill_on_drop).
+The current frontend restores its terminal before runtime shutdown and bounds
+that shutdown to 200 ms. Clipboard work uses asynchronous pipes, a two-second
+timeout, and a kill-on-drop child; it does not write to the terminal from the
+worker.
+
+Added two native PTY regressions with a fake `wl-copy` executable that stalls for
+30 seconds. On timeout, the UI reports copy failure and remains running; on
+Ctrl-Q, it exits within the 1.5-second test bound without waiting for that timeout.
+Both verify terminal restoration and that the helper has exited. The test uses
+a Linux pidfd to observe and clean up only its own helper, avoiding PID reuse
+races. It never invokes the real desktop clipboard.
+
+Both cases passed with the existing production code, so no implementation change
+was justified. The tests verify child termination, not an additional guarantee
+about when the operating system reaps it; Tokio documents reaping as best effort.
+Ruff checks/formatting and diff checks passed. All 15 SVGs pass `--check`;
+regenerated SVG hashes and live dashboard PNG bytes match the before set exactly.
+Inspected the after PNG. Existing PTY coverage separately verifies quitting
+during an output operation leaves the daemon and its station state independent
+of the client.
+
 ## Remaining review
 
 - Review remaining applicable application examples and tutorial integration details.

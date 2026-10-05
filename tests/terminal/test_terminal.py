@@ -578,3 +578,56 @@ def test_title_double_click_copies_actual_snapshot_without_touching_desktop_clip
         assert "mock" not in snapshot
     finally:
         session.close()
+
+
+@pytest.mark.parametrize("ending", ["timeout", "ctrlq"])
+def test_stalled_clipboard_helper_is_stopped_without_blocking_the_tui(
+    daemon_process, tui_binary, tmp_path, ending
+):
+    _, url, env = daemon_process
+    helpers = tmp_path / "helpers"
+    helpers.mkdir()
+    pid_path = tmp_path / "clipboard.pid"
+    helper = helpers / "wl-copy"
+    helper.write_text(
+        "#!/bin/sh\nprintf '%s\\n' \"$$\" > " + shlex.quote(str(pid_path)) + "\nexec sleep 30\n"
+    )
+    helper.chmod(0o755)
+    env = {**env, "PATH": str(helpers) + os.pathsep + env["PATH"]}
+    session = Session(tui_binary, tmp_path, env, "--server", url)
+    pid_fd = None
+    try:
+        session.read(b"CONNECTED")
+        row = next(index for index, text in enumerate(session.screen.display) if "MYPOWERS" in text)
+        column = session.screen.display[row].index("MYPOWERS") + 3
+        click = f"\x1b[<0;{column + 1};{row + 1}M\x1b[<0;{column + 1};{row + 1}m".encode()
+        session.write(click)
+        time.sleep(0.15)
+        session.write(click)
+        deadline = time.monotonic() + 3
+        while not pid_path.exists() or pid_path.stat().st_size == 0:
+            assert time.monotonic() < deadline, "Clipboard helper did not start"
+            time.sleep(0.02)
+        # A pidfd identifies our helper even if the numeric PID is later reused.
+        pid_fd = os.pidfd_open(int(pid_path.read_text()))
+        if ending == "timeout":
+            session.read(b"Copy failed; check clipboard access", budget=4)
+            assert session.process.poll() is None
+            session.write(b"\x11")
+        else:
+            started = time.monotonic()
+            session.write(b"\x11")
+        session.read(b"\x1b[?1049l", budget=1.5)
+        assert session.process.wait(timeout=1.5) == 0
+        if ending == "ctrlq":
+            assert time.monotonic() - started < 1.5
+        assert select.select([pid_fd], [], [], 3)[0], "Clipboard helper survived cancellation"
+        assert termios.tcgetattr(session.slave) == session.original
+    finally:
+        if pid_fd is not None:
+            try:
+                signal.pidfd_send_signal(pid_fd, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+            os.close(pid_fd)
+        session.close()
