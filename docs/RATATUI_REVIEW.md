@@ -754,6 +754,30 @@ All 29 terminal-suite cases passed in 81.57 seconds against isolated services.
 Built the release frontend and updated the local installed binary, without
 restarting existing processes.
 
+### 26. Review text/style representation and preview fidelity
+
+Completed the [text recipe](https://ratatui.rs/recipes/render/display-text/),
+[style recipe](https://ratatui.rs/recipes/render/style-text/), and
+[modifier example](https://ratatui.rs/examples/style/modifiers/). Compared them
+with production Span/Line/Paragraph use and the cell exporter. The renderer uses
+the appropriate text primitives and delegates clipping/alignment to Ratatui.
+The exporter paints all full-cell backgrounds before glyphs, uses each cell's
+terminal width, and keeps combining clusters together. Existing tests exercise
+CJK, combining marks, box/block glyphs, RGB backgrounds, ANSI/indexed colors,
+reversed/hidden cells, bold and foreground dimming. Its fixed palette and font
+declaration are preview assumptions, not a claim that every terminal has the
+same palette or glyph outlines; these limits are already documented.
+
+Also checked the installed Crossterm backend's modifier-diff implementation:
+removing bold or dim resets intensity and reapplies whichever modifier remains.
+The production UI does not need its own ANSI/style reset engine. No rendering or
+export implementation change was warranted. All nine xtask tests passed in
+0.40 seconds and xtask Clippy with warnings denied passed. Saved all 15 scenes
+before this documentation update, verified them with `--check`, regenerated and
+compared them exactly. The 80x24 live-dashboard PNG also remains byte-identical;
+inspected it before and after. Production/test code and the installed binary
+remain unchanged.
+
 ## Remaining review
 
 - Review remaining applicable application examples and tutorial integration details.
