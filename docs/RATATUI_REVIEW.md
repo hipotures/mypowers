@@ -939,6 +939,35 @@ The standard release build matches the terminal-tested binary byte-for-byte.
 Updated the installed local frontend from that build without restarting existing
 application processes.
 
+### 32. Align state-conflict feedback with the actual server contract
+
+Completed the remaining [Elm architecture example](https://ratatui.rs/concepts/application-patterns/the-elm-architecture/).
+The existing event/update/render separation fits the application; mutable rendering
+state for hitboxes and scrollbar geometry is intentional. No immutable-model copy
+or framework replacement is warranted.
+
+Cross-checking output error feedback against the server found that the frontend
+recognized three unused conflict aliases, while the actual server emits
+`state_conflict` for an obsolete daemon instance, an obsolete output revision,
+or an output revision change while waiting for fresh telemetry. Replaced the
+aliases with the actual code. A conflict now explains that station state changed
+and the user can try again, rather than giving a generic rejection message.
+
+The regression first reproduced the incorrect message through a real isolated
+HTTP 409 response. It covers both immediate admission rejection and an accepted
+command subsequently failing with that reason during polling. Each case asserts
+error severity, no replay or further polling after failure, only the appropriate
+admission event, cleared pending state, unchanged station telemetry, and no raw
+server details in feedback.
+
+All 56 Rust tests passed in 35.07 seconds. Five selected native terminal cases
+passed against the updated release build in 26.35 seconds, including multiple
+clients sharing one simulated daemon and controls/logs/paste/resize/restoration.
+Formatting, Clippy with warnings denied, and diff checks passed. All 15 SVGs pass
+`--check` and match the saved before set exactly; the command-pending PNG is also
+byte-identical and was inspected before and after. Updated the installed local
+frontend without restarting existing application processes.
+
 ## Remaining review
 
 - Review remaining applicable application examples and tutorial integration details.

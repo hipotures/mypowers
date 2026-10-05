@@ -110,9 +110,7 @@ fn reason(code: &str) -> &'static str {
         "shutdown" => "daemon stopped",
         "transport_or_status_timeout" => "station did not respond",
         "confirmation_contradiction" => "station reported a different state",
-        "revision_conflict" | "stale_revision" | "instance_mismatch" => {
-            "station state changed; try again"
-        }
+        "state_conflict" => "station state changed; try again",
         "unauthorized" | "forbidden" => "access denied",
         _ => "request rejected; see Logs",
     }

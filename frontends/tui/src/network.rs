@@ -1252,6 +1252,100 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn state_conflicts_report_a_refreshable_failure_without_replaying_the_command() {
+        const ID: &str = "6147f85c-53ef-42f4-b3f2-c15b071320a5";
+        for admitted in [false, true] {
+            let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+            let api = api_for(&listener);
+            let mut app = crate::app::App::new(false, Some(chrono_tz::UTC));
+            app.update(Event::Status(Box::new(crate::tests::status())));
+            let crate::app::Effect::Request(intent) = app.toggle(0) else {
+                panic!("Expected an AC ON command");
+            };
+            let server = tokio::spawn(async move {
+                let responses = if admitted {
+                    vec![
+                        (
+                            "PUT /api/v1/outputs/ac HTTP/1.1".to_owned(),
+                            "202 Accepted",
+                            json!({
+                                "schema_version": 1, "command_id": ID, "status": "accepted",
+                                "output": "ac", "requested_enabled": true, "reason_code": null
+                            }),
+                        ),
+                        (
+                            format!("GET /api/v1/commands/{ID} HTTP/1.1"),
+                            "200 OK",
+                            json!({
+                                "schema_version": 1, "command_id": ID, "status": "failed",
+                                "output": "ac", "requested_enabled": true, "reason_code": "state_conflict"
+                            }),
+                        ),
+                    ]
+                } else {
+                    vec![(
+                        "PUT /api/v1/outputs/ac HTTP/1.1".to_owned(),
+                        "409 Conflict",
+                        json!({
+                            "error": {"code": "state_conflict", "message": "internal detail must not be shown"}
+                        }),
+                    )]
+                };
+                for (path, status, response) in responses {
+                    let (mut socket, request) = accept_http_request(&listener).await;
+                    assert!(request.starts_with(&path));
+                    let body = response.to_string();
+                    socket.write_all(format!(
+                        "HTTP/1.1 {status}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+                        body.len()
+                    ).as_bytes()).await.unwrap();
+                }
+                assert!(
+                    timeout(Duration::from_millis(300), listener.accept())
+                        .await
+                        .is_err(),
+                    "A state conflict must not replay the PUT or continue polling"
+                );
+            });
+            let (events, mut incoming) = mpsc::channel(4);
+            let feedback = timeout(Duration::from_secs(3), api.perform(intent, &events)).await;
+            timeout(Duration::from_secs(3), server)
+                .await
+                .unwrap()
+                .unwrap();
+            let feedback = feedback.unwrap();
+            assert_eq!(
+                feedback.message,
+                if admitted {
+                    "AC ON failed: station state changed; try again"
+                } else {
+                    "Command failed: station state changed; try again"
+                }
+            );
+            assert_eq!(feedback.severity, Severity::Error);
+            if admitted {
+                let Event::Command(command) = incoming.try_recv().unwrap() else {
+                    panic!("Expected the admission event");
+                };
+                app.update(Event::Command(command));
+            }
+            assert!(incoming.try_recv().is_err());
+            app.update(Event::Finished(feedback));
+            assert!(app.pending.is_none());
+            assert!(
+                !app.status
+                    .as_ref()
+                    .unwrap()
+                    .telemetry
+                    .sample
+                    .as_ref()
+                    .unwrap()
+                    .ac_enabled
+            );
+        }
+    }
+
+    #[tokio::test]
     async fn command_polling_preserves_the_admitted_output_intention() {
         const ID: &str = "6147f85c-53ef-42f4-b3f2-c15b071320a5";
         for (output, enabled, status, id, valid) in [
