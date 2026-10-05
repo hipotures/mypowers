@@ -1375,3 +1375,27 @@ seconds. Formatting, Clippy with warnings denied and diff checks passed. All
 16 snapshots pass `--check`; the 16 SVGs and Logs PNG are byte-identical before
 and after, and the PNG was inspected. The installed release matches the tested
 immutable candidate. No user process, daemon or desktop session was changed.
+
+### 46. Exercise complete history-window bounds and deadlines
+
+Rechecked Tokio watch/timeout semantics and the distinction between a page's
+timeout and a complete operation's deadline. Added real loopback HTTP boundary
+tests: ten 1,000-row pages return all 10,000 observations, while one additional
+row fails the complete result. A second fixture takes 400 milliseconds per
+page, each below the configured 600-millisecond operation deadline; the second
+page starts, but the complete request times out without delivering the first
+page's observations. No production adjustment was necessary: cycle 44 already
+applies both bounds to the complete history operation.
+
+All 73 Rust tests passed in 35.07 seconds. Nine xtask tests passed; formatting,
+Clippy with warnings denied and diff checks passed. All 16 scenes pass `--check`,
+and the 16 SVGs plus inspected dashboard PNG remain byte-identical. The previous
+34-case native terminal result still applies to the unchanged production code;
+this batch changes only tests and this report.
+
+Also ran the existing release/TestBackend benchmark without changing its layout,
+40-observation histories or 2,000-row log fixture. Median times were 81.20 us for
+the live dashboard, 80.08 us for idle and 182.80 us for Logs; the Logs rounds varied
+from 124.88 to 190.14 us. Allocations/reallocations remain 90/94/294 respectively.
+These are local measurements with visible system-load variation, not a measured
+before/after speedup or a claim about terminal/network throughput.

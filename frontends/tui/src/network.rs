@@ -1498,6 +1498,93 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn graph_history_accepts_the_complete_window_limit_and_rejects_one_more_row() {
+        for extra in [0, 1] {
+            let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+            let api = api_for(&listener);
+            let count = crate::history::MAX_POINTS + extra;
+            let server = tokio::spawn(async move {
+                for start in (0..count).step_by(crate::history::PAGE_SIZE) {
+                    let (mut socket, _) = accept_http_request(&listener).await;
+                    let end = (start + crate::history::PAGE_SIZE).min(count);
+                    let points: Vec<_> = (start..end)
+                        .map(|index| graph_history_point(index as u64 + 1, -119_000 + index as i64))
+                        .collect();
+                    respond_json(&mut socket, json!({
+                        "schema_version": 1, "source": "database", "gap": false,
+                        "items": points, "next_cursor": (end < count).then(|| format!("page-{end}"))
+                    })).await;
+                }
+            });
+            let result = api.history(&graph_history_request(0)).await;
+            if extra == 0 {
+                let points = result.unwrap();
+                assert_eq!(points.len(), crate::history::MAX_POINTS);
+                assert_eq!(points.first().unwrap().id, 1);
+                assert_eq!(points.last().unwrap().id, crate::history::MAX_POINTS as u64);
+            } else {
+                assert_eq!(result.unwrap_err(), "Invalid or oversized history page.");
+            }
+            server.await.unwrap();
+        }
+    }
+
+    #[tokio::test]
+    async fn graph_history_timeout_covers_all_pages_without_delivering_partial_points() {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let mut api = api_for(&listener);
+        api.timeout = Duration::from_millis(600);
+        let (second_page, queried) = tokio::sync::oneshot::channel();
+        let server = tokio::spawn(async move {
+            let (mut socket, _) = accept_http_request(&listener).await;
+            tokio::time::sleep(Duration::from_millis(400)).await;
+            respond_json(
+                &mut socket,
+                json!({
+                    "schema_version": 1, "source": "database", "gap": false,
+                    "items": [graph_history_point(1, -1000)], "next_cursor": "second"
+                }),
+            )
+            .await;
+            let (mut socket, _) = accept_http_request(&listener).await;
+            second_page.send(()).unwrap();
+            tokio::time::sleep(Duration::from_millis(400)).await;
+            respond_json(
+                &mut socket,
+                json!({
+                    "schema_version": 1, "source": "database", "gap": false,
+                    "items": [graph_history_point(2, -500)], "next_cursor": null
+                }),
+            )
+            .await;
+        });
+        let (requests, operations) = tokio::sync::watch::channel(None);
+        let (events, mut incoming) = mpsc::channel(4);
+        let worker = tokio::spawn(Arc::new(api).history_pages(operations, events));
+        requests.send(Some(graph_history_request(1))).unwrap();
+        timeout(Duration::from_secs(2), queried)
+            .await
+            .unwrap()
+            .unwrap();
+        let Event::History(_, result) = timeout(Duration::from_secs(2), incoming.recv())
+            .await
+            .unwrap()
+            .unwrap()
+        else {
+            panic!("Expected the complete request result");
+        };
+        assert_eq!(result.unwrap_err(), "History request timed out.");
+        assert!(incoming.try_recv().is_err());
+        server.abort();
+        assert!(server.await.unwrap_err().is_cancelled());
+        drop(requests);
+        timeout(Duration::from_secs(1), worker)
+            .await
+            .unwrap()
+            .unwrap();
+    }
+
+    #[tokio::test]
     async fn graph_history_worker_cancels_obsolete_requests_and_bounds_total_wait() {
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
         let mut api = api_for(&listener);
