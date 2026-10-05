@@ -778,6 +778,33 @@ compared them exactly. The 80x24 live-dashboard PNG also remains byte-identical;
 inspected it before and after. Production/test code and the installed binary
 remain unchanged.
 
+### 27. Keep Pong write backpressure inside the stream deadline
+
+Reviewed [Tungstenite 0.30's automatic control replies](https://docs.rs/tungstenite/0.30.0/tungstenite/protocol/struct.WebSocket.html)
+and the installed Tokio-Tungstenite adapter. Receiving Ping queues a matching
+Pong; a later flush sends it. MyPowers protected reads with its valid-message
+deadline but awaited a separate manual Pong send without any deadline. A peer
+that stopped reading replies could therefore prevent stream loss from being
+reported indefinitely, even though telemetry freshness still expired normally.
+
+Added a real loopback backpressure regression. The server has a small receive
+buffer, sends one valid snapshot followed by a burst of valid 125-byte Ping
+frames, and never reads the client's replies. Before the fix, the stream exceeded
+the test's 16-second outer guard instead of honoring its 15-second deadline.
+The server task is aborted and awaited before assertions so failure leaves no
+detached producer. Replaced manual Pong construction with an automatic-reply
+flush, bounded by the remaining time since the last valid API message. Neither
+Ping nor Pong renews that clock. Fully flushing before reading another frame
+also keeps write backpressure effective rather than accumulating control replies.
+
+The targeted regression passed in 15.07 seconds. All 53 Rust tests passed in
+35.11 seconds, including the existing exact-Pong-payload, heartbeat and telemetry
+expiration checks. All 29 terminal-suite cases passed in 81.60 seconds. Formatting,
+Clippy with warnings denied, and diff checks passed. All 15 SVGs pass `--check`;
+regenerated SVGs and daemon-offline PNG bytes match the before set exactly.
+Inspected that scene before and after. Built the release frontend and updated
+the installed local binary without restarting existing application processes.
+
 ## Remaining review
 
 - Review remaining applicable application examples and tutorial integration details.

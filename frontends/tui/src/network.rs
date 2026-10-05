@@ -400,10 +400,14 @@ impl Api {
                 .map_err(|_| "Daemon stream lost. Reconnecting...")?;
             let text = match frame {
                 Message::Text(text) => text,
-                Message::Ping(data) => {
-                    socket
-                        .send(Message::Pong(data))
+                Message::Ping(_) => {
+                    // Tungstenite queues the matching Pong; writes share the receive deadline.
+                    timeout(
+                        Duration::from_secs(15).saturating_sub(valid_at.elapsed()),
+                        socket.flush(),
+                    )
                         .await
+                        .map_err(|_| "Daemon stream timed out. Reconnecting...")?
                         .map_err(|_| "Stream ping failed.")?;
                     continue;
                 }
@@ -892,6 +896,56 @@ mod tests {
                 "Unexpected state reached the UI"
             );
         }
+    }
+
+    #[tokio::test]
+    async fn blocked_pong_writes_cannot_escape_the_valid_message_deadline() {
+        use std::sync::atomic::{AtomicUsize, Ordering};
+
+        let socket = tokio::net::TcpSocket::new_v4().unwrap();
+        socket.set_recv_buffer_size(1024).unwrap();
+        socket.bind("127.0.0.1:0".parse().unwrap()).unwrap();
+        let listener = socket.listen(1).unwrap();
+        let api = api_for(&listener);
+        let sent = Arc::new(AtomicUsize::new(0));
+        let count = sent.clone();
+        let server = tokio::spawn(async move {
+            let (socket, _) = listener.accept().await.unwrap();
+            let mut socket = tokio_tungstenite::accept_async(socket).await.unwrap();
+            socket
+                .send(Message::Text(
+                    status_envelope(1, "snapshot").to_string().into(),
+                ))
+                .await
+                .unwrap();
+            // Never read the client's Pong replies; eventually its writes must block.
+            let ping = Message::Ping(vec![b'p'; 125].into());
+            for _ in 0..100_000 {
+                if socket.send(ping.clone()).await.is_err() {
+                    break;
+                }
+                count.fetch_add(1, Ordering::Relaxed);
+            }
+            std::future::pending::<()>().await;
+        });
+        let (events, mut incoming) = mpsc::channel(4);
+        let result = timeout(Duration::from_secs(16), api.stream_once(false, &events)).await;
+        server.abort();
+        let _ = server.await;
+        assert!(
+            sent.load(Ordering::Relaxed) > 1000,
+            "The server did not create backpressure"
+        );
+        let result = result.expect("A blocked Pong write escaped the 15-second stream deadline");
+        assert_eq!(
+            result.unwrap_err(),
+            "Daemon stream timed out. Reconnecting..."
+        );
+        assert!(matches!(incoming.try_recv(), Ok(Event::Status(_))));
+        assert!(
+            incoming.try_recv().is_err(),
+            "Pings became application updates"
+        );
     }
 
     #[tokio::test]
