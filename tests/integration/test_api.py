@@ -109,6 +109,8 @@ def test_strict_booleans_unknown_fields_and_error_envelope(config, body):
     [
         ("/api/v1/status", "get"),
         ("/api/v1/capabilities", "get"),
+        ("/api/v1/settings", "get"),
+        ("/api/v1/settings", "put"),
         ("/api/v1/history", "get"),
         ("/api/v1/history/aggregates", "get"),
         ("/api/v1/logs", "get"),
@@ -410,3 +412,38 @@ def test_history_aggregates_contract_and_request_validation(config, seconds):
             assert invalid.status_code == 422
             assert "error" in invalid.json()
         assert client.get("/api/v1/history/aggregates").status_code == 422
+
+
+def test_settings_api_validates_partial_updates_and_persists_across_restart(config):
+    config.history.enabled = False
+    with TestClient(create_app(config)) as client:
+        for _ in range(100):
+            response = client.get("/api/v1/settings")
+            if response.status_code == 200:
+                break
+            time.sleep(0.02)
+        assert response.json() == {"schema_version": 1, "graph_interval_seconds": 10}
+        assert (
+            client.put("/api/v1/settings", json={"graph_interval_seconds": 60}).json()[
+                "graph_interval_seconds"
+            ]
+            == 60
+        )
+        assert client.put("/api/v1/settings", json={}).json()["graph_interval_seconds"] == 60
+        for invalid in [11, True, 10.0, "10", None]:
+            assert (
+                client.put("/api/v1/settings", json={"graph_interval_seconds": invalid}).status_code
+                == 422
+            )
+        assert (
+            client.put("/api/v1/settings", json={"telegram_token": "not-a-real-token"}).status_code
+            == 422
+        )
+        assert client.get("/api/v1/settings").json()["graph_interval_seconds"] == 60
+    with TestClient(create_app(config)) as client:
+        for _ in range(100):
+            response = client.get("/api/v1/settings")
+            if response.status_code == 200:
+                break
+            time.sleep(0.02)
+        assert response.json() == {"schema_version": 1, "graph_interval_seconds": 60}

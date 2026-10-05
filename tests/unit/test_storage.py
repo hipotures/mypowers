@@ -7,7 +7,7 @@ from uuid import uuid4
 import pytest
 from conftest import frame
 
-from mypowers.contracts import AppError, timestamp
+from mypowers.contracts import AppError, SettingsUpdate, timestamp
 from mypowers.storage import CursorCodec, HistoryStore
 
 
@@ -359,3 +359,70 @@ async def test_hourly_aggregates_return_bars_instead_of_thousands_of_raw_rows(co
         assert all(item.sample_count == 360 for item in result.items)
     finally:
         await store.close()
+
+
+async def test_settings_persist_without_history_and_preserve_future_keys(core, tmp_path):
+    store = HistoryStore(core[0], tmp_path, False, 10)
+    await store.open()
+    try:
+        assert store.state == "disabled"
+        assert (await store.settings()).graph_interval_seconds == 10
+        await store.db.execute("INSERT INTO settings VALUES('future_preference','true')")
+        await store.db.commit()
+        assert (
+            await store.settings(SettingsUpdate(graph_interval_seconds=60))
+        ).graph_interval_seconds == 60
+        assert (await store.settings(SettingsUpdate())).graph_interval_seconds == 60
+        async with store.db.execute(
+            "SELECT value_json FROM settings WHERE key='future_preference'"
+        ) as query:
+            assert (await query.fetchone())[0] == "true"
+        async with store.db.execute("PRAGMA integrity_check") as query:
+            assert (await query.fetchone())[0] == "ok"
+    finally:
+        await store.close()
+    reopened = HistoryStore(core[0], tmp_path, False, 10)
+    await reopened.open()
+    try:
+        assert (await reopened.settings()).graph_interval_seconds == 60
+        with pytest.raises(AppError, match="disabled"):
+            await reopened.query()
+    finally:
+        await reopened.close()
+    with pytest.raises(AppError) as unavailable:
+        await reopened.settings(SettingsUpdate(graph_interval_seconds=3600))
+    assert unavailable.value.code == "settings_unavailable"
+
+
+async def test_settings_table_addition_preserves_a_consistent_existing_database_snapshot(
+    core, tmp_path
+):
+    source_dir = tmp_path / "source"
+    source_dir.mkdir()
+    original = HistoryStore(core[0], source_dir, True, 10)
+    await original.open()
+    await original.insert(core[0].latest)
+    await original.close()
+    target_dir = tmp_path / "snapshot"
+    target_dir.mkdir()
+    # Model the existing schema, then test only its Online Backup snapshot.
+    with closing(sqlite3.connect(source_dir / "mypowers.db")) as source:
+        source.execute("DROP TABLE settings")
+        source.commit()
+        with closing(sqlite3.connect(target_dir / "mypowers.db")) as target:
+            source.backup(target)
+    store = HistoryStore(core[0], target_dir, True, 10)
+    await store.open()
+    try:
+        assert (await store.settings()).graph_interval_seconds == 10
+        await store.settings(SettingsUpdate(graph_interval_seconds=3600))
+        assert len((await store.query(until=timestamp(core[0].clock.time() + 1))).items) == 1
+        async with store.db.execute("PRAGMA integrity_check") as query:
+            assert (await query.fetchone())[0] == "ok"
+    finally:
+        await store.close()
+    with closing(sqlite3.connect(source_dir / "mypowers.db")) as source:
+        assert (
+            source.execute("SELECT name FROM sqlite_master WHERE name='settings'").fetchone()
+            is None
+        )

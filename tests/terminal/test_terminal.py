@@ -633,6 +633,8 @@ def test_native_pause_resume_retry_and_runtime_logging_receipts(
             initial = client.get("/api/v1/status").json()
             session.write(b"s")
             session.read(b"SETTINGS")
+            session.write(b"\t\t\t\t")
+            session.read(b"Debug / Diagnostics")
             for key, message in [
                 (b"p", b"Station connection paused"),
                 (b"r", b"Reconnecting to station"),
@@ -1312,3 +1314,37 @@ def test_stalled_clipboard_helper_is_stopped_without_blocking_the_tui(
                 pass
             os.close(pid_fd)
         session.close()
+
+
+def test_settings_startup_interval_is_saved_on_daemon_and_applied_on_next_tui_start(
+    daemon_process, tui_binary, tmp_path
+):
+    _, url, env = daemon_process
+    with httpx.Client(base_url=url, trust_env=False) as client:
+        assert (
+            client.put("/api/v1/settings", json={"graph_interval_seconds": 60}).status_code == 200
+        )
+        session = Session(tui_binary, tmp_path, env, "--server", url)
+        try:
+            session.read(b"t 60s")
+            session.write(b"s")
+            session.read(b"SETTINGS")
+            session.write(b"\t")
+            session.read(b"Power graphs")
+            session.read(b"Startup interval")
+            session.write(b"d")
+            session.read(b"(unsaved)")
+            session.write(b"s")
+            session.read(b"Settings saved")
+            assert client.get("/api/v1/settings").json()["graph_interval_seconds"] == 3600
+            current = next(row for row in session.screen.display if "Current interval" in row)
+            assert "60s" in current
+            session.write(b"\x1b")
+            session.read(b"t 60s")
+        finally:
+            session.close()
+        restarted = Session(tui_binary, tmp_path, env, "--server", url)
+        try:
+            restarted.read(b"t 1h")
+        finally:
+            restarted.close()

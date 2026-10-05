@@ -4,6 +4,7 @@ use crate::{
     history::{Point, Resolution},
     model::{Command, Status},
     network::{ClipboardTarget, Event, Intent},
+    settings::{Settings, SettingsTab},
     ui,
 };
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
@@ -88,6 +89,118 @@ fn text(buffer: &Buffer) -> String {
         })
         .collect::<Vec<_>>()
         .join("\n")
+}
+
+#[test]
+fn settings_tabs_wrap_route_contextual_keys_and_mouse_without_dashboard_actions() {
+    let mut app = app();
+    app.key(KeyEvent::new(KeyCode::Char('s'), KeyModifiers::NONE));
+    for tab in SettingsTab::ALL {
+        assert_eq!(app.settings_tab, tab);
+        let screen = text(&render(&mut app, 60, 19));
+        assert!(screen.contains("Preferences · Charts · Alerts · Notify · Debug"));
+        assert!(app.controls.iter().all(|rect| rect.width == 0));
+        for key in ['a', 'l'] {
+            assert!(matches!(
+                app.key(KeyEvent::new(KeyCode::Char(key), KeyModifiers::NONE)),
+                Effect::None
+            ));
+        }
+        if tab != SettingsTab::Debug {
+            for key in ['r', 'p', 'b'] {
+                assert!(matches!(
+                    app.key(KeyEvent::new(KeyCode::Char(key), KeyModifiers::NONE)),
+                    Effect::None
+                ));
+            }
+        }
+        app.key(KeyEvent::new(KeyCode::Tab, KeyModifiers::NONE));
+    }
+    assert_eq!(app.settings_tab, SettingsTab::Preferences);
+    app.key(KeyEvent::new(KeyCode::BackTab, KeyModifiers::SHIFT));
+    assert_eq!(app.settings_tab, SettingsTab::Debug);
+    render(&mut app, 94, 29);
+    let target = app.settings_tabs[1];
+    app.mouse(MouseEvent {
+        kind: MouseEventKind::Down(MouseButton::Left),
+        column: target.x,
+        row: target.y,
+        modifiers: KeyModifiers::NONE,
+    });
+    assert_eq!(app.settings_tab, SettingsTab::Charts);
+    app.key(KeyEvent::new(KeyCode::Char('?'), KeyModifiers::NONE));
+    let help = text(&render(&mut app, 94, 29));
+    assert!(help.contains("HELP — SETTINGS / Charts") && help.contains("Save startup interval"));
+    assert!(!help.contains("Retry station connection"));
+    app.key(KeyEvent::new(KeyCode::Esc, KeyModifiers::NONE));
+    assert!(app.view == View::Dashboard);
+    assert!(app.settings_tabs.iter().all(|rect| rect.width == 0));
+    let selected = app.selected;
+    app.key(KeyEvent::new(KeyCode::Tab, KeyModifiers::NONE));
+    assert_ne!(app.selected, selected);
+}
+
+#[test]
+fn startup_interval_load_and_save_do_not_overwrite_session_choices_or_failed_drafts() {
+    let settings = |seconds| {
+        Event::Settings(Settings {
+            schema_version: 1,
+            graph_interval_seconds: seconds,
+        })
+    };
+    let mut app = app();
+    app.update(settings(60));
+    assert_eq!(app.graph.resolution, Resolution::Minute);
+    app.key(KeyEvent::new(KeyCode::Char('s'), KeyModifiers::NONE));
+    app.key(KeyEvent::new(KeyCode::Tab, KeyModifiers::NONE));
+    app.key(KeyEvent::new(KeyCode::Char('d'), KeyModifiers::NONE));
+    assert_eq!(app.startup_interval, Resolution::Hour);
+    assert_eq!(app.graph.resolution, Resolution::Minute);
+    assert!(text(&render(&mut app, 94, 29)).contains("1h  (unsaved)"));
+    assert!(matches!(
+        app.key(KeyEvent::new(KeyCode::Char('s'), KeyModifiers::NONE)),
+        Effect::Request(Intent::SaveSettings(3600))
+    ));
+    assert!(matches!(
+        app.key(KeyEvent::new(KeyCode::Char('s'), KeyModifiers::NONE)),
+        Effect::None
+    ));
+    app.update(Event::Finished(Feedback::new(
+        "Could not save settings; try again",
+        Severity::Error,
+    )));
+    assert_eq!(app.settings.as_ref().unwrap().graph_interval_seconds, 60);
+    assert_eq!(app.startup_interval, Resolution::Hour);
+    app.key(KeyEvent::new(KeyCode::Char('s'), KeyModifiers::NONE));
+    app.update(settings(3600));
+    app.update(Event::Finished(Feedback::new(
+        "Settings saved",
+        Severity::Success,
+    )));
+    assert_eq!(app.settings.as_ref().unwrap().graph_interval_seconds, 3600);
+    assert_eq!(app.graph.resolution, Resolution::Minute);
+    assert!(!text(&render(&mut app, 94, 29)).contains("(unsaved)"));
+
+    let mut late = fixed_graph_app();
+    late.key(KeyEvent::new(KeyCode::Char('t'), KeyModifiers::NONE));
+    late.update(settings(3600));
+    assert_eq!(late.graph.resolution, Resolution::Minute);
+    assert_eq!(late.startup_interval, Resolution::Hour);
+    late.update(Event::Settings(Settings {
+        schema_version: 2,
+        graph_interval_seconds: 10,
+    }));
+    assert_eq!(late.settings.as_ref().unwrap().graph_interval_seconds, 3600);
+    let mut unloaded = fixed_graph_app();
+    unloaded.view = View::Settings;
+    unloaded.settings_tab = SettingsTab::Charts;
+    unloaded.update(Event::SettingsUnavailable);
+    assert!(text(&render(&mut unloaded, 60, 19)).contains("Unavailable; retrying"));
+    assert!(matches!(
+        unloaded.key(KeyEvent::new(KeyCode::Char('s'), KeyModifiers::NONE)),
+        Effect::None
+    ));
+    assert!(unloaded.pending.is_none());
 }
 
 #[test]
@@ -1741,6 +1854,7 @@ fn shortcuts_are_confined_to_the_active_context() {
         for key in ['r', 'p'] {
             let mut app = app();
             app.view = View::Settings;
+            app.settings_tab = SettingsTab::Debug;
             app.status.as_mut().unwrap().connection.desired = desired.into();
             let effect = app.key(KeyEvent::new(KeyCode::Char(key), KeyModifiers::NONE));
             assert!(match (key, effect) {
@@ -1850,6 +1964,7 @@ fn help_lists_only_the_context_that_opened_it() {
     for context in [View::Dashboard, View::Logs, View::Settings] {
         let mut app = app();
         app.view = context;
+        app.settings_tab = SettingsTab::Debug;
         app.key(KeyEvent::new(KeyCode::Char('?'), KeyModifiers::NONE));
         assert!(app.view == View::Help && app.help_context == context);
         let screen = text(&render(&mut app, 94, 29));
@@ -2120,6 +2235,7 @@ fn settings_and_help_are_bounded_modal_overlays_with_inactive_dashboard_hitboxes
     let station_color = normal[(2, 1)].fg;
     app.key(KeyEvent::new(KeyCode::Char('s'), KeyModifiers::NONE));
     assert!(app.view == View::Settings);
+    app.settings_tab = SettingsTab::Debug;
     for (width, height) in [(60, 19), (80, 24), (94, 29)] {
         let screen = text(&render(&mut app, width, height));
         assert!(screen.contains("SETTINGS") && screen.contains("Debug / Diagnostics"));

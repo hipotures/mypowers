@@ -1,4 +1,4 @@
-"""Bounded asynchronous telemetry persistence, without raw frames or log tables."""
+"""SQLite telemetry persistence and validated application settings, without raw frames or logs."""
 
 import asyncio
 import base64
@@ -15,8 +15,22 @@ from uuid import uuid4
 
 import aiosqlite
 
-from mypowers.contracts import AppError, HistoryAggregates, HistoryBucket, Page, aware_ms
+from mypowers.contracts import (
+    AppError,
+    HistoryAggregates,
+    HistoryBucket,
+    Page,
+    Settings,
+    SettingsUpdate,
+    aware_ms,
+)
 from mypowers.core import Core, Observation
+
+SETTINGS_SCHEMA = """
+CREATE TABLE IF NOT EXISTS settings (
+ key TEXT PRIMARY KEY, value_json TEXT NOT NULL
+) STRICT;
+"""
 
 SCHEMA = """
 BEGIN IMMEDIATE;
@@ -151,6 +165,7 @@ class HistoryStore:
                 integrity = await cursor.fetchone()
             if integrity is None or integrity[0] != "ok":
                 raise RuntimeError("Database integrity failed; operator action required.")
+            await connection.executescript(SETTINGS_SCHEMA)
             await connection.execute(
                 "INSERT INTO devices(address,name,model,created_at_ms) VALUES (?,?,?,?) "
                 "ON CONFLICT(address) DO NOTHING",
@@ -167,7 +182,7 @@ class HistoryStore:
             await connection.close()
             raise
         self.db = connection
-        self.state, self.error = "ok", None
+        self.state, self.error = ("ok" if self.enabled else "disabled"), None
         self.core.segment = str(uuid4())
         self.instance = hashlib.sha256(
             f"{self.path.stat().st_ino}:{self.instance}".encode()
@@ -227,7 +242,7 @@ class HistoryStore:
     async def run(self) -> None:
         retry = 0.0
         while not self.stopping or not self.queue.empty():
-            if self.enabled and self.db is None and time.monotonic() >= retry and not self.stopping:
+            if self.db is None and time.monotonic() >= retry and not self.stopping:
                 try:
                     await self.open()
                 except Exception as error:
@@ -390,6 +405,39 @@ class HistoryStore:
             ) from None
         finally:
             self.queries -= 1
+
+    async def settings(self, update: SettingsUpdate | None = None) -> Settings:
+        if self.db is None or self.state not in {"ok", "disabled"}:
+            raise AppError("settings_unavailable", "Settings storage is unavailable.", 503, True)
+        try:
+            async with asyncio.timeout(6):
+                async with self.lock:
+                    if self.db is None:
+                        raise AppError(
+                            "settings_unavailable", "Settings storage is unavailable.", 503, True
+                        )
+                    if update is not None:
+                        values = update.model_dump(exclude_unset=True)
+                        try:
+                            await self.db.executemany(
+                                "INSERT INTO settings(key,value_json) VALUES (?,?) "
+                                "ON CONFLICT(key) DO UPDATE SET value_json=excluded.value_json",
+                                [(key, json.dumps(value)) for key, value in values.items()],
+                            )
+                            await self.db.commit()
+                        except BaseException:
+                            await self.db.rollback()
+                            raise
+                    async with self.db.execute("SELECT key,value_json FROM settings") as cursor:
+                        rows = await cursor.fetchall()
+                    fields = Settings.model_fields.keys() - {"schema_version"}
+                    return Settings.model_validate(
+                        {key: json.loads(value) for key, value in rows if key in fields}
+                    )
+        except (TimeoutError, sqlite3.Error, ValueError):
+            raise AppError(
+                "settings_unavailable", "Settings storage is unavailable.", 503, True
+            ) from None
 
     async def close(self) -> None:
         self.stopping = True

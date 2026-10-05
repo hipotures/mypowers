@@ -3,6 +3,7 @@ use crate::{
     feedback::{Feedback, Severity, output_name},
     model::{Command, Status},
     network::{ClipboardTarget, Event, Intent},
+    settings::{Settings, SettingsTab},
 };
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
 use ratatui::layout::{Position, Rect};
@@ -34,6 +35,12 @@ pub struct App {
     pub connection_notice: String,
     pub log_notice: String,
     pub pending: Option<String>,
+    pub settings_tab: SettingsTab,
+    pub settings_tabs: [Rect; 5],
+    pub settings: Option<Settings>,
+    pub startup_interval: crate::history::Resolution,
+    pub settings_error: bool,
+    graph_interval_overridden: bool,
     pub view: View,
     pub help_context: View,
     pub logs: crate::logs::Logs,
@@ -84,6 +91,12 @@ impl App {
             connection_notice: "Connecting to daemon...".into(),
             log_notice: String::new(),
             pending: None,
+            settings_tab: SettingsTab::default(),
+            settings_tabs: [Rect::default(); 5],
+            settings: None,
+            startup_interval: crate::history::Resolution::TenSeconds,
+            settings_error: false,
+            graph_interval_overridden: false,
             view: View::Dashboard,
             help_context: View::Dashboard,
             logs: crate::logs::Logs::new_at(timezone, clock.now()),
@@ -105,6 +118,35 @@ impl App {
 
     pub fn update(&mut self, event: Event) {
         match event {
+            Event::Settings(settings) => {
+                let Some(resolution) = settings.resolution() else {
+                    return;
+                };
+                let unchanged = self
+                    .settings
+                    .as_ref()
+                    .is_none_or(|old| old.resolution() == Some(self.startup_interval));
+                if self.settings.is_none() && !self.graph_interval_overridden {
+                    self.graph.resolution = resolution;
+                    self.graph.points.clear();
+                    self.reset_history();
+                }
+                if unchanged || self.pending.as_deref() == Some("settings request") {
+                    self.startup_interval = resolution;
+                }
+                self.settings = Some(settings);
+                self.settings_error = false;
+            }
+            Event::SettingsUnavailable => {
+                if self.connected && !self.settings_error {
+                    self.feedback = Some(Feedback::new(
+                        "Settings unavailable; retrying",
+                        Severity::Warning,
+                    ));
+                }
+                self.settings_error = true;
+            }
+
             Event::LogStreamReady => self.log_notice.clear(),
             Event::Status(status) => {
                 self.connection_feedback(&status);
@@ -494,23 +536,8 @@ impl App {
                 KeyCode::Enter | KeyCode::Char(' ') => {
                     return self.toggle(self.selected.unwrap_or(0));
                 }
-                KeyCode::Char('t') => {
-                    self.graph.resolution = self.graph.resolution.next();
-                    self.graph.points.clear();
-                    self.reset_history();
-                    self.feedback = Some(Feedback::new(
-                        format!("Graph interval: {} per bar", self.graph.resolution.label()),
-                        Severity::Info,
-                    ));
-                }
-                KeyCode::Char('g') => {
-                    self.graph.visualization = self.graph.visualization.next();
-                    self.resize();
-                    self.feedback = Some(Feedback::new(
-                        format!("Graph view: {}", self.graph.visualization.label()),
-                        Severity::Info,
-                    ));
-                }
+                KeyCode::Char('t') => self.cycle_graph_interval(),
+                KeyCode::Char('g') => self.toggle_graph_view(),
                 _ => {}
             },
             View::Logs => match key.code {
@@ -524,7 +551,43 @@ impl App {
             },
             View::Settings => match key.code {
                 KeyCode::F(1) | KeyCode::Char('?') => self.open_help(),
-                KeyCode::Char(key @ ('r' | 'p' | 'b')) => return self.operation(key),
+                KeyCode::Tab | KeyCode::Right => {
+                    self.select_settings_tab(self.settings_tab.next(false))
+                }
+                KeyCode::BackTab | KeyCode::Left => {
+                    self.select_settings_tab(self.settings_tab.next(true))
+                }
+                KeyCode::Char(key @ ('r' | 'p' | 'b'))
+                    if self.settings_tab == SettingsTab::Debug =>
+                {
+                    return self.operation(key);
+                }
+                KeyCode::Char('t') if self.settings_tab == SettingsTab::Charts => {
+                    self.cycle_graph_interval()
+                }
+                KeyCode::Char('g') if self.settings_tab == SettingsTab::Charts => {
+                    self.toggle_graph_view()
+                }
+                KeyCode::Char('d')
+                    if self.settings_tab == SettingsTab::Charts
+                        && self.settings.is_some()
+                        && self.pending.is_none() =>
+                {
+                    self.startup_interval = self.startup_interval.next();
+                }
+                KeyCode::Char('s') if self.settings_tab == SettingsTab::Charts => {
+                    if self.connected && self.settings.is_some() && self.pending.is_none() {
+                        self.pending = Some("settings request".into());
+                        self.feedback = Some(Feedback::new("Saving settings...", Severity::Info));
+                        return Effect::Request(Intent::SaveSettings(
+                            self.startup_interval.seconds(),
+                        ));
+                    }
+                    self.feedback = Some(Feedback::new(
+                        "Settings unavailable or operation pending",
+                        Severity::Warning,
+                    ));
+                }
                 _ => {}
             },
             View::Help => {}
@@ -547,6 +610,31 @@ impl App {
         Effect::None
     }
 
+    fn cycle_graph_interval(&mut self) {
+        self.graph_interval_overridden = true;
+        self.graph.resolution = self.graph.resolution.next();
+        self.graph.points.clear();
+        self.reset_history();
+        self.feedback = Some(Feedback::new(
+            format!("Graph interval: {} per bar", self.graph.resolution.label()),
+            Severity::Info,
+        ));
+    }
+
+    fn toggle_graph_view(&mut self) {
+        self.graph.visualization = self.graph.visualization.next();
+        self.resize();
+        self.feedback = Some(Feedback::new(
+            format!("Graph view: {}", self.graph.visualization.label()),
+            Severity::Info,
+        ));
+    }
+
+    fn select_settings_tab(&mut self, tab: SettingsTab) {
+        self.settings_tab = tab;
+        self.resize();
+    }
+
     fn open_help(&mut self) {
         self.help_context = self.view;
         self.view = View::Help;
@@ -558,6 +646,7 @@ impl App {
         self.controls = [Rect::default(); 3];
         self.title = Rect::default();
         self.quit_buttons = [Rect::default(); 2];
+        self.settings_tabs = [Rect::default(); 5];
         self.title_click = None;
         self.press = None;
         self.logs.resize();
@@ -587,6 +676,19 @@ impl App {
                 .mouse(mouse)
                 .map(Effect::Logs)
                 .unwrap_or(Effect::None);
+        }
+        if self.view == View::Settings {
+            if mouse.kind == MouseEventKind::Down(MouseButton::Left) {
+                let position = Position::new(mouse.column, mouse.row);
+                if let Some(index) = self
+                    .settings_tabs
+                    .iter()
+                    .position(|rect| rect.contains(position))
+                {
+                    self.select_settings_tab(SettingsTab::ALL[index]);
+                }
+            }
+            return Effect::None;
         }
         if self.view != View::Dashboard {
             return Effect::None;

@@ -50,7 +50,7 @@ The current bucket can change as recorded samples arrive. Missing buckets stay
 empty; actual zeros participate in averages. Live numeric labels stay independent
 of graph history, and positive fractional averages remain visible.
 
-`dashboard-chart.svg` shows the production four-row shared Chart widget with
+`dashboard-chart.svg` shows the production seven-row shared Chart widget with
 Braille line datasets: INPUT green and OUTPUT cyan, one common auto scale starting
 at 100 W and doubling as needed. The additional chart scenes cover 80x24, 60x19,
 recording gaps, idle, low load and daemon loss. The 60s and 1h chart scenes
@@ -73,9 +73,13 @@ clipped cell viewports keep borders continuous and prevent block glyph overhang;
 ordinary text keeps its monospace spacing. Explicit glyph transforms work without
 relying on viewer-specific `textLength`/`lengthAdjust` support.
 
-Settings is the actual read-only Preferences and Debug / Diagnostics modal
-(dashboard `s`; `b` toggles runtime DEBUG). Mutable server settings and an alert
-engine are separate work. Warning/error counts in these fixtures demonstrate the
+Settings uses the production Tabs widget (dashboard `s`). `settings-modal.svg`
+shows Preferences; `settings-charts.svg`, `settings-alerts.svg`,
+`settings-notify.svg` and `settings-debug.svg` cover every other tab. Additional
+60x19 Charts/Debug scenes verify the minimum size; `help-settings.svg` shows
+contextual help. Charts fixtures include a saved startup interval. The actual
+TUI persists that interval through the daemon settings API; snapshot generation
+uses only fake state. Battery alerts and connectors remain future features. Warning/error counts in these fixtures demonstrate the
 production status strip's rendering; they do not implement server alert tracking.
 Zero counters are never displayed.
 

@@ -59,6 +59,7 @@ fn run() -> Result<(), String> {
         api.clone()
             .history_aggregates(history_operations, events.clone()),
     );
+    runtime.spawn(api.clone().load_settings(events.clone()));
     runtime.spawn(api.operations(operations, events.clone()));
     let signal_events = events.clone();
     runtime.spawn(async move {

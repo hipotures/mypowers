@@ -3,6 +3,7 @@ use crate::{
     feedback::{Feedback, Severity},
     history::{Visualization, power_scale},
     model::safe,
+    settings::SettingsTab,
 };
 use ratatui::{
     Frame,
@@ -13,7 +14,7 @@ use ratatui::{
     text::{Line, Span},
     widgets::{
         Axis, Block, BorderType, Borders, Chart, Clear, Dataset, GraphType, Paragraph, Scrollbar,
-        ScrollbarOrientation, ScrollbarState, Sparkline, SparklineBar, Widget,
+        ScrollbarOrientation, ScrollbarState, Sparkline, SparklineBar, Tabs, Widget,
     },
 };
 use std::borrow::Cow;
@@ -45,6 +46,7 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
     app.controls = [Rect::default(); 3];
     app.title = Rect::default();
     app.quit_buttons = [Rect::default(); 2];
+    app.settings_tabs = [Rect::default(); 5];
     app.logs.clear_hitboxes();
     if screen.width < MIN_WIDTH || screen.height < MIN_HEIGHT {
         frame.render_widget(
@@ -78,6 +80,7 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
         area.width,
         app.graph.resolution.label(),
         app.graph.visualization,
+        app.settings_tab,
     );
     let outer = Block::default()
         .borders(Borders::ALL)
@@ -161,7 +164,7 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
                 ..inner
             };
             if app.view == View::Help {
-                help(frame, inner, app.help_context);
+                help(frame, inner, app.help_context, app.settings_tab);
             } else {
                 settings(frame, inner, app);
             }
@@ -202,7 +205,13 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
     }
 }
 
-fn outer_footer(view: View, width: u16, interval: &str, visualization: Visualization) -> String {
+fn outer_footer(
+    view: View,
+    width: u16,
+    interval: &str,
+    visualization: Visualization,
+    tab: SettingsTab,
+) -> String {
     let alternate = if visualization == Visualization::Sparkline {
         "chart"
     } else {
@@ -216,7 +225,20 @@ fn outer_footer(view: View, width: u16, interval: &str, visualization: Visualiza
             format!(" a/d/l outputs F3 logs s settings t {interval} g view ? q quit ")
         }
         View::Logs => " Esc close  ? help  q quit ".into(),
-        View::Settings => " r retry  p pause  b DEBUG  Esc close  ? help  q quit ".into(),
+        View::Settings => match tab {
+            SettingsTab::Debug if width < 80 => " Tab tabs  r retry  p pause  b DEBUG  Esc  ?  q ",
+            SettingsTab::Debug => {
+                " Tab tabs  r retry  p pause  b DEBUG  Esc close  ? help  q quit "
+            }
+            SettingsTab::Charts if width < 80 => {
+                " Tab tabs  g view  t time  d default  s save  Esc  ?  q "
+            }
+            SettingsTab::Charts => {
+                " Tab tabs  g view  t interval  d default  s save  Esc close  ? help  q quit "
+            }
+            _ => " Tab tabs  Esc close  ? help  q quit ",
+        }
+        .into(),
         View::Help => " Esc close  q quit ".into(),
         View::Quit => String::new(),
     }
@@ -1025,7 +1047,33 @@ fn quit_modal(frame: &mut Frame, screen: Rect, app: &mut App) {
     }
 }
 
-fn settings(frame: &mut Frame, area: Rect, app: &App) {
+fn settings(frame: &mut Frame, area: Rect, app: &mut App) {
+    let rows = Layout::vertical([
+        Constraint::Length(1),
+        Constraint::Length(1),
+        Constraint::Fill(1),
+    ])
+    .split(area);
+    frame.render_widget(
+        Tabs::new(SettingsTab::ALL.map(SettingsTab::title))
+            .select(app.settings_tab as usize)
+            .divider(" · ")
+            .padding("", "")
+            .style(Style::default().fg(MUTED))
+            .highlight_style(
+                Style::default()
+                    .fg(GREEN)
+                    .bg(TRACK)
+                    .add_modifier(Modifier::BOLD),
+            ),
+        rows[0],
+    );
+    let mut x = rows[0].x;
+    for (index, tab) in SettingsTab::ALL.iter().enumerate() {
+        let width = tab.title().len() as u16;
+        app.settings_tabs[index] = Rect::new(x, rows[0].y, width, 1);
+        x += width + 3;
+    }
     let status = app.status.as_ref();
     let row = |label: &str, value: String| {
         Line::from(vec![
@@ -1036,69 +1084,137 @@ fn settings(frame: &mut Frame, area: Rect, app: &App) {
     let heading = |title: &'static str| {
         Line::from(title).style(Style::default().fg(TEXT).add_modifier(Modifier::BOLD))
     };
-    let lines = vec![
-        heading("Preferences (read-only)"),
-        row(
-            "Timezone",
-            app.timezone
-                .map(|zone| zone.name().to_owned())
-                .unwrap_or_else(|| "System local".into()),
-        ),
-        row("Logs page size", app.logs.page_size.to_string()),
-        Line::default(),
-        heading("Debug / Diagnostics"),
-        row(
-            "Daemon",
-            if app.connected {
-                "Connected"
-            } else {
-                "Offline"
-            }
-            .into(),
-        ),
-        row(
-            "Station phase",
-            status
-                .map(|s| s.connection.phase.clone())
-                .unwrap_or_else(|| "Unknown".into()),
-        ),
-        row(
-            "BLE adapter",
-            status
-                .and_then(|s| s.connection.adapter_id.clone())
-                .unwrap_or_else(|| "--".into()),
-        ),
-        row(
-            "Telemetry",
-            status
-                .map(|s| s.telemetry.state.clone())
-                .unwrap_or_else(|| "unknown".into()),
-        ),
-        row(
-            "Sample age",
-            app.age()
-                .map(|age| format!("{age:.1} s"))
-                .unwrap_or_else(|| "--".into()),
-        ),
-        row(
-            "History",
-            status
-                .and_then(|s| s.history["state"].as_str())
-                .unwrap_or("unknown")
+    let note = |text: &'static str| Line::from(text).style(Style::default().fg(DIM));
+    let lines = match app.settings_tab {
+        SettingsTab::Preferences => vec![
+            heading("Preferences"),
+            row(
+                "Timezone",
+                app.timezone
+                    .map(|zone| zone.name().to_owned())
+                    .unwrap_or_else(|| "System local".into()),
+            ),
+            row("Logs page size", app.logs.page_size.to_string()),
+            Line::default(),
+            note("These preferences are read-only for now."),
+        ],
+        SettingsTab::Charts => vec![
+            heading("Power graphs"),
+            row("Visualization", app.graph.visualization.label().into()),
+            row("Current interval", app.graph.resolution.label().into()),
+            row("Base scale", "0–100 W; automatic doubling".into()),
+            Line::default(),
+            row(
+                "Startup interval",
+                if app.settings.is_some() {
+                    format!(
+                        "{}{}",
+                        app.startup_interval.label(),
+                        if app
+                            .settings
+                            .as_ref()
+                            .and_then(|settings| settings.resolution())
+                            != Some(app.startup_interval)
+                        {
+                            "  (unsaved)"
+                        } else {
+                            ""
+                        }
+                    )
+                } else if app.settings_error {
+                    "Unavailable; retrying".into()
+                } else {
+                    "Loading...".into()
+                },
+            ),
+            note("d changes the startup interval; s saves it."),
+            note("The saved interval applies on next TUI start."),
+        ],
+        SettingsTab::Alerts => vec![
+            heading("Battery alerts"),
+            note("Battery alerts are not available yet."),
+        ],
+        SettingsTab::Notify => vec![
+            heading("Notifications"),
+            note("No notification connectors available yet."),
+            note("Telegram support is planned."),
+        ],
+        SettingsTab::Debug => vec![
+            heading("Debug / Diagnostics"),
+            row(
+                "Daemon",
+                if app.connected {
+                    "Connected"
+                } else {
+                    "Offline"
+                }
                 .into(),
-        ),
-        row("Runtime logging", logging_status(app)),
-    ];
-    frame.render_widget(Paragraph::new(lines), area);
+            ),
+            row(
+                "Station phase",
+                status
+                    .map(|s| s.connection.phase.clone())
+                    .unwrap_or_else(|| "Unknown".into()),
+            ),
+            row(
+                "Station mode",
+                status
+                    .map(|s| s.connection.desired.clone())
+                    .unwrap_or_else(|| "Unknown".into()),
+            ),
+            row(
+                "BLE adapter",
+                status
+                    .and_then(|s| s.connection.adapter_id.clone())
+                    .unwrap_or_else(|| "--".into()),
+            ),
+            row(
+                "Telemetry",
+                status
+                    .map(|s| s.telemetry.state.clone())
+                    .unwrap_or_else(|| "unknown".into()),
+            ),
+            row(
+                "Sample age",
+                app.age()
+                    .map(|age| format!("{age:.1} s"))
+                    .unwrap_or_else(|| "--".into()),
+            ),
+            row(
+                "History",
+                status
+                    .and_then(|s| s.history["state"].as_str())
+                    .unwrap_or("unknown")
+                    .into(),
+            ),
+            row("Runtime logging", logging_status(app)),
+        ],
+    };
+    frame.render_widget(Paragraph::new(lines), rows[2]);
 }
 
-fn help(frame: &mut Frame, area: Rect, context: View) {
+fn help(frame: &mut Frame, area: Rect, context: View, tab: SettingsTab) {
     let text = if context == View::Settings {
-        "HELP — SETTINGS\n\nPreferences are read-only in this version.\nDebug / Diagnostics shows current daemon state.\nr                        Retry station connection\np                        Pause/resume station connection\nb                        Toggle runtime DEBUG override\n\nEsc                      Return to dashboard\nq                        Confirm quit"
+        let actions = match tab {
+            SettingsTab::Preferences => "Timezone and logs page size are read-only.",
+            SettingsTab::Charts => {
+                "g     Switch Sparkline / Chart for this session\nt     Cycle current interval: 10s / 60s / 1h\nd     Cycle the default startup interval\ns     Save startup interval on the daemon"
+            }
+            SettingsTab::Debug => {
+                "r     Retry station connection\np     Pause/resume station connection\nb     Toggle runtime DEBUG override"
+            }
+            SettingsTab::Alerts => "Battery alerts are not available yet.",
+            SettingsTab::Notify => "Notification connectors are not available yet.",
+        };
+        format!(
+            "HELP — SETTINGS / {}\n\nTab / Shift-Tab or Left/Right  Switch tab\nClick a tab                   Select tab\n\n{}\n\nEsc close   q confirm quit",
+            tab.title(),
+            actions
+        )
     } else if context == View::Logs {
-        "HELP — LOGS\n\nUp/Down, PageUp/PageDown   Scroll records\nMouse wheel / scrollbar   Scroll or drag\nLeft/Right or [ / ]       Previous/next day\nf                        Change minimum log level\n+ / -                    Change page size\nHome                     Beginning of selected day\nEnd                      Today: latest records and live follow\nb                        Toggle runtime DEBUG override\nDouble-click LOGS        Copy all loaded records\n\nEsc close   q confirm quit"
+        "HELP — LOGS\n\nUp/Down, PageUp/PageDown   Scroll records\nMouse wheel / scrollbar   Scroll or drag\nLeft/Right or [ / ]       Previous/next day\nf                        Change minimum log level\n+ / -                    Change page size\nHome                     Beginning of selected day\nEnd                      Today: latest records and live follow\nb                        Toggle runtime DEBUG override\nDouble-click LOGS        Copy all loaded records\n\nEsc close   q confirm quit".into()
     } else {
-        "HELP — DASHBOARD\n\na / d / l                Request AC / DC / lamps ON/OFF\nTab / Shift-Tab          Focus output control\nEnter / Space            Activate focused output\nF3                       Open Logs\ns                        Open Settings / Diagnostics\nt                        Cycle average per bar: 10s / 60s / 1h\ng                        Switch Sparkline / Chart (session only)\nF1 / ?                   Help for the active window\nDouble-click MYPOWERS    Copy current API snapshot\n\nEsc close   q confirm quit"
+        "HELP — DASHBOARD\n\na / d / l                Request AC / DC / lamps ON/OFF\nTab / Shift-Tab          Focus output control\nEnter / Space            Activate focused output\nF3                       Open Logs\ns                        Open Settings / Diagnostics\nt                        Cycle average per bar: 10s / 60s / 1h\ng                        Switch Sparkline / Chart (session only)\nF1 / ?                   Help for the active window\nDouble-click MYPOWERS    Copy current API snapshot\n\nEsc close   q confirm quit".into()
     };
     frame.render_widget(Paragraph::new(text).style(Style::default().fg(MUTED)), area);
 }

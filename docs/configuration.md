@@ -69,3 +69,19 @@ and complete messages at 32 KiB, allowing space for a log record's stream envelo
 log pages/tails 1,000, and query admission caps four per subsystem.
 Produced JSONL log records also cap 16 KiB, including their newline. Oversized records
 mark context as truncated and shorten text as needed to remain readable by the archive API.
+
+
+## Persisted application preferences
+
+The daemon stores mutable public preferences in SQLite `settings(key, value_json)`.
+`graph_interval_seconds` is the TUI startup default: 10 (initial default), 60, or
+3600 seconds. This is separate from `history.interval_seconds`, which controls
+telemetry recording. Settings storage remains available when history recording
+is disabled. The daemon creates the table when opening its database.
+
+Read and update preferences through `GET` / `PUT /api/v1/settings`. Updates change
+only supplied, validated fields. New preferences require a typed field in the
+settings contracts and its UI; adding a field does not require another table or
+an alteration of this table. Unknown fields are rejected at the API boundary.
+Secrets stay outside public mutable settings. YAML continues to configure daemon
+deployment, authentication and hardware access.

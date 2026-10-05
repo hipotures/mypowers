@@ -52,7 +52,7 @@ uv run mypowers tui
 | Enter / Space on dashboard | Activate the focused output |
 | Left click, released over the same dashboard control | Activate that output |
 | F3 on dashboard | Open the logs modal |
-| s on dashboard | Open Settings / Diagnostics |
+| s on dashboard | Open Settings tabs |
 | t on dashboard | Cycle average per bucket: 10 seconds, 60 seconds, 1 hour |
 | g on dashboard | Switch two sparklines / shared line chart (session only) |
 | F1 / ? on dashboard, in logs, or in settings | Help for the active context |
@@ -62,9 +62,12 @@ uv run mypowers tui
 | + / - in logs | Change records per request: 50, 100, 250, 500, 1,000 |
 | Home in logs | Load the beginning of the selected day |
 | End in logs | Return to today and follow its live bottom |
-| r in settings | Request connection retry |
-| p in settings | Pause/resume daemon BLE acquisition |
-| b in logs or settings | Toggle runtime DEBUG override |
+| r in Settings → Debug | Request connection retry |
+| p in Settings → Debug | Pause/resume daemon BLE acquisition |
+| b in Logs or Settings → Debug | Toggle runtime DEBUG override |
+| Tab / Shift-Tab, Left/Right, or click in Settings | Select Preferences / Charts / Alerts / Notify / Debug |
+| d / s in Settings → Charts | Cycle / save the startup interval on the daemon |
+| g / t in Settings → Charts | Change the current session graph / interval |
 | Double-click MYPOWERS | Copy current rendered API snapshot through Wayland `wl-copy` |
 | Double-click LOGS title | Copy every currently loaded log record, including rows outside the viewport |
 
@@ -80,10 +83,10 @@ total size 94x29. Hotkeys stay
 in the dashboard's bottom border. The logs modal stays inside that frame with two-cell
 margins on every side (90x24 when the dashboard has its full size). Opening a
 modal dims the dashboard while telemetry updates continue underneath.
-Help and Settings are overlays using the same margins. Settings currently shows
-read-only timezone/page-size preferences and actual runtime diagnostics: daemon,
+Help and Settings are overlays using the same margins. Settings separates
+Preferences, Charts, Alerts, Notify and Debug into tabs. Debug shows daemon,
 station phase, BLE adapter, telemetry age/state, history, and effective logging.
-Connection retry and pause/resume are available only inside Settings (`r` / `p`).
+Connection retry and pause/resume are available only in Settings → Debug (`r` / `p`).
 Resize invalidates old mouse presses and
 hitboxes. Bracketed paste never activates controls. Drawing is limited to 4 FPS;
 HTTP and the independent event/log streams run outside the input/render loop.
@@ -129,8 +132,12 @@ use the selected timezone: HH:MM or month-day/hour. Ticks move with the history
 window and remain at their actual timestamps, rather than relabeling fixed
 endpoints. Axes remain visible during idle. When both channels are idle it shows
 one shared idle marker.
-Visualization selection is local to the current process; no settings API,
-database persistence or config-file writes are introduced.
+Visualization selection is local to the current process. The startup interval
+is persisted on the daemon via `GET` / `PUT /api/v1/settings` and loaded when a
+TUI starts. In Settings → Charts, `d` cycles its draft and `s` saves it. Saving
+does not change the current interval; dashboard `t` never saves a default. A
+late startup response preserves an interval already selected with `t`. Failed
+saves retain the draft and show an error; unavailable settings are retried.
 
 For 43 columns, the visible history spans about 7 minutes, 43 minutes or 43 hours,
 including the unfinished current bucket. UTC epoch boundaries keep completed
@@ -193,9 +200,12 @@ Removing the two old instruction/diagnostic header rows leaves 19 visible record
 at the maximum dashboard size.
 
 Permanent age, history health, adapter, and logging diagnostics are absent from
-the normal dashboard and appear in Settings / Diagnostics. Full command details
-remain in Logs and the API. Mutable settings and server alert tracking are not
-implemented by the snapshot tool.
+the normal dashboard and appear in Settings → Debug / Diagnostics. Full command details
+remain in Logs and the API. Settings has five contextual tabs. Preferences displays the current timezone
+and logs page size; Charts controls graphs and the persisted startup interval;
+Debug contains diagnostics and connection/logging actions. Alerts and Notify
+show that those features are not available yet. The snapshot tool exercises the
+same settings renderer with deterministic fixtures, without an API or database.
 
 The logs modal opens as a stationary archive for today. Days use the selected
 IANA timezone (or the local system timezone), including daylight-saving transitions;

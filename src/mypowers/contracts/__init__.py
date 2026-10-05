@@ -6,7 +6,7 @@ from enum import StrEnum
 from typing import Any, Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, StrictBool
+from pydantic import BaseModel, ConfigDict, Field, StrictBool, field_validator
 
 
 class DTO(BaseModel):
@@ -43,6 +43,23 @@ class Empty(DTO):
 class LogLevelRequest(DTO):
     level: Level
     duration_seconds: float | None = Field(default=None, gt=0, le=86400, allow_inf_nan=False)
+
+
+class Settings(DTO):
+    schema_version: Literal[1] = 1
+    graph_interval_seconds: Literal[10, 60, 3600] = 10
+
+
+class SettingsUpdate(DTO):
+    # Omitted fields retain their values, so clients never overwrite unrelated preferences.
+    graph_interval_seconds: Literal[10, 60, 3600] = 10
+
+    @field_validator("graph_interval_seconds", mode="before")
+    @classmethod
+    def integer_interval(cls, value: Any) -> int:
+        if type(value) is not int:
+            raise ValueError("Use an integer interval.")
+        return value
 
 
 class Sample(DTO):

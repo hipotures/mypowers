@@ -6,6 +6,7 @@ use mypowers_tui::{
     feedback::{Feedback, Severity},
     history::{Point, Resolution, Visualization},
     model::Status,
+    settings::{Settings, SettingsTab},
     ui,
 };
 use ratatui::{Terminal, backend::TestBackend, buffer::Buffer};
@@ -33,6 +34,11 @@ pub enum Scene {
     CommandPending,
     Logs,
     Settings,
+    SettingsCharts,
+    SettingsAlerts,
+    SettingsNotify,
+    SettingsDebug,
+    SettingsHelp,
     Help,
     LogsHelp,
     Quit,
@@ -78,6 +84,13 @@ pub const SCENES: &[(&str, Scene, u16, u16)] = &[
     ("logs-modal.svg", Scene::Logs, 120, 30),
     ("logs-modal-80x24.svg", Scene::Logs, 80, 24),
     ("settings-modal.svg", Scene::Settings, 120, 30),
+    ("settings-charts.svg", Scene::SettingsCharts, 120, 30),
+    ("settings-alerts.svg", Scene::SettingsAlerts, 120, 30),
+    ("settings-notify.svg", Scene::SettingsNotify, 120, 30),
+    ("settings-debug.svg", Scene::SettingsDebug, 120, 30),
+    ("settings-debug-60x19.svg", Scene::SettingsDebug, 60, 19),
+    ("settings-charts-60x19.svg", Scene::SettingsCharts, 60, 19),
+    ("help-settings.svg", Scene::SettingsHelp, 120, 30),
     ("help-modal.svg", Scene::Help, 120, 30),
     ("help-logs-modal.svg", Scene::LogsHelp, 120, 30),
     ("quit-modal.svg", Scene::Quit, 120, 30),
@@ -233,10 +246,31 @@ fn app(scene: Scene) -> Result<App, String> {
                 json!({"effective_level":"DEBUG", "override_expires_at":"2026-10-05T12:15:00Z"});
             app.feedback = Some(Feedback::new("Logs loaded", Severity::Info));
         }
-        Scene::Settings => {
+        Scene::Settings
+        | Scene::SettingsCharts
+        | Scene::SettingsAlerts
+        | Scene::SettingsNotify
+        | Scene::SettingsDebug
+        | Scene::SettingsHelp => {
             app.view = View::Settings;
+            app.settings = Some(Settings {
+                schema_version: 1,
+                graph_interval_seconds: 60,
+            });
+            app.startup_interval = Resolution::Minute;
+            app.settings_tab = match scene {
+                Scene::SettingsCharts => SettingsTab::Charts,
+                Scene::SettingsAlerts => SettingsTab::Alerts,
+                Scene::SettingsNotify => SettingsTab::Notify,
+                Scene::SettingsDebug | Scene::SettingsHelp => SettingsTab::Debug,
+                _ => SettingsTab::Preferences,
+            };
+            if matches!(scene, Scene::SettingsHelp) {
+                app.view = View::Help;
+                app.help_context = View::Settings;
+            }
             app.warning_count = 1;
-            app.feedback = Some(Feedback::new("Diagnostics loaded", Severity::Info));
+            app.feedback = Some(Feedback::new("Settings saved", Severity::Success));
         }
         Scene::Help | Scene::LogsHelp => {
             app.view = View::Help;
@@ -370,7 +404,8 @@ mod tests {
         assert!(live.contains("CONNECTED") && live.contains("AC ON confirmed"));
         let chart = render(Scene::Chart, 120, 30).unwrap();
         let chart_text = text(&chart);
-        assert_eq!(chart_text.matches("0–400 W").count(), 1);
+        assert!(chart_text.contains("400") && chart_text.contains("200"));
+        assert!(!chart_text.contains("0–400 W"));
         for color in [
             ratatui::style::Color::Rgb(118, 203, 137),
             ratatui::style::Color::Rgb(92, 181, 204),
@@ -406,11 +441,25 @@ mod tests {
                 && logs.contains("AP S300 V2.0")
                 && logs.contains("Log: DEBUG | until 2026-10-05 12:15:00")
         );
-        let settings = text(&render(Scene::Settings, 120, 30).unwrap());
+        let settings = text(&render(Scene::SettingsDebug, 120, 30).unwrap());
         assert!(
             settings.contains(" SETTINGS ")
                 && settings.contains("Debug / Diagnostics")
                 && settings.contains("hci2")
+        );
+        let charts = text(&render(Scene::SettingsCharts, 60, 19).unwrap());
+        assert!(charts.contains("Startup interval") && charts.contains("60s"));
+        let footer = charts
+            .lines()
+            .find(|row| row.contains("d default"))
+            .unwrap();
+        assert!(footer.starts_with('╰') && footer.ends_with('╯'));
+        assert!(
+            text(&render(Scene::SettingsAlerts, 60, 19).unwrap()).contains("not available yet")
+        );
+        assert!(
+            text(&render(Scene::SettingsNotify, 60, 19).unwrap())
+                .contains("No notification connectors")
         );
         let help = text(&render(Scene::Help, 120, 30).unwrap());
         assert!(help.contains(" HELP ") && help.contains("AP S300 V2.0"));

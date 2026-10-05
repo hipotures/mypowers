@@ -25,6 +25,8 @@ pub enum ClipboardTarget {
 }
 
 pub enum Event {
+    Settings(crate::settings::Settings),
+    SettingsUnavailable,
     LogStreamReady,
     Status(Box<Status>),
     Disconnected(String),
@@ -42,6 +44,7 @@ pub enum Event {
 }
 
 pub enum Intent {
+    SaveSettings(i64),
     Output {
         output: &'static str,
         enabled: bool,
@@ -183,6 +186,25 @@ impl Api {
 
     async fn perform(&self, intent: Intent, events: &mpsc::Sender<Event>) -> Feedback {
         match intent {
+            Intent::SaveSettings(interval) => {
+                let result = self
+                    .request(
+                        reqwest::Method::PUT,
+                        "/settings",
+                        Some(json!({"graph_interval_seconds": interval})),
+                        None,
+                    )
+                    .await
+                    .and_then(Self::settings_response);
+                match result {
+                    Ok(settings) if settings.graph_interval_seconds == interval => {
+                        let _ = events.send(Event::Settings(settings)).await;
+                        Feedback::new("Settings saved", Severity::Success)
+                    }
+                    _ => Feedback::new("Could not save settings; try again", Severity::Error),
+                }
+            }
+
             Intent::Output {
                 output,
                 enabled,
@@ -304,6 +326,36 @@ impl Api {
                     ))
                 })
                 .unwrap_or_else(|error| Feedback::request_error(&error)),
+        }
+    }
+
+    fn settings_response(value: Value) -> Result<crate::settings::Settings, String> {
+        let settings: crate::settings::Settings =
+            serde_json::from_value(value).map_err(|_| "Invalid settings response.")?;
+        if settings.resolution().is_none() {
+            return Err("Invalid settings interval or schema.".into());
+        }
+        Ok(settings)
+    }
+
+    pub async fn load_settings(self: Arc<Self>, events: mpsc::Sender<Event>) {
+        loop {
+            match self
+                .request(reqwest::Method::GET, "/settings", None, None)
+                .await
+                .and_then(Self::settings_response)
+            {
+                Ok(settings) => {
+                    let _ = events.send(Event::Settings(settings)).await;
+                    return;
+                }
+                Err(_) => {
+                    if events.send(Event::SettingsUnavailable).await.is_err() {
+                        return;
+                    }
+                }
+            }
+            tokio::time::sleep(Duration::from_secs(2)).await;
         }
     }
 
@@ -2358,5 +2410,64 @@ mod tests {
         assert!(!result.message.contains(&key));
         assert_eq!(result.severity, Severity::Warning);
         server.await.unwrap();
+    }
+    #[tokio::test]
+    async fn settings_loader_validates_schema_and_save_requires_matching_receipt_without_replay() {
+        for body in [
+            json!({"schema_version":1,"graph_interval_seconds":60}),
+            json!({"schema_version":2,"graph_interval_seconds":60}),
+            json!({"schema_version":1,"graph_interval_seconds":11}),
+            json!({"schema_version":1,"graph_interval_seconds":"60"}),
+        ] {
+            let valid = body["schema_version"] == 1 && body["graph_interval_seconds"] == 60;
+            let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+            let api = Arc::new(api_for(&listener));
+            let server = tokio::spawn(async move {
+                let (mut socket, request) = accept_http_request(&listener).await;
+                assert!(request.starts_with("GET /api/v1/settings HTTP/1.1"));
+                respond_json(&mut socket, body).await;
+            });
+            let (events, mut incoming) = mpsc::channel(8);
+            let task = tokio::spawn(api.load_settings(events));
+            let event = timeout(Duration::from_secs(3), incoming.recv())
+                .await
+                .unwrap()
+                .unwrap();
+            assert!(matches!(event, Event::Settings(_)) == valid);
+            if !valid {
+                assert!(matches!(event, Event::SettingsUnavailable));
+            }
+            task.abort();
+            server.await.unwrap();
+        }
+        for body in [
+            json!({"schema_version":1,"graph_interval_seconds":3600}),
+            json!({"schema_version":1,"graph_interval_seconds":60}),
+            json!({"schema_version":2,"graph_interval_seconds":3600}),
+        ] {
+            let valid = body["schema_version"] == 1 && body["graph_interval_seconds"] == 3600;
+            let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+            let api = api_for(&listener);
+            let server = tokio::spawn(async move {
+                let (mut socket, request) = accept_http_request(&listener).await;
+                assert!(request.starts_with("PUT /api/v1/settings HTTP/1.1"));
+                respond_json(&mut socket, body).await;
+                assert!(
+                    timeout(Duration::from_millis(200), listener.accept())
+                        .await
+                        .is_err()
+                );
+            });
+            let (events, mut incoming) = mpsc::channel(8);
+            let feedback = api.perform(Intent::SaveSettings(3600), &events).await;
+            if valid {
+                assert_eq!(feedback.message, "Settings saved");
+                assert!(matches!(incoming.try_recv().unwrap(), Event::Settings(_)));
+            } else {
+                assert_eq!(feedback.severity, Severity::Error);
+                assert!(incoming.try_recv().is_err());
+            }
+            server.await.unwrap();
+        }
     }
 }

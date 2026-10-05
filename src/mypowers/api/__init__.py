@@ -30,6 +30,8 @@ from mypowers.contracts import (
     Output,
     OutputRequest,
     Page,
+    Settings,
+    SettingsUpdate,
     Status,
     StreamKind,
     StreamMessage,
@@ -218,6 +220,17 @@ def create_app(config: ServerConfig, service: Service | None = None) -> FastAPI:
             "write_freshness_seconds": 3,
             "confirmation_samples": 2,
         }
+
+    @app.get("/api/v1/settings", response_model=Settings, operation_id="settings")
+    async def settings() -> Settings:
+        return await runtime.history.settings()
+
+    @app.put("/api/v1/settings", response_model=Settings, operation_id="update_settings")
+    async def update_settings(body: SettingsUpdate) -> Settings:
+        result = await runtime.history.settings(body)
+        if body.model_fields_set:
+            runtime.logs.log("INFO", "settings_saved", "Settings saved.")
+        return result
 
     @app.get("/api/v1/history", response_model=Page, operation_id="history")
     async def history(

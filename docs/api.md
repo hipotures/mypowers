@@ -11,6 +11,8 @@ the checked-in [OpenAPI artifact](openapi.json) describes typed requests and res
 |---|---|
 | GET `/api/v1/status` | Complete immutable transport snapshot |
 | GET `/api/v1/capabilities` | Only qualified reads and AC/DC/common-lamp outputs |
+| GET `/api/v1/settings` | Persisted application settings and defaults |
+| PUT `/api/v1/settings` | Validate and persist supplied settings fields; omitted fields stay unchanged |
 | GET `/api/v1/history` | UTC `[since,until)` raw sample page, limit/cursor |
 | GET `/api/v1/history/aggregates` | UTC power averages and sample counts per 10s / 60s / 1h bucket |
 | PUT `/api/v1/outputs/{ac,dc,light}` | One explicit boolean intention with idempotency UUID |
@@ -125,3 +127,20 @@ upgrade. WS messages are observational: no socket command can control the statio
 accept cursor/min_level query filters; tokens never belong there. Expired cursor closes explicitly.
 After reconnect, discard old stream assumptions, accept the new full snapshot and query retained
 command IDs. Slow queues close 1013; command results remain queryable. No durable state replay.
+
+
+## Application settings
+
+`GET /api/v1/settings` returns `{"schema_version":1,"graph_interval_seconds":10}`
+until a startup interval is saved. `PUT /api/v1/settings` accepts, for example,
+`{"graph_interval_seconds":60}` and returns the complete saved settings document.
+The supported intervals are integer **10, 60, 3600** seconds. Unknown fields,
+null, booleans, strings, and fractional numbers return 422; an empty object keeps
+all saved values. Settings use the same authentication and request policies as
+other API endpoints. Unavailable SQLite storage returns 503.
+
+Values survive daemon restarts in the `settings` table, independently of telemetry
+recording being enabled. They do not rewrite YAML or dotenv. The TUI loads the
+saved default at startup; its `t` shortcut changes only the current session.
+Settings contain only explicitly declared public preference fields. Connector
+credentials must not be added to this client-visible document.
