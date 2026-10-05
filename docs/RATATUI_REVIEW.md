@@ -1093,6 +1093,30 @@ the Settings PNG is byte-identical and was inspected before and after. The
 standard release binary matches the terminal-tested copy byte-for-byte. Updated
 the installed local frontend without restarting existing application processes.
 
+### 37. Allow stream envelopes around bounded Unicode log records
+
+Rechecked Tungstenite's separate incoming frame/message limits against the actual
+Starlette `send_json` implementation and production Diagnostics handler. A real
+CRITICAL record containing 4,096 battery symbols produced 16,777 UTF-8 bytes with
+its stream envelope. The old 16 KiB frontend cap discarded it. The record limit
+and the complete stream-message limit are different boundaries; the server's
+incoming client-message cap does not constrain its outgoing frames.
+
+Raised both frontend receive limits to a bounded 32 KiB. An isolated real
+WebSocket regression first reproduced the missing record, then verified the
+complete Unicode text reaches the frontend and remains available for clipboard
+export. Boundary cases still enforce the exact limit and reject one extra byte,
+both as a single frame and as a reassembled fragmented message. This does not
+remove message limits or change the UI text/layout. The producer's independent
+oversized-file-record bug is addressed in the next cycle.
+
+All 61 Rust tests passed in 35.08 seconds; formatting, Clippy with warnings denied,
+and diff checks passed. Three native release cases passed in 15.79 seconds,
+covering stream bursts, resize/quit responsiveness, and archive/live navigation.
+All 15 SVGs pass `--check` and match the saved before set exactly. The Logs PNG is
+byte-identical and was inspected before and after. Updated the installed local
+frontend without restarting existing application processes.
+
 ## Remaining review
 
 - Review remaining applicable application examples and tutorial integration details.

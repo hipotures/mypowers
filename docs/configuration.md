@@ -58,5 +58,7 @@ HTTP proxy discovery and insecure TLS bypasses are disabled.
 
 Command results/idempotency keys expire after one hour and are capped at 1,000. They are local
 to one server UUID, not durable exactly-once storage. Streams cap 16 clients, 128 state events or
-256 log records per client; slow clients close with retryable 1013. Bodies and WS messages cap
-16 KiB, history pages cap 10,000, log pages/tails 1,000, and query admission caps four per subsystem.
+256 log records per client; slow clients close with retryable 1013. Incoming HTTP bodies and
+client-to-server WS messages cap 16 KiB. The TUI caps received WS frames and complete messages
+at 32 KiB, allowing space for a log record's stream envelope. History pages cap 10,000,
+log pages/tails 1,000, and query admission caps four per subsystem.

@@ -15,6 +15,9 @@ use tokio_tungstenite::{
     tungstenite::{Message, client::IntoClientRequest, protocol::WebSocketConfig},
 };
 
+// Outbound log records need space for their stream envelope as well as their text.
+const STREAM_MESSAGE_LIMIT: usize = 32 * 1024;
+
 #[derive(Clone, Copy, PartialEq)]
 pub enum ClipboardTarget {
     Snapshot,
@@ -406,8 +409,8 @@ impl Api {
             request.headers_mut().insert("Authorization", header);
         }
         let config = WebSocketConfig::default()
-            .max_message_size(Some(16384))
-            .max_frame_size(Some(16384));
+            .max_message_size(Some(STREAM_MESSAGE_LIMIT))
+            .max_frame_size(Some(STREAM_MESSAGE_LIMIT));
         let connection = connect_async_tls_with_config(
             request,
             Some(config),
@@ -840,7 +843,12 @@ mod tests {
             Frame,
             coding::{Data, OpCode},
         };
-        for (size, fragmented) in [(16384, false), (16385, false), (16384, true), (16385, true)] {
+        for (size, fragmented) in [
+            (STREAM_MESSAGE_LIMIT, false),
+            (STREAM_MESSAGE_LIMIT + 1, false),
+            (STREAM_MESSAGE_LIMIT, true),
+            (STREAM_MESSAGE_LIMIT + 1, true),
+        ] {
             let mut envelope = status_envelope(2, "state");
             envelope["padding"] = json!("");
             let padding = size - envelope.to_string().len();
@@ -856,7 +864,7 @@ mod tests {
                     (&payload.as_bytes()[..middle], Data::Text, false),
                     (&payload.as_bytes()[middle..], Data::Continue, true),
                 ] {
-                    assert!(bytes.len() < 16384);
+                    assert!(bytes.len() < STREAM_MESSAGE_LIMIT);
                     frames.push(Message::Frame(Frame::message(
                         bytes.to_vec(),
                         OpCode::Data(opcode),
@@ -868,8 +876,8 @@ mod tests {
             }
             assert_status_stream(
                 frames,
-                if size == 16384 { 2 } else { 1 },
-                if size == 16384 {
+                if size == STREAM_MESSAGE_LIMIT { 2 } else { 1 },
+                if size == STREAM_MESSAGE_LIMIT {
                     "Daemon stream closed or invalid. Reconnecting..."
                 } else {
                     "Daemon stream lost. Reconnecting..."
@@ -1075,6 +1083,31 @@ mod tests {
         );
         app.update(Event::Disconnected(error));
         assert!(!app.connected && !app.allowed());
+    }
+
+    #[tokio::test]
+    async fn log_stream_preserves_long_unicode_messages() {
+        let message = "🔋".repeat(4096);
+        let record = json!({
+            "schema_version": 1, "timestamp": "2026-10-05T12:00:00Z",
+            "server_instance_id": "11111111-1111-4111-8111-111111111111",
+            "sequence": 1, "level": "CRITICAL", "logger": "mypowers",
+            "event": "application", "message": message, "context": {"truncated": true}
+        });
+        assert_eq!(record["message"].as_str().unwrap().len(), 16384);
+        let (_, received) = receive_stream_record(record.clone()).await;
+        assert!(
+            received.as_ref() == Some(&record),
+            "Unicode log was not preserved"
+        );
+        let mut logs = crate::logs::Logs::new_at(
+            Some(chrono_tz::UTC),
+            chrono::DateTime::parse_from_rfc3339("2026-10-05T12:00:00Z")
+                .unwrap()
+                .with_timezone(&chrono::Utc),
+        );
+        logs.records.push_back(record);
+        assert!(logs.clipboard_text().contains(&message));
     }
 
     #[tokio::test]
