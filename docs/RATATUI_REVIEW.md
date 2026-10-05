@@ -555,6 +555,38 @@ pass `--check`; regenerated SVGs and Logs PNG bytes match the before set exactly
 Inspected Logs before and after. Built the release frontend and updated the local
 installed binary without restarting existing processes.
 
+### 19. Verify stream rejection and fragmented-message bounds
+
+Compared the [async application example](https://ratatui.rs/examples/apps/async-github/)
+with the frontend's channel-driven network updates and read the installed
+[WebSocket configuration contract](https://docs.rs/tungstenite/0.30.0/tungstenite/protocol/struct.WebSocketConfig.html).
+The renderer never waits on a network lock. Existing 16-KiB frame/message limits
+are explicit and smaller than the library defaults; the aggregate message limit
+also applies to fragmented messages. No dependency or architecture change was
+needed.
+
+Added regressions that exercise the production reconnecting stream worker,
+its queued events, and App control gating against isolated loopback servers.
+Eleven malformed envelope/status cases, a missing initial snapshot and binary
+JSON must disconnect before a later valid state can reach the UI. Cases cover
+non-increasing sequences, schema/instance mismatches, out-of-range telemetry,
+missing live samples and unsupported event kinds. A positive sequence-gap case
+preserves the API contract's increasing rather than consecutive sequence rule.
+Every disconnect disables output controls; no command request is produced.
+
+A second regression sends valid JSON messages at exactly 16,384 bytes and one
+byte above that limit, both as single frames and as two smaller fragments.
+At the limit the state reaches the UI; above it the worker disconnects first.
+This verifies aggregate-message enforcement rather than only inspecting the
+configured frame limit. Both regressions passed the existing implementation.
+
+All 47 Rust tests passed in 35.10 seconds. Formatting, Clippy with warnings
+denied, and diff checks passed. All 15 SVGs pass `--check`; regenerated SVGs and
+daemon-offline PNG bytes match the before set exactly. Inspected that scene
+before and after. No native PTY rerun or installed-binary update was needed:
+this cycle changes only tests/documentation, and cycle 18's 24 native cases and
+installed release binary still cover the current production implementation.
+
 ## Remaining review
 
 - Review remaining applicable application examples and tutorial integration details.

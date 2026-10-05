@@ -580,6 +580,205 @@ mod tests {
         (result, received)
     }
 
+    fn status_envelope(sequence: u64, kind: &str) -> Value {
+        let status = crate::tests::status();
+        json!({
+            "schema_version": 1, "server_instance_id": status.server_instance_id,
+            "server_time": status.server_time, "stream_sequence": sequence,
+            "type": kind, "data": status
+        })
+    }
+
+    async fn assert_status_stream(frames: Vec<Message>, count: usize, expected_error: &str) {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let api = Arc::new(api_for(&listener));
+        let server = tokio::spawn(async move {
+            let (socket, _) = listener.accept().await.unwrap();
+            let mut socket = tokio_tungstenite::accept_async(socket).await.unwrap();
+            for frame in frames {
+                if socket.send(frame).await.is_err() {
+                    break;
+                }
+            }
+            let _ = socket.close(None).await;
+        });
+        let (events, mut incoming) = mpsc::channel(4);
+        let worker = tokio::spawn(api.stream(false, events));
+        let mut app = crate::app::App::new(false, Some(chrono_tz::UTC));
+        for _ in 0..count {
+            let event = timeout(Duration::from_secs(3), incoming.recv())
+                .await
+                .unwrap()
+                .unwrap();
+            assert!(matches!(event, Event::Status(_)));
+            app.update(event);
+            assert!(app.allowed());
+        }
+        let event = timeout(Duration::from_secs(3), incoming.recv())
+            .await
+            .unwrap()
+            .unwrap();
+        let Event::Disconnected(error) = &event else {
+            panic!("Expected stream rejection before another UI update");
+        };
+        assert_eq!(error, expected_error);
+        app.update(event);
+        assert!(!app.connected && !app.allowed());
+        assert!(matches!(app.toggle(0), crate::app::Effect::None));
+        assert!(incoming.try_recv().is_err());
+        worker.abort();
+        assert!(worker.await.unwrap_err().is_cancelled());
+        timeout(Duration::from_secs(3), server)
+            .await
+            .unwrap()
+            .unwrap();
+    }
+
+    #[tokio::test]
+    async fn rejected_stream_frames_disconnect_before_later_state_can_enable_controls() {
+        let text = |value: Value| Message::Text(value.to_string().into());
+        for (path, value, error) in [
+            (
+                "/stream_sequence",
+                json!(1),
+                "Invalid API stream sequence or schema.",
+            ),
+            (
+                "/stream_sequence",
+                json!(0),
+                "Invalid API stream sequence or schema.",
+            ),
+            (
+                "/schema_version",
+                json!(2),
+                "Invalid API stream sequence or schema.",
+            ),
+            (
+                "/server_instance_id",
+                json!("invalid"),
+                "Invalid API stream sequence or schema.",
+            ),
+            (
+                "/server_instance_id",
+                json!("6147f85c-53ef-42f4-b3f2-c15b071320a5"),
+                "Daemon instance changed within stream.",
+            ),
+            (
+                "/data/server_instance_id",
+                json!("6147f85c-53ef-42f4-b3f2-c15b071320a5"),
+                "Invalid API status schema.",
+            ),
+            (
+                "/data/telemetry/sample/battery_percent",
+                json!(101),
+                "Invalid API status schema.",
+            ),
+            (
+                "/data/telemetry/sample/input_power_w",
+                json!(65536),
+                "Invalid API status schema.",
+            ),
+            (
+                "/data/telemetry/sample",
+                Value::Null,
+                "Invalid API status schema.",
+            ),
+            (
+                "/data/telemetry/age_seconds",
+                json!(-1),
+                "Invalid API status schema.",
+            ),
+            ("/type", json!("unknown"), "Unsupported API stream event."),
+        ] {
+            let mut bad = status_envelope(2, "state");
+            *bad.pointer_mut(path).unwrap() = value;
+            assert_status_stream(
+                vec![
+                    text(status_envelope(1, "snapshot")),
+                    text(bad),
+                    text(status_envelope(3, "state")),
+                ],
+                1,
+                error,
+            )
+            .await;
+        }
+        assert_status_stream(
+            vec![
+                text(status_envelope(1, "heartbeat")),
+                text(status_envelope(2, "state")),
+            ],
+            0,
+            "Missing initial daemon snapshot.",
+        )
+        .await;
+        assert_status_stream(
+            vec![
+                text(status_envelope(1, "snapshot")),
+                Message::Binary(status_envelope(2, "state").to_string().into_bytes().into()),
+                text(status_envelope(3, "state")),
+            ],
+            1,
+            "Daemon stream closed or invalid. Reconnecting...",
+        )
+        .await;
+        // Sequence gaps are valid: the contract requires increasing, not consecutive IDs.
+        assert_status_stream(
+            vec![
+                text(status_envelope(1, "snapshot")),
+                text(status_envelope(10, "state")),
+            ],
+            2,
+            "Daemon stream closed or invalid. Reconnecting...",
+        )
+        .await;
+    }
+
+    #[tokio::test]
+    async fn websocket_limits_cover_single_frames_and_reassembled_messages() {
+        use tokio_tungstenite::tungstenite::protocol::frame::{
+            Frame,
+            coding::{Data, OpCode},
+        };
+        for (size, fragmented) in [(16384, false), (16385, false), (16384, true), (16385, true)] {
+            let mut envelope = status_envelope(2, "state");
+            envelope["padding"] = json!("");
+            let padding = size - envelope.to_string().len();
+            envelope["padding"] = json!("x".repeat(padding));
+            let payload = envelope.to_string();
+            assert_eq!(payload.len(), size);
+            let mut frames = vec![Message::Text(
+                status_envelope(1, "snapshot").to_string().into(),
+            )];
+            if fragmented {
+                let middle = payload.len() / 2;
+                for (bytes, opcode, final_frame) in [
+                    (&payload.as_bytes()[..middle], Data::Text, false),
+                    (&payload.as_bytes()[middle..], Data::Continue, true),
+                ] {
+                    assert!(bytes.len() < 16384);
+                    frames.push(Message::Frame(Frame::message(
+                        bytes.to_vec(),
+                        OpCode::Data(opcode),
+                        final_frame,
+                    )));
+                }
+            } else {
+                frames.push(Message::Text(payload.into()));
+            }
+            assert_status_stream(
+                frames,
+                if size == 16384 { 2 } else { 1 },
+                if size == 16384 {
+                    "Daemon stream closed or invalid. Reconnecting..."
+                } else {
+                    "Daemon stream lost. Reconnecting..."
+                },
+            )
+            .await;
+        }
+    }
+
     #[tokio::test]
     async fn heartbeats_require_valid_server_timestamps_before_the_next_state() {
         for (timestamp, valid) in [
