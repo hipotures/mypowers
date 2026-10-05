@@ -1,4 +1,6 @@
 import asyncio
+import json
+import logging
 import time
 from uuid import uuid4
 
@@ -7,7 +9,7 @@ from fastapi.testclient import TestClient
 from starlette.websockets import WebSocketDisconnect
 
 from mypowers.api import create_app
-from mypowers.contracts import Status
+from mypowers.contracts import Status, StreamMessage
 from mypowers.daemon.service import Service
 
 
@@ -203,6 +205,74 @@ def test_websocket_snapshot_heartbeat_and_auth(config):
         ) as ws:
             assert ws.receive_json()["type"] == "snapshot"
             assert ws.receive_json()["type"] in {"log", "heartbeat"}
+
+
+@pytest.mark.parametrize(
+    ("message", "context", "truncated", "large_envelope"),
+    [
+        ("🔋" * 4096, {}, True, False),
+        ("x" * 4096, {f"key{i}": "y" * 3960 for i in range(3)}, False, True),
+        ("Station metric", {"payload": "電" * 4096}, True, False),
+    ],
+    ids=["unicode-message", "near-limit-context", "oversized-context"],
+)
+def test_bounded_logs_replay_and_arrive_live_through_the_actual_api(
+    config, message, context, truncated, large_envelope
+):
+    service = Service(config)
+    with TestClient(create_app(config, service)) as client:
+        initial = ready(client)
+
+        def emit(event):
+            record = logging.LogRecord("mypowers", logging.CRITICAL, "", 0, message, (), None)
+            record.event = event
+            record.context = context
+            service.logs.handler.emit(record)
+            with service.logs.mutex:
+                return next(row for row in reversed(service.logs.records) if row["event"] == event)
+
+        async def flush_records():
+            await asyncio.wait_for(asyncio.to_thread(service.logs.queue.join), 2)
+
+        retained = emit("bounded_transport_retained")
+        client.portal.call(flush_records)
+        with client.websocket_connect("/api/v1/logs/stream?min_level=ERROR") as ws:
+            snapshot = ws.receive_json()
+            assert snapshot["type"] == "snapshot"
+            raw = ws.receive_text()
+            replay = json.loads(raw)
+            StreamMessage.model_validate(replay)
+            assert replay["type"] == "log" and replay["data"] == retained
+            assert replay["stream_sequence"] > snapshot["stream_sequence"]
+            assert len(raw.encode("utf-8")) <= 32768
+            if large_envelope:
+                assert len(raw.encode("utf-8")) > 16384
+
+            current = emit("bounded_transport_live")
+            raw = ws.receive_text()
+            live = json.loads(raw)
+            StreamMessage.model_validate(live)
+            assert live["type"] == "log" and live["data"] == current
+            assert live["stream_sequence"] > replay["stream_sequence"]
+            assert len(raw.encode("utf-8")) <= 32768
+
+        client.portal.call(flush_records)
+        response = client.get("/api/v1/logs?tail=10&min_level=ERROR")
+        assert response.status_code == 200
+        page = response.json()
+        assert page["source"] == "files" and page["skipped_lines"] == 0
+        assert page["items"] == [retained, current]
+        for row in page["items"]:
+            assert bool(row["context"].get("truncated")) == truncated
+            assert message.startswith(row["message"])
+            if not truncated:
+                assert row["message"] == message and row["context"] == context
+        lines = config.log_dir.joinpath("mypowers.jsonl").read_bytes().splitlines(keepends=True)
+        assert all(len(line) <= 16384 for line in lines)
+        assert (
+            client.get("/api/v1/status").json()["server_instance_id"]
+            == initial["server_instance_id"]
+        )
 
 
 def test_unavailable_transport_http_startup_and_task_health(config):

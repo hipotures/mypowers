@@ -1149,6 +1149,37 @@ All 15 SVGs pass `--check` and match the saved before set exactly. The Logs PNG
 is byte-identical and was inspected before and after. The Rust release is unchanged
 from cycle 37. No existing daemon or hardware process was restarted.
 
+### 39. Verify the complete producer-to-API log path
+
+Completed the [JSON Editor App tutorial](https://ratatui.rs/tutorials/json-editor/app/),
+[Builder Lite explanation](https://ratatui.rs/concepts/builder-lite-pattern/), and
+[inline viewport example](https://ratatui.rs/examples/apps/inline/). The production
+View enum/context routing and consumed widget builder chains already follow the
+relevant patterns. An inline viewport or scrollback feed would change the chosen
+alternate-screen/modal behavior, so neither was introduced. Reviewed mouse
+press/release, resize invalidation, modal isolation, and title-copy paths against
+existing tests. A serialization probe also confirmed Pydantic's JSON-mode dump
+normalizes non-finite context numbers before API transmission; no speculative
+numeric rewrite was added.
+
+Added three real API integration cases using the standard logging handler and
+an isolated simulated Service. Each verifies a retained record replayed over WS,
+a second live record arriving over the same stream, increasing envelope sequence,
+full schema decoding, HTTP archive equality, bounded actual file lines, and the
+explicit truncation marker where needed. Cases cover a long Unicode message,
+large Unicode context, and a valid near-limit ASCII record whose complete WS
+message exceeds 16 KiB. The last case confirms the 32 KiB receive limit remains
+necessary after fixing the producer's separate record bound.
+
+The new API cases passed in 1.88 seconds. The full unit/integration coverage run
+passed 284 cases with one existing skip in 77.07 seconds; the repository's line
+and protocol/core branch coverage checks passed. All 31 native terminal tests
+passed against the current immutable release and updated producer in 87.58 seconds.
+Nine xtask tests passed in 0.40 seconds. Full Python formatting/lint and typing
+checks passed. All 15 SVGs pass `--check` and match the saved before set exactly;
+the Logs PNG is byte-identical and was inspected before and after. No production
+code or release binary changed in this cycle.
+
 ## Remaining review
 
 - Review remaining applicable application examples and tutorial integration details.
