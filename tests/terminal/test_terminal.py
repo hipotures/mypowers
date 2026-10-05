@@ -12,6 +12,7 @@ import socket
 import struct
 import subprocess
 import termios
+import threading
 import time
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -200,6 +201,112 @@ def test_keyboard_burst_does_not_starve_immediate_quit(daemon_process, tui_binar
         assert termios.tcgetattr(session.slave) == session.original
     finally:
         session.close()
+
+
+@pytest.mark.parametrize("ending", ["ctrlq", "sigterm"])
+def test_stream_bursts_do_not_starve_modal_resize_or_quit(
+    daemon_process, tui_binary, tmp_path, ending
+):
+    from websockets.exceptions import ConnectionClosed
+    from websockets.sync.server import serve
+
+    _, url, env = daemon_process
+    with httpx.Client(base_url=url, trust_env=False) as client:
+        snapshot = client.get("/api/v1/status").json()
+    stopped = threading.Event()
+    sent = {"logs": 0, "status": 0}
+
+    def stream(connection):
+        logs = connection.request.path.startswith("/api/v1/logs/stream")
+        current = json.loads(json.dumps(snapshot))
+        sequence = 1
+        try:
+            connection.send(
+                json.dumps(
+                    {
+                        "schema_version": 1,
+                        "server_instance_id": snapshot["server_instance_id"],
+                        "stream_sequence": sequence,
+                        "type": "snapshot",
+                        "data": current,
+                    }
+                )
+            )
+            while not stopped.is_set():
+                sequence += 1
+                stamp = datetime.now(UTC).isoformat()
+                if logs:
+                    data = {
+                        "schema_version": 1,
+                        "timestamp": stamp,
+                        "server_instance_id": snapshot["server_instance_id"],
+                        "sequence": sequence,
+                        "level": "INFO" if (sequence - 1) % 2048 == 0 else "DEBUG",
+                        "message": f"Stream burst processed {sequence - 1}",
+                    }
+                else:
+                    current["server_time"] = stamp
+                    current["telemetry"]["sample"].update(sequence=sequence, received_at=stamp)
+                    data = current
+                connection.send(
+                    json.dumps(
+                        {
+                            "schema_version": 1,
+                            "server_instance_id": snapshot["server_instance_id"],
+                            "stream_sequence": sequence,
+                            "type": "log" if logs else "state",
+                            "data": data,
+                        }
+                    )
+                )
+                sent["logs" if logs else "status"] += 1
+                # Send an initial burst, then sustain traffic until the client exits.
+                if logs and sequence > 2049 and sequence % 8 == 0:
+                    stopped.wait(0.002)
+                elif not logs:
+                    stopped.wait(0.01)
+        except ConnectionClosed:
+            pass
+
+    with serve(stream, "127.0.0.1", 0, compression=None, close_timeout=1) as server:
+        worker = threading.Thread(target=server.serve_forever)
+        worker.start()
+        session = None
+        try:
+            origin = f"http://127.0.0.1:{server.socket.getsockname()[1]}"
+            session = Session(tui_binary, tmp_path, env, "--server", origin)
+            session.read(b"CONNECTED")
+            # This marker is emitted only after 2,048 individual log events.
+            session.read(b"Stream burst processed 2048")
+            before = sent.copy()
+            session.write(b"?")
+            session.read("HELP — DASHBOARD".encode(), budget=2)
+            size(session.slave, 50, 15)
+            os.kill(session.process.pid, signal.SIGWINCH)
+            session.read(b"Terminal too small", budget=2)
+            size(session.slave, 80, 24)
+            os.kill(session.process.pid, signal.SIGWINCH)
+            session.read("HELP — DASHBOARD".encode(), budget=2)
+            # Observe consumption, not just sends: socket backpressure can stall a producer.
+            session.read(b"Stream burst processed 4096")
+            assert sent["status"] > before["status"]
+            assert sent["logs"] >= 4096
+            started = time.monotonic()
+            if ending == "ctrlq":
+                session.write(b"\x11")
+            else:
+                session.process.terminate()
+            session.read(b"\x1b[?1049l", budget=2)
+            assert session.process.wait(timeout=2) == 0
+            assert time.monotonic() - started < 2
+            assert termios.tcgetattr(session.slave) == session.original
+        finally:
+            stopped.set()
+            if session is not None:
+                session.close()
+            server.shutdown()
+            worker.join(timeout=2)
+            assert not worker.is_alive()
 
 
 def test_status_strip_confirmations_fade_and_debug_does_not_keep_it_alive(

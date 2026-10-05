@@ -376,6 +376,31 @@ All 39 Rust tests, formatting, Clippy with warnings denied, and diff checks
 passed. All 15 SVGs pass `--check`; regenerated SVG hashes and idle dashboard
 PNG bytes match the before set exactly. Inspected the idle PNG before and after.
 
+### 13. Verify responsiveness during sustained stream bursts
+
+Reviewed [event handling](https://ratatui.rs/concepts/event-handling/), the complete
+[terminal/event-handler recipe](https://ratatui.rs/recipes/apps/terminal-and-event-handler/),
+and Tokio's [bounded channels](https://docs.rs/tokio/latest/tokio/sync/mpsc/fn.channel.html).
+MyPowers already separates blocking terminal polling from asynchronous network
+workers. It processes at most 256 incoming events before polling terminal input;
+the shared queue has capacity 256 and applies backpressure. The recipe's
+unbounded event queue is an example, not a reason to replace this bounded design.
+
+Added two native PTY stress regressions using a local WebSocket server and a
+status template from the isolated simulated daemon. The server sends an initial
+2,048-log burst, then sustained log traffic and fresh status updates. UI-visible
+markers prove the frontend consumed at least 4,096 log events. While streams
+continue, Help opens and terminal resizing reaches both the minimum-size warning
+and the restored Help view. Ctrl-Q and SIGTERM each exit within the two-second
+test bound and restore terminal attributes. No output command is sent.
+
+The initial test incorrectly required both producers' send counters to keep
+advancing; socket backpressure can correctly stall the log producer. Replaced
+that assertion with a marker proving actual UI consumption. Both cases then
+passed with unchanged production code. Ruff checks/formatting and diff checks
+passed. All 15 SVGs pass `--check`; regenerated SVG hashes and Help PNG bytes
+match the before set exactly. Inspected Help before and after.
+
 ## Remaining review
 
 - Review remaining applicable application examples and tutorial integration details.
