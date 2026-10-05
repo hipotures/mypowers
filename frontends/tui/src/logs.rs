@@ -309,7 +309,8 @@ impl Logs {
         }
         if self.follow && self.day == self.today() && !self.loading {
             self.append_live(record);
-        } else if self.matches(&record) {
+        } else if self.matches(&record) && !self.records.iter().any(|old| same_record(old, &record))
+        {
             self.unseen += 1;
         }
         true

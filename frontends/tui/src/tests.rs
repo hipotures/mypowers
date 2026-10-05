@@ -602,6 +602,48 @@ fn archived_logs_stay_still_during_live_arrivals_and_scrollbar_drag() {
 }
 
 #[test]
+fn archived_records_replayed_by_the_stream_do_not_count_as_unseen() {
+    let mut logs = crate::logs::Logs::new(Some(chrono_tz::UTC));
+    logs.layout(2);
+    let stamp = chrono::Utc::now().to_rfc3339();
+    let record = |sequence| {
+        json!({
+            "sequence": sequence, "timestamp": stamp,
+            "server_instance_id": "88767477-2a2a-481f-843b-30d56a5e3f10",
+            "level": "INFO", "message": format!("Record {sequence}")
+        })
+    };
+    let request = logs.open().unwrap();
+    let page = serde_json::from_value(json!({
+        "schema_version": 1, "items": [record(1), record(2), record(3), record(4)],
+        "previous_cursor": null, "next_cursor": null,
+        "has_more_before": false, "has_more_after": false,
+        "source": "files", "gap": false, "skipped_lines": 0
+    }))
+    .unwrap();
+    logs.accept(&request, Ok(page));
+    logs.offset = 1;
+    let archive = logs.clipboard_text();
+    for sequence in 1..=4 {
+        assert!(logs.record(record(sequence)));
+    }
+    assert_eq!(logs.unseen, 0);
+    assert_eq!(logs.offset, 1);
+    assert_eq!(logs.clipboard_text(), archive);
+    assert!(logs.record(record(5)));
+    assert_eq!(logs.unseen, 1);
+    assert!(!logs.record(record(5)));
+    assert_eq!(logs.unseen, 1);
+    // Sequences belong to a daemon instance; another instance's same sequence is new.
+    let mut other_instance = record(1);
+    other_instance["server_instance_id"] = json!("d1b293be-fc79-40b6-9f6b-ae38b507e36c");
+    assert!(logs.record(other_instance));
+    assert_eq!(logs.unseen, 2);
+    assert_eq!(logs.offset, 1);
+    assert_eq!(logs.clipboard_text(), archive);
+}
+
+#[test]
 fn log_pages_ignore_old_responses_and_keep_cursor_edges_when_cache_is_bounded() {
     let mut logs = crate::logs::Logs::new(Some(chrono_tz::UTC));
     logs.page_size = 50;

@@ -274,6 +274,38 @@ recoverable daemon failures stay in the status strip. Modal rendering already
 uses `Clear` within its bounded region. Adding an error-reporting framework or
 copying the tutorial's screen layout is unnecessary.
 
+### 9. Exclude already loaded archive rows from the new-log counter
+
+Compared the frontend archive/stream merge with the daemon's actual WebSocket
+behavior: each connection sends retained records after its snapshot. A regression
+loaded four rows through an archive page and then replayed those same identities
+through the stream. The viewport stayed fixed, but `unseen` incorrectly became
+four even though the rows were already in the loaded archive.
+
+The archive path now checks the existing loaded identities before increasing
+`unseen`, using the same `(server_instance_id, sequence)` comparison as live
+insertion. The bounded recent stream cache remains populated, and repeated stream
+events still return false. An unseen row is counted once; the same sequence from
+another daemon instance remains a distinct row. No cache index, extra retained
+state, or layout change was added.
+
+Validation: all 36 Rust tests passed. The new regression covers archive replay,
+genuinely new records, repeated stream events, daemon-instance identity, unchanged
+scroll offset, and unchanged archive clipboard contents. The native PTY
+day/archive/lazy-page/drag/live-resume test passed against an isolated simulated
+daemon. Formatting, Clippy with warnings denied, and diff checks passed. All 15
+SVGs pass `--check`; regenerated SVG hashes and Logs PNG bytes match the before
+set exactly. Inspected the after PNG.
+
+Reviewed the complete [Async GitHub example](https://ratatui.rs/examples/apps/async-github/)
+and [Scrollbar demo](https://ratatui.rs/examples/apps/scrollbar/), plus the installed
+0.30.2 scrollbar implementation. The app already separates network work from
+rendering and clips the log viewport before constructing Paragraph rows. Its
+scrollbar state correctly uses `max_offset + 1` with the actual viewport length:
+Ratatui's thumb calculation adds that viewport to the maximum position. Using
+the total row count in its place would count the viewport twice. No replacement
+for the current pagination or scrollbar is warranted.
+
 ## Remaining review
 
 - Review remaining applicable application examples and tutorial integration details.
