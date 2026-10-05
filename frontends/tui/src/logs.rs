@@ -55,7 +55,7 @@ pub struct Logs {
     pub viewport: usize,
     pub scrollbar: Rect,
     pub thumb: Rect,
-    pub buttons: [Rect; 3],
+    pub buttons: [Rect; 2],
     pub title: Rect,
     pub more_before: bool,
     pub more_after: bool,
@@ -91,7 +91,7 @@ impl Logs {
             viewport: 0,
             scrollbar: Rect::default(),
             thumb: Rect::default(),
-            buttons: [Rect::default(); 3],
+            buttons: [Rect::default(); 2],
             title: Rect::default(),
             more_before: false,
             more_after: false,
@@ -169,7 +169,7 @@ impl Logs {
         let page = match result {
             Ok(page) => page,
             Err(error) => {
-                self.message = format!("{error} | r refresh");
+                self.message = error;
                 return;
             }
         };
@@ -181,7 +181,7 @@ impl Logs {
             after: page.next_cursor.clone(),
         };
         self.message = if page.gap {
-            format!("History incomplete | source {} | r refresh", page.source)
+            format!("History incomplete | source {}", page.source)
         } else if page.skipped_lines > 0 {
             format!(
                 "Logs loaded | {} malformed lines skipped",
@@ -344,7 +344,7 @@ impl Logs {
         self.title = Rect::default();
         self.scrollbar = Rect::default();
         self.thumb = Rect::default();
-        self.buttons = [Rect::default(); 3];
+        self.buttons = [Rect::default(); 2];
     }
 
     pub fn resize(&mut self) {
@@ -413,7 +413,7 @@ impl Logs {
         self.load(if next { Load::Oldest } else { Load::Latest })
     }
 
-    fn refresh(&mut self) -> Option<Request> {
+    fn start_archive(&mut self) -> Option<Request> {
         self.follow = false;
         self.load(Load::Oldest)
     }
@@ -451,7 +451,6 @@ impl Logs {
 
     pub fn key(&mut self, key: KeyCode) -> Option<Request> {
         match key {
-            KeyCode::Char('r') | KeyCode::F(5) => self.refresh(),
             KeyCode::Char('[') | KeyCode::Left => self.navigate(false),
             KeyCode::Char(']') | KeyCode::Right => self.navigate(true),
             KeyCode::End => {
@@ -463,10 +462,7 @@ impl Logs {
                 self.follow = true;
                 self.load(Load::Latest)
             }
-            KeyCode::Home => {
-                self.follow = false;
-                self.load(Load::Oldest)
-            }
+            KeyCode::Home => self.start_archive(),
             KeyCode::Up | KeyCode::PageUp => self.scroll(
                 false,
                 if key == KeyCode::Up {
@@ -487,7 +483,7 @@ impl Logs {
                 self.level = (self.level + 1) % LEVELS.len();
                 self.records.clear();
                 self.pages.clear();
-                self.refresh()
+                self.start_archive()
             }
             KeyCode::Char('+' | '=') | KeyCode::Char('-') => {
                 let index = PAGE_SIZES
@@ -500,7 +496,7 @@ impl Logs {
                     (index + 1).min(PAGE_SIZES.len() - 1)
                 };
                 self.page_size = PAGE_SIZES[index];
-                self.refresh()
+                self.start_archive()
             }
             _ => None,
         }
@@ -513,11 +509,7 @@ impl Logs {
             MouseEventKind::ScrollDown => self.scroll(true, 3),
             MouseEventKind::Down(MouseButton::Left) => {
                 if let Some(index) = self.buttons.iter().position(|rect| rect.contains(position)) {
-                    return match index {
-                        0 => self.navigate(false),
-                        1 => self.navigate(true),
-                        _ => self.refresh(),
-                    };
+                    return self.navigate(index == 1);
                 }
                 if self.scrollbar.contains(position) {
                     self.follow = false;

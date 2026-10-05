@@ -116,7 +116,7 @@ def wait_state(client, output, enabled):
     pytest.fail(f"No observed {output}={enabled}")
 
 
-@pytest.mark.parametrize("ending", ["q", "sigterm", "ctrlc", "ctrlz", "ctrlq"])
+@pytest.mark.parametrize("ending", ["q", "sigterm", "sigint", "ctrlq"])
 def test_native_controls_logs_paste_resize_and_restoration(
     daemon_process, tui_binary, tmp_path, ending
 ):
@@ -160,10 +160,12 @@ def test_native_controls_logs_paste_resize_and_restoration(
             session.write(b"f\x1b[A\x1b[Fb")
             session.read(b"Log level changed to DEBUG")
             assert "Runtime log level updated" not in "\n".join(session.screen.display)
-            session.write(b"\x1bOQ")  # F2
+            session.write(b"\x1b")  # Esc closes the modal.
             session.read(b"INPUT")
         if ending == "sigterm":
             session.process.terminate()
+        elif ending == "sigint":
+            session.process.send_signal(signal.SIGINT)
         else:
             if ending == "q":
                 session.write(b"q")
@@ -176,7 +178,7 @@ def test_native_controls_logs_paste_resize_and_restoration(
                 session.read(b"Quit MyPowers?")
                 session.write(b"\r")
             else:
-                session.write({"ctrlc": b"\x03", "ctrlz": b"\x1a", "ctrlq": b"\x11"}[ending])
+                session.write(b"\x11")  # Ctrl-Q
         restored = session.read(b"\x1b[?2004l")
         assert b"\x1b[?1006l" in restored
         assert session.process.wait(timeout=3) == 0
@@ -218,7 +220,45 @@ def test_status_strip_confirmations_fade_and_debug_does_not_keep_it_alive(
         session.close()
 
 
-def test_day_archive_refresh_lazy_pages_drag_and_live_resume(daemon_process, tui_binary, tmp_path):
+def test_modal_shortcuts_do_not_dispatch_dashboard_actions(daemon_process, tui_binary, tmp_path):
+    _, url, env = daemon_process
+    session = Session(tui_binary, tmp_path, env, "--server", url, "--utc")
+    try:
+        session.read(b"CONNECTED")
+        session.write(b"\x1bOR")  # F3
+        session.read(b"LOGS")
+        session.read(b"Log: INFO")
+        with httpx.Client(base_url=url, trust_env=False) as client:
+            before = client.get("/api/v1/status").json()
+            session.write(b"rpadl\x1bOQ\x1bOR\x1b[15~\x03\x1a")
+            time.sleep(0.5)
+            session.read(b"ARCHIVE")
+            assert session.process.poll() is None
+            screen = "\n".join(session.screen.display)
+            assert "refresh" not in screen and "F2" not in screen and "F3" not in screen
+            after = client.get("/api/v1/status").json()
+            assert after["connection"]["session_id"] == before["connection"]["session_id"]
+            assert after["connection"]["desired"] == before["connection"]["desired"]
+            for output in ["ac_enabled", "dc_enabled", "light_enabled"]:
+                assert after["telemetry"]["sample"][output] == before["telemetry"]["sample"][output]
+            session.write(b"b")
+            session.read(b"Log level changed to DEBUG")
+            session.read(b"Log: DEBUG")
+            session.write(b"?")
+            session.read("HELP — LOGS".encode())
+            session.write(b"rpadlb\x1bOR")
+            time.sleep(0.5)
+            session.read("HELP — LOGS".encode())
+            assert client.get("/api/v1/status").json()["logging"]["effective_level"] == "DEBUG"
+            assert session.process.poll() is None
+        session.write(b"\x1b")
+        session.read(b"F3 logs")
+        assert "F3 logs" in "\n".join(session.screen.display)
+    finally:
+        session.close()
+
+
+def test_day_archive_lazy_pages_drag_and_live_resume(daemon_process, tui_binary, tmp_path):
     _, url, env = daemon_process
     helpers = tmp_path / "helpers"
     helpers.mkdir()
@@ -295,7 +335,7 @@ def test_day_archive_refresh_lazy_pages_drag_and_live_resume(daemon_process, tui
         session.read(b"100 loaded")
         session.write(b"\x1b[6~")
         session.read(b"Archive 050")
-        session.write(b"r")
+        session.write(b"\x1b[H")  # Home loads the selected day's beginning.
         session.read(b"50 loaded")
         session.read(b"Archive 000")
         session.write(b"\x1b[D")

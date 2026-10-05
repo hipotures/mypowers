@@ -37,6 +37,7 @@ pub struct App {
     pub log_notice: String,
     pub pending: Option<String>,
     pub view: View,
+    pub help_context: View,
     pub logs: crate::logs::Logs,
     pub no_color: bool,
     pub timezone: Option<chrono_tz::Tz>,
@@ -74,6 +75,7 @@ impl App {
             log_notice: String::new(),
             pending: None,
             view: View::Dashboard,
+            help_context: View::Dashboard,
             logs: crate::logs::Logs::new(timezone),
             no_color,
             timezone,
@@ -371,18 +373,66 @@ impl App {
     }
 
     pub fn key(&mut self, key: KeyEvent) -> Effect {
-        if key.modifiers.contains(KeyModifiers::CONTROL)
-            && matches!(key.code, KeyCode::Char('q' | 'c' | 'z'))
-        {
+        if key.modifiers.contains(KeyModifiers::CONTROL) && key.code == KeyCode::Char('q') {
             return Effect::Quit;
         }
+        if key
+            .modifiers
+            .intersects(KeyModifiers::CONTROL | KeyModifiers::ALT)
+        {
+            return Effect::None;
+        }
         if key.code == KeyCode::Esc {
-            self.view = View::Dashboard;
+            if self.view != View::Dashboard {
+                self.view = View::Dashboard;
+                self.resize();
+            }
+            return Effect::None;
+        }
+        if key.code == KeyCode::Char('q') {
+            self.view = View::Quit;
+            self.quit_yes = true;
             self.resize();
             return Effect::None;
         }
-        if self.view == View::Quit {
-            match key.code {
+        match self.view {
+            View::Dashboard => match key.code {
+                KeyCode::F(3) => {
+                    self.view = View::Logs;
+                    self.resize();
+                    if let Some(request) = self.logs.open() {
+                        return Effect::Logs(request);
+                    }
+                }
+                KeyCode::F(1) | KeyCode::Char('?') => self.open_help(),
+                KeyCode::Char('a' | 'd' | 'l') => {
+                    return self.toggle(match key.code {
+                        KeyCode::Char('a') => 0,
+                        KeyCode::Char('d') => 1,
+                        _ => 2,
+                    });
+                }
+                KeyCode::Tab | KeyCode::BackTab => {
+                    let step = if key.code == KeyCode::Tab { 1 } else { 2 };
+                    self.selected = Some((self.selected.unwrap_or(0) + step) % 3);
+                }
+                KeyCode::Enter | KeyCode::Char(' ') => {
+                    return self.toggle(self.selected.unwrap_or(0));
+                }
+                KeyCode::Char(key @ ('r' | 'p')) => return self.operation(key),
+                _ => {}
+            },
+            View::Logs => match key.code {
+                KeyCode::F(1) | KeyCode::Char('?') => self.open_help(),
+                KeyCode::Char('b') => return self.operation('b'),
+                _ => {
+                    if let Some(request) = self.logs.key(key.code) {
+                        return Effect::Logs(request);
+                    }
+                }
+            },
+            View::Help => {}
+            View::Quit => match key.code {
                 KeyCode::Enter | KeyCode::Char('y')
                     if self.quit_yes || key.code == KeyCode::Char('y') =>
                 {
@@ -393,67 +443,18 @@ impl App {
                     self.resize();
                 }
                 KeyCode::Tab | KeyCode::BackTab | KeyCode::Left | KeyCode::Right => {
-                    self.quit_yes = !self.quit_yes
+                    self.quit_yes = !self.quit_yes;
                 }
                 _ => {}
-            }
-            return Effect::None;
-        }
-        if self.view == View::Logs {
-            if matches!(key.code, KeyCode::Esc | KeyCode::F(2) | KeyCode::F(3)) {
-                self.view = View::Dashboard;
-                self.resize();
-                return Effect::None;
-            }
-            if let Some(request) = self.logs.key(key.code) {
-                return Effect::Logs(request);
-            }
-            if !matches!(
-                key.code,
-                KeyCode::Char('q' | 'b') | KeyCode::F(1) | KeyCode::Char('?')
-            ) {
-                return Effect::None;
-            }
-        }
-        match key.code {
-            KeyCode::Char('q') => {
-                self.view = View::Quit;
-                self.quit_yes = true;
-                self.resize();
-            }
-            KeyCode::F(1) | KeyCode::Char('?') => {
-                self.view = View::Help;
-                self.resize();
-            }
-            KeyCode::F(2) => {
-                self.view = View::Dashboard;
-                self.resize();
-            }
-            KeyCode::F(3) => {
-                self.view = View::Logs;
-                self.resize();
-                if let Some(request) = self.logs.open() {
-                    return Effect::Logs(request);
-                }
-            }
-            KeyCode::Char('a' | 'd' | 'l') if self.view == View::Dashboard => {
-                return self.toggle(match key.code {
-                    KeyCode::Char('a') => 0,
-                    KeyCode::Char('d') => 1,
-                    _ => 2,
-                });
-            }
-            KeyCode::Tab | KeyCode::BackTab if self.view == View::Dashboard => {
-                let step = if key.code == KeyCode::Tab { 1 } else { 2 };
-                self.selected = Some((self.selected.unwrap_or(0) + step) % 3);
-            }
-            KeyCode::Enter | KeyCode::Char(' ') if self.view == View::Dashboard => {
-                return self.toggle(self.selected.unwrap_or(0));
-            }
-            KeyCode::Char(key @ ('r' | 'p' | 'b')) => return self.operation(key),
-            _ => {}
+            },
         }
         Effect::None
+    }
+
+    fn open_help(&mut self) {
+        self.help_context = self.view;
+        self.view = View::Help;
+        self.resize();
     }
 
     pub fn resize(&mut self) {
@@ -490,6 +491,9 @@ impl App {
                 .mouse(mouse)
                 .map(Effect::Logs)
                 .unwrap_or(Effect::None);
+        }
+        if self.view != View::Dashboard {
+            return Effect::None;
         }
         let position = Position::new(mouse.column, mouse.row);
         let hit = self

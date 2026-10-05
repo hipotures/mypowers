@@ -68,7 +68,10 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
         ..surface
     };
     let status_area = Rect::new(surface.x + 1, area.bottom(), surface.width - 2, 1);
-    app.title = Rect::new(area.x + (area.width - 10) / 2 + 1, area.y, 8, 1);
+    if app.view == View::Dashboard {
+        app.title = Rect::new(area.x + (area.width - 10) / 2 + 1, area.y, 8, 1);
+    }
+    let footer = outer_footer(app.view, area.width);
     let outer = Block::default()
         .borders(Borders::ALL)
         .border_type(BorderType::Rounded)
@@ -79,13 +82,9 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
                 .centered(),
         )
         .title_bottom(
-            Line::from(if app.view == View::Dashboard {
-                " a AC  d DC  l lamps  F3 logs  ? help  q quit "
-            } else {
-                " F2 dashboard  F3 logs  ? help  q quit "
-            })
-            .style(Style::default().fg(MUTED))
-            .centered(),
+            Line::from(footer)
+                .style(Style::default().fg(MUTED))
+                .centered(),
         );
     let inner = outer.inner(area);
     frame.render_widget(outer, area);
@@ -119,7 +118,7 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
                         .style(Style::default().fg(TEXT).add_modifier(Modifier::BOLD)),
                 )
                 .title_bottom(
-                    Line::from(" Esc close  End today/live ")
+                    Line::from(logs_footer(modal.width))
                         .centered()
                         .style(Style::default().fg(MUTED)),
                 );
@@ -127,7 +126,7 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
             frame.render_widget(block, modal);
             logs(frame, inner, app);
         }
-        View::Help => help(frame, content),
+        View::Help => help(frame, content, app.help_context),
         View::Quit => {
             dashboard(frame, content, app);
             dim_background(frame);
@@ -136,13 +135,80 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
             quit_modal(frame, screen, app);
         }
     }
-    // No persistent alerts exist yet. Keep their region empty, without zero counters.
-    status_line(frame, status_area, app.feedback.as_ref(), Line::default());
+    if matches!(app.view, View::Logs | View::Quit) {
+        // The footer belongs to the active context, so it stays readable over a dimmed dashboard.
+        frame.render_widget(
+            Paragraph::new(footer).style(Style::default().fg(MUTED).bg(BACKGROUND)),
+            centered(
+                Rect::new(area.x, area.bottom() - 1, area.width, 1),
+                Span::raw(footer).width() as u16,
+                1,
+            ),
+        );
+    }
+    status_line(
+        frame,
+        status_area,
+        app.feedback.as_ref(),
+        context_status(app),
+    );
     if app.no_color {
         for cell in &mut frame.buffer_mut().content {
             cell.set_fg(Color::Reset).set_bg(Color::Reset);
         }
     }
+}
+
+fn outer_footer(view: View, width: u16) -> &'static str {
+    match view {
+        View::Dashboard if width >= 80 => {
+            " a AC  d DC  l lamps  F3 logs  r retry  p pause  ? help  q quit "
+        }
+        View::Dashboard => " a/d/l outputs  F3 logs  r retry  p pause  ? help  q quit ",
+        View::Logs => " Esc close  ? help  q quit  Ctrl-Q quit now ",
+        View::Help => " Esc close  q quit  Ctrl-Q quit now ",
+        View::Quit => " Ctrl-Q quit now ",
+    }
+}
+
+fn logs_footer(width: u16) -> &'static str {
+    if width >= 80 {
+        " ←/→ day  ↑/↓ scroll  f filter  +/- page  b DEBUG  Home start  End today/live "
+    } else if width >= 64 {
+        " ←/→ day  f filter  +/- page  b DEBUG  Home start  End live "
+    } else {
+        " ←/→ day  f filter  +/- page  b DEBUG  End live "
+    }
+}
+
+fn context_status(app: &App) -> Line<'static> {
+    if app.view != View::Logs {
+        return Line::default();
+    }
+    let logging = app.status.as_ref().map(|status| &status.logging);
+    let level = logging
+        .and_then(|logging| logging["effective_level"].as_str())
+        .filter(|level| crate::logs::LEVELS.contains(level))
+        .unwrap_or("--");
+    let mut text = format!("Log: {level}");
+    if let Some(expiry) = logging
+        .and_then(|logging| logging["override_expires_at"].as_str())
+        .and_then(|stamp| chrono::DateTime::parse_from_rfc3339(stamp).ok())
+        .filter(|expiry| *expiry > chrono::Utc::now())
+    {
+        let expiry = match app.timezone {
+            Some(zone) => expiry
+                .with_timezone(&zone)
+                .format("%Y-%m-%d %H:%M:%S")
+                .to_string(),
+            None => expiry
+                .with_timezone(&chrono::Local)
+                .format("%Y-%m-%d %H:%M:%S")
+                .to_string(),
+        };
+        text.push_str(&format!(" | until {expiry}"));
+    }
+    Line::from(text).style(Style::default().fg(MUTED))
 }
 
 pub(crate) fn status_line(
@@ -396,7 +462,7 @@ fn dashboard(frame: &mut Frame, content: Rect, app: &mut App) {
 
 fn logs(frame: &mut Frame, area: Rect, app: &mut App) {
     let parts = Layout::vertical([
-        Constraint::Length(4),
+        Constraint::Length(2),
         Constraint::Fill(1),
         Constraint::Length(1),
     ])
@@ -406,18 +472,13 @@ fn logs(frame: &mut Frame, area: Rect, app: &mut App) {
         Constraint::Length(14),
         Constraint::Length(8),
         Constraint::Fill(1),
-        Constraint::Length(11),
     ])
     .split(Rect {
         height: 1,
         ..parts[0]
     });
-    app.logs.buttons = [header[0], header[2], header[4]];
-    for (rect, text) in [
-        (header[0], "[ prev ]"),
-        (header[2], "[ next ]"),
-        (header[4], "[ refresh ]"),
-    ] {
+    app.logs.buttons = [header[0], header[2]];
+    for (rect, text) in [(header[0], "[ prev ]"), (header[2], "[ next ]")] {
         frame.render_widget(Paragraph::new(text).style(Style::default().fg(MUTED)), rect);
     }
     frame.render_widget(
@@ -429,7 +490,7 @@ fn logs(frame: &mut Frame, area: Rect, app: &mut App) {
     let mode = if app.logs.follow { "LIVE" } else { "ARCHIVE" };
     frame.render_widget(
         Paragraph::new(format!(
-            "{mode} | {} | >= {} | page {}",
+            "{mode} | {} | Filter ≥ {} | page {}",
             app.logs.zone_name(),
             crate::logs::LEVELS[app.logs.level],
             app.logs.page_size
@@ -441,36 +502,7 @@ fn logs(frame: &mut Frame, area: Rect, app: &mut App) {
             ..parts[0]
         },
     );
-    frame.render_widget(
-        Paragraph::new("←/→ day  r refresh  f filter  +/- page  b DEBUG")
-            .style(Style::default().fg(DIM)),
-        Rect {
-            y: parts[0].y + 2,
-            height: 1,
-            ..parts[0]
-        },
-    );
     let viewport = parts[1].height as usize;
-    let logging = app.status.as_ref().map(|status| &status.logging);
-    let effective = logging
-        .and_then(|value| value["effective_level"].as_str())
-        .unwrap_or("--");
-    let expiry = logging
-        .and_then(|value| value["override_expires_at"].as_str())
-        .unwrap_or("none");
-    frame.render_widget(
-        Paragraph::new(format!(
-            "Log {} | override until {}",
-            safe(effective),
-            safe(expiry)
-        ))
-        .style(Style::default().fg(DIM)),
-        Rect {
-            y: parts[0].y + 3,
-            height: 1,
-            ..parts[0]
-        },
-    );
     app.logs.layout(viewport);
     let max_scroll = app.logs.max_offset();
     let start = app.logs.offset;
@@ -630,8 +662,13 @@ fn quit_modal(frame: &mut Frame, screen: Rect, app: &mut App) {
     }
 }
 
-fn help(frame: &mut Frame, area: Rect) {
-    frame.render_widget(Paragraph::new("HELP\n\na / d / l     AC / DC / lamps: request desired ON/OFF\nTab / Shift-Tab  Focus control; Enter / Space activate\nF2 dashboard  F3 logs modal  F1 / ? help\nLOGS: Up/Down, PageUp/PageDown, wheel or drag scrollbar\nLeft/Right or [/] previous/next day\nr / F5 refresh archive; f filter; +/- page size\nHome day start; End today/live bottom\nb runtime DEBUG; p pause/resume; r retry on dashboard\nEsc close modal; q confirm quit; Ctrl-Q quit immediately\nDouble-click MYPOWERS to copy the current API snapshot.\nDouble-click LOGS to copy all loaded log records.\n\nObserved states change only when confirmed by telemetry.\nLast-known readings remain visible during outages.\nPending and stale data disable output controls.\nUncertain commands are never automatically replayed.\nClosing this client leaves daemon and outputs running.").style(Style::default().fg(MUTED)), area);
+fn help(frame: &mut Frame, area: Rect, context: View) {
+    let text = if context == View::Logs {
+        "HELP — LOGS\n\nUp/Down, PageUp/PageDown   Scroll records\nMouse wheel / scrollbar   Scroll or drag\nLeft/Right or [ / ]       Previous/next day\nf                        Change minimum log level\n+ / -                    Change page size\nHome                     Beginning of selected day\nEnd                      Today: latest records and live follow\nb                        Toggle runtime DEBUG override\nDouble-click LOGS        Copy all loaded records\n\nEsc close   q confirm quit   Ctrl-Q quit immediately"
+    } else {
+        "HELP — DASHBOARD\n\na / d / l                Request AC / DC / lamps ON/OFF\nTab / Shift-Tab          Focus output control\nEnter / Space            Activate focused output\nF3                       Open Logs\nr                        Retry station connection\np                        Pause/resume station connection\nF1 / ?                   Help for the active window\nDouble-click MYPOWERS    Copy current API snapshot\n\nEsc close   q confirm quit   Ctrl-Q quit immediately\n\nClosing this client leaves the daemon and outputs running."
+    };
+    frame.render_widget(Paragraph::new(text).style(Style::default().fg(MUTED)), area);
 }
 
 fn centered(area: Rect, width: u16, height: u16) -> Rect {

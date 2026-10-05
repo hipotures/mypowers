@@ -44,28 +44,31 @@ uv run mypowers tui
 
 | Input | Action |
 |---|---|
-| a / d / l | Request AC / DC / lamps ON or OFF from the displayed snapshot |
-| Tab / Shift-Tab | Focus an output |
-| Enter / Space | Activate the focused output |
-| Left click, released over the same control | Activate that output |
-| F2 | Dashboard |
-| F3 | Open/close the logs modal |
-| F1 / ? | Help |
-| f | Cycle minimum log level |
-| Up/Down / PageUp/PageDown / mouse wheel / scrollbar drag | Scroll logs; lazily load adjacent pages |
-| Left/Right or [ / ] | Previous/next log day |
-| r / F5 in logs | Refresh the selected day's archive |
+| Esc | Close a modal/help and return to the dashboard; no action on the dashboard |
+| q | Open quit confirmation; Enter confirms, Esc cancels |
+| Ctrl-Q | Quit immediately and restore the terminal |
+| a / d / l on dashboard | Request AC / DC / lamps ON or OFF from the displayed snapshot |
+| Tab / Shift-Tab on dashboard | Focus an output |
+| Enter / Space on dashboard | Activate the focused output |
+| Left click, released over the same dashboard control | Activate that output |
+| F3 on dashboard | Open the logs modal |
+| F1 / ? on dashboard or in logs | Help for the active context |
+| f in logs | Cycle minimum log level |
+| Up/Down / PageUp/PageDown / mouse wheel / scrollbar drag in logs | Scroll records; lazily load adjacent pages |
+| Left/Right or [ / ] in logs | Previous/next log day |
 | + / - in logs | Change records per request: 50, 100, 250, 500, 1,000 |
 | Home in logs | Load the beginning of the selected day |
 | End in logs | Return to today and follow its live bottom |
 | r on dashboard | Request connection retry |
-| p | Pause/resume daemon BLE acquisition |
-| b | Toggle runtime DEBUG override |
+| p on dashboard | Pause/resume daemon BLE acquisition |
+| b in logs | Toggle runtime DEBUG override |
 | Double-click MYPOWERS | Copy current rendered API snapshot through Wayland `wl-copy` |
 | Double-click LOGS title | Copy every currently loaded log record, including rows outside the viewport |
-| Esc | Close a modal/help and return to the dashboard |
-| q | Open quit confirmation; Enter confirms, Esc cancels |
-| Ctrl-Q / Ctrl-C / Ctrl-Z | Quit immediately and restore the terminal |
+
+Only q, Ctrl-Q, and Esc are global. Other shortcuts belong to the active view;
+modal input never dispatches dashboard actions. F2 and log refresh shortcuts are
+removed. Typed Ctrl-C/Ctrl-Z are ignored; external SIGINT/SIGTERM still trigger
+terminal restoration. Help lists the shortcuts of the view that opened it.
 
 The dashboard is centered and capped at 94x28 cells; it fits within smaller
 terminals down to 60x19 including the status strip. A single borderless status
@@ -96,8 +99,7 @@ Trends retain at most 120 seconds and 512 actual notifications. Time buckets
 represent the last sample in each display column, with empty columns across
 missing intervals/segments. No synthetic history is generated. Scales remain
 0–100 W input and 0–300 W output; larger readings are displayed numerically while
-the graph saturates. Logs show history gaps,
-effective level, and DEBUG override expiry. Clipboard support is optional and
+the graph saturates. Logs show history gaps. Clipboard support is optional and
 requires `wl-copy` and an accessible Wayland session.
 Log copies are plain text with timestamps in the selected timezone, levels, and
 complete messages, without terminal width clipping. Pages not yet loaded are not
@@ -110,11 +112,19 @@ history never replace the message. Regular telemetry and repeated command states
 do not restart its timer. Feedback fades in four two-second color/style stages
 and becomes empty after eight seconds. Success uses green, information muted
 cyan, warnings yellow, and errors red. The right region is reserved for future
-alerts and remains completely empty for now. Long messages are shortened with
+alerts. While Logs is open, it shows contextual runtime metadata: `Log: INFO`,
+with `| until YYYY-MM-DD HH:MM:SS` in the selected timezone only when an override
+has a future expiry. It is empty on the normal dashboard until alerts exist.
+Long messages are shortened with
 an ellipsis while preserving space for right-aligned indicators.
 The logs modal footer shows only archive loading/pagination information. Action
 results and pending feedback appear exclusively in the status strip. A response
 to an earlier log request cannot overwrite newer action feedback.
+The two-row header contains day navigation and archive/live mode, timezone,
+`Filter ≥ LEVEL`, and page size. Log controls sit in the modal's bottom border;
+the dashboard's bottom border shows close/help/quit while the modal is open.
+Removing the two old instruction/diagnostic header rows leaves 19 visible records
+at the maximum dashboard size.
 
 Permanent age, history health, adapter, and logging diagnostics are absent from
 the normal dashboard. They remain available through the API; a future Settings
@@ -136,8 +146,10 @@ also scroll. At the first/last cached row, another scroll loads the adjacent pag
 at a completed day's boundary, another scroll enters the previous/next day.
 Empty days are navigable. Future days are blocked.
 
-`r`/F5 refreshes the selected day from its beginning without live insertion. New
-stream records cannot move a stationary archive or a dragged thumb. Reaching the
+Home loads the selected day's beginning. There is no refresh button or shortcut:
+the footer counts new stream records, and End fetches today's latest records and
+resumes live follow. New stream records cannot move a stationary archive or a
+dragged thumb. Reaching the
 bottom of today's completed range or pressing End enables live follow. Scrolling
 up disables follow immediately. The header labels ARCHIVE/LIVE explicitly.
 

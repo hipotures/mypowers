@@ -751,3 +751,134 @@ fn runtime_action_feedback_stays_only_in_status_strip_despite_concurrent_log_pag
     );
     assert!(screen.contains("Logs loaded | 0 loaded"));
 }
+
+#[test]
+fn shortcuts_are_confined_to_the_active_context() {
+    for view in [View::Logs, View::Help, View::Quit] {
+        for code in [
+            KeyCode::Char('a'),
+            KeyCode::Char('d'),
+            KeyCode::Char('l'),
+            KeyCode::Char('r'),
+            KeyCode::Char('p'),
+            KeyCode::F(2),
+            KeyCode::F(3),
+            KeyCode::F(5),
+        ] {
+            let mut app = app();
+            app.view = view;
+            assert!(matches!(
+                app.key(KeyEvent::new(code, KeyModifiers::NONE)),
+                Effect::None
+            ));
+            assert!(app.view == view);
+            assert!(app.pending.is_none());
+        }
+    }
+    for view in [View::Dashboard, View::Help, View::Quit] {
+        let mut app = app();
+        app.view = view;
+        assert!(matches!(
+            app.key(KeyEvent::new(KeyCode::Char('b'), KeyModifiers::NONE)),
+            Effect::None
+        ));
+        assert!(app.pending.is_none());
+    }
+    for view in [View::Dashboard, View::Logs, View::Help, View::Quit] {
+        let mut app = app();
+        app.view = view;
+        for code in [KeyCode::Char('c'), KeyCode::Char('z'), KeyCode::Char('a')] {
+            assert!(matches!(
+                app.key(KeyEvent::new(code, KeyModifiers::CONTROL)),
+                Effect::None
+            ));
+            assert!(app.view == view);
+        }
+        assert!(matches!(
+            app.key(KeyEvent::new(KeyCode::Char('q'), KeyModifiers::CONTROL)),
+            Effect::Quit
+        ));
+        app.key(KeyEvent::new(KeyCode::Char('q'), KeyModifiers::NONE));
+        assert!(app.view == View::Quit);
+        app.key(KeyEvent::new(KeyCode::Esc, KeyModifiers::NONE));
+        assert!(app.view == View::Dashboard);
+    }
+    let mut app = app();
+    app.view = View::Logs;
+    assert!(matches!(
+        app.key(KeyEvent::new(KeyCode::Char('b'), KeyModifiers::NONE)),
+        Effect::Request(Intent::Debug(true))
+    ));
+}
+
+#[test]
+fn logs_layout_gains_two_rows_and_moves_contextual_diagnostics_to_status() {
+    let mut app = app();
+    app.view = View::Logs;
+    app.feedback = None;
+    for sequence in 0..100 {
+        app.logs.records.push_back(json!({"timestamp":"2026-10-05T12:00:00Z", "level":"INFO", "message":format!("Record {sequence:03}")}));
+    }
+    for (width, height, rows) in [(60, 19, 9), (80, 24, 14), (94, 29, 19)] {
+        let screen = text(&render(&mut app, width, height));
+        assert_eq!(
+            screen
+                .lines()
+                .filter(|line| line.contains("Record"))
+                .count(),
+            rows
+        );
+        assert!(screen.contains("Filter ≥ DEBUG"));
+        assert!(screen.contains("End live") || screen.contains("End today/live"));
+        assert!(screen.contains("Esc close") && screen.contains("q quit"));
+        assert!(!screen.contains("refresh") && !screen.contains("F2") && !screen.contains("F3"));
+        assert!(!screen.contains("override") && !screen.contains("none"));
+        assert!(screen.lines().last().unwrap().ends_with("Log: INFO "));
+        assert!(app.title.is_empty());
+        assert_eq!(app.logs.buttons.len(), 2);
+    }
+    app.timezone = Some(chrono_tz::Europe::Warsaw);
+    let expiry = chrono::Utc::now() + chrono::Duration::minutes(10);
+    app.status.as_mut().unwrap().logging["override_expires_at"] = json!(expiry.to_rfc3339());
+    let expected = format!(
+        "Log: INFO | until {}",
+        expiry
+            .with_timezone(&chrono_tz::Europe::Warsaw)
+            .format("%Y-%m-%d %H:%M:%S")
+    );
+    let screen = text(&render(&mut app, 94, 29));
+    assert!(screen.lines().last().unwrap().contains(&expected));
+    app.status.as_mut().unwrap().logging["override_expires_at"] =
+        json!((chrono::Utc::now() - chrono::Duration::seconds(1)).to_rfc3339());
+    let screen = text(&render(&mut app, 94, 29));
+    assert!(!screen.contains("until"));
+    app.view = View::Dashboard;
+    assert!(
+        text(&render(&mut app, 94, 29))
+            .lines()
+            .last()
+            .unwrap()
+            .trim()
+            .is_empty()
+    );
+}
+
+#[test]
+fn help_lists_only_the_context_that_opened_it() {
+    for context in [View::Dashboard, View::Logs] {
+        let mut app = app();
+        app.view = context;
+        app.key(KeyEvent::new(KeyCode::Char('?'), KeyModifiers::NONE));
+        assert!(app.view == View::Help && app.help_context == context);
+        let screen = text(&render(&mut app, 94, 29));
+        assert!(app.title.is_empty());
+        if context == View::Logs {
+            assert!(screen.contains("HELP — LOGS") && screen.contains("End"));
+            assert!(!screen.contains("Request AC") && !screen.contains("F3"));
+        } else {
+            assert!(screen.contains("F3") && !screen.contains("Toggle runtime DEBUG"));
+        }
+        app.key(KeyEvent::new(KeyCode::Esc, KeyModifiers::NONE));
+        assert!(app.view == View::Dashboard);
+    }
+}

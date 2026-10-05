@@ -1005,7 +1005,9 @@ foreground/style in four two-second stages, then clear after eight seconds. A ne
 message replaces the previous one. Repeated telemetry must not restart the timer.
 Use green for success, muted cyan for information, yellow for warnings, and red
 for errors. Reserve an independent right-aligned region for future persistent
-alerts, but keep it empty until alerts exist; never render zero counters or
+alerts. While Logs is open, show `Log: LEVEL` there and the selected-timezone
+override expiry only when a future expiry exists. On the normal dashboard, keep
+the right region empty until alerts exist; never render zero counters or
 reassuring health text. Preserve the right region and one separating space when
 shortening a long left message with an ellipsis. Keep full details in Logs/API.
 Permanent age, history health, adapter, and log-level diagnostics belong in the
@@ -1025,17 +1027,25 @@ Keep at most 120 seconds of received power samples and a hard cap of 512 live sa
 
 Use small input/output sparklines or equivalent terminal trends. Render using actual timestamps. Different `segment_id` values and missing intervals produce visible gaps; do not bridge outages. Grouping real samples into terminal columns is display reduction, not stored aggregation. Do not infer Wh, charging state, or solar irradiance from these plots.
 
-Provide a Logs overlay modal with day navigation, refresh, level filtering, vertical scrolling and a draggable scrollbar. Translate local calendar day boundaries in the selected IANA timezone to UTC `since`/`until` filters. Load older/newer pages lazily through the authenticated API; never read log files in the frontend. Keep at most five loaded archive pages and 1,000 recent stream records. The session page-size control supports 50, 100, 250, 500 and 1,000 records per request; persistence through mutable server settings is a separate task. Archive mode stays stationary until explicit refresh. Scrolling beyond a completed day's start/end enters the previous/next day. Today's completed bottom enables live follow; scrolling away disables it; End returns to today/live bottom. Include a runtime DEBUG action and visible effective level/expiry. These actions use the documented authenticated API. Application errors must not overwrite the alternate screen with uncontrolled tracebacks.
+Provide a Logs overlay modal with day navigation, level filtering, vertical scrolling and a draggable scrollbar. Its two-row header contains day navigation followed by mode, timezone, `Filter ≥ LEVEL`, and page size. Put log navigation/filter/page-size/DEBUG shortcuts in the modal bottom border and close/help/quit shortcuts in the outer bottom border. Runtime log level and any future override expiry appear on the status strip's right side only while Logs is open. No refresh button or shortcut is needed: show the new-record count, use Home for the selected day's beginning, and End to fetch today/live bottom.
+
+Translate local calendar day boundaries in the selected IANA timezone to UTC `since`/`until` filters. Load older/newer pages lazily through the authenticated API; never read log files in the frontend. Keep at most five loaded archive pages and 1,000 recent stream records. The session page-size control supports 50, 100, 250, 500 and 1,000 records per request; persistence through mutable server settings is a separate task. Archive mode stays stationary while new records arrive. Scrolling beyond a completed day's start/end enters the previous/next day. Today's completed bottom enables live follow; scrolling away disables it. These actions use the documented authenticated API. Application errors must not overwrite the alternate screen with uncontrolled tracebacks.
 
 ### 14.5 Input and terminal restoration
 
 Implement at least Tab/Shift-Tab focus, Enter/Space activation, keyboard view selection, scrolling where relevant and help. Esc closes a modal and returns to the dashboard; it never exits. `q` opens quit confirmation; Ctrl+Q exits immediately. Mouse buttons and scroll must work in a Linux terminal supporting SGR mouse reporting. Provide `--no-mouse` for keyboard-only use.
 
+Only q, Ctrl+Q, and Esc are global. Other keys belong to the active context and
+must not fall through from modals to dashboard actions. F3 opens Logs from the
+dashboard; F1/? open help for the active dashboard or Logs context. Dashboard
+r/p retry or pause acquisition; b toggles DEBUG only in Logs. Help content and
+border hotkeys match the active context. Remove F2 and log refresh actions.
+
 Keep terminal event decoding isolated and tested. Use bounded incremental parsing for fragmented escape sequences. Recognize SGR mouse sequences, resize, and bracketed paste; ignore pasted content as control actions. Register an action once per complete click, not once for both press and release. After layout/state changes, do not apply an old press/release pair to a different widget. Prevent duplicate mutation from double clicks while a command is pending.
 
 Record original termios/terminal settings before modification. Use cbreak/noncanonical input as appropriate while retaining signal handling. Enable only needed mouse modes (e.g. button reporting and SGR coordinates), not unrestricted mouse-movement floods. Restore all modes changed by the program: mouse reporting, bracketed paste, cursor, alternate buffer, and original termios. Use `try/finally` and signal-aware shutdown. [E15, E16]
 
-Test normal exit, Ctrl+C, SIGTERM, initialization failure, API failure, render exception, and resize. Restore modes before suspension and reinitialize after continuation; alternatively map Ctrl+Z to an explicitly documented clean exit in v1. No cleanup guarantee is possible after SIGKILL or terminal destruction; do not claim one. After supported exit paths, the shell must accept input with normal echo and no mouse escape garbage, without requiring `reset` or `stty sane`.
+Test normal exit, Ctrl+Q, external SIGINT/SIGTERM, initialization failure, API failure, render exception, and resize. Typed Ctrl+C/Ctrl+Z are ignored in raw mode. No cleanup guarantee is possible after SIGKILL or terminal destruction; do not claim one. After supported exit paths, the shell must accept input with normal echo and no mouse escape garbage, without requiring `reset` or `stty sane`.
 
 In non-TTY output/input, refuse full-screen mode with a useful message directing the user to the CLI. A TUI connection loss never stops server collection.
 
