@@ -996,6 +996,34 @@ and diff checks passed. All 15 SVGs pass `--check` and match the saved before se
 exactly; the command-pending PNG is byte-identical and was inspected before and
 after. Production code and the installed release binary remain unchanged.
 
+### 34. Preserve critical records in live log filtering and feedback
+
+Completed the [Paragraph recipe](https://ratatui.rs/recipes/widgets/paragraph/)
+and compared frontend filtering with the server's standard Python logging
+semantics, including [CRITICAL](https://docs.python.org/3/library/logging.html#logging-levels).
+The HTTP/WS boundary already preserves valid named levels, but the frontend's
+live/day filter recognized only its four selectable minimum levels. A valid
+critical record could therefore appear in an HTTP archive while disappearing
+from live follow, unseen counts, and the merge after an in-flight page request.
+Operational feedback also ignored it.
+
+A regression reproduced the missing live row. Added CRITICAL above ERROR in
+record matching, without adding another selectable minimum level, and mapped its
+feedback to the existing error severity. The regression checks all four minimum
+filters, copied loaded text, frozen-archive unseen counts, duplicate rejection,
+latest-page merging, and continued suppression of DEBUG status feedback. Existing
+row styling, layout, controls, and filter cycling remain unchanged.
+
+Independently exercised the actual server StructuredHandler with a standard
+critical LogRecord and verified all four filters against both temporary files
+and the degraded in-memory ring. No daemon, hardware, user log files, or database
+was involved. All 58 Rust tests passed in 35.07 seconds. The release frontend's
+native status-fading and day/archive/live-navigation tests passed in 18.06 seconds.
+Formatting, Clippy with warnings denied, and diff checks passed. All 15 SVGs pass
+`--check` and match the saved before set exactly; the Logs PNG is byte-identical
+and was inspected before and after. Updated the installed local frontend without
+restarting existing application processes.
+
 ## Remaining review
 
 - Review remaining applicable application examples and tutorial integration details.

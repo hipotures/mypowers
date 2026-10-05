@@ -71,7 +71,7 @@ impl Feedback {
         let severity = match record["level"].as_str()? {
             "INFO" => Severity::Info,
             "WARNING" => Severity::Warning,
-            "ERROR" => Severity::Error,
+            "ERROR" | "CRITICAL" => Severity::Error,
             _ => return None,
         };
         // Connection and output events have more precise feedback in the state/command stream.

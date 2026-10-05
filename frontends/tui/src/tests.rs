@@ -1041,6 +1041,61 @@ fn live_log_cache_stays_bounded_when_page_refresh_fails_and_recovers_from_the_se
 }
 
 #[test]
+fn live_and_archived_log_filters_preserve_critical_records() {
+    let now = chrono::Utc::now();
+    let record = |sequence, level| {
+        json!({
+            "sequence": sequence, "timestamp": now.to_rfc3339(),
+            "server_instance_id": "88767477-2a2a-481f-843b-30d56a5e3f10",
+            "level": level, "message": format!("Message {level}")
+        })
+    };
+    for minimum in 0..crate::logs::LEVELS.len() {
+        let mut logs = crate::logs::Logs::new_at(Some(chrono_tz::UTC), now);
+        logs.level = minimum;
+        logs.follow = true;
+        for (sequence, level) in ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
+            .into_iter()
+            .enumerate()
+        {
+            assert!(logs.record(record(sequence, level)));
+        }
+        let levels: Vec<_> = logs
+            .records
+            .iter()
+            .map(|r| r["level"].as_str().unwrap())
+            .collect();
+        assert_eq!(
+            levels,
+            ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"][minimum..]
+        );
+        assert!(logs.clipboard_text().contains("CRITICAL Message CRITICAL"));
+        let critical = record(5, "CRITICAL");
+        logs.follow = false;
+        assert!(logs.record(critical.clone()));
+        assert_eq!(logs.unseen, 1);
+        assert!(!logs.record(critical.clone()));
+        assert_eq!(logs.unseen, 1);
+        let feedback = Feedback::log(&critical).expect("Critical errors need operational feedback");
+        assert_eq!(feedback.message, "Message CRITICAL");
+        assert_eq!(feedback.severity, Severity::Error);
+        assert!(Feedback::log(&record(6, "DEBUG")).is_none());
+        let request = logs.key(KeyCode::End).unwrap();
+        logs.accept(
+            &request,
+            Ok(serde_json::from_value(json!({
+                "schema_version": 1, "items": [], "previous_cursor": null,
+                "next_cursor": null, "has_more_before": false, "has_more_after": false,
+                "source": "files", "gap": false, "skipped_lines": 0
+            }))
+            .unwrap()),
+        );
+        assert_eq!(logs.records.back().unwrap(), &critical);
+        assert_eq!(logs.unseen, 0);
+    }
+}
+
+#[test]
 fn log_day_bounds_use_iana_dst_transitions_and_midnight_offsets() {
     let zone = Some(chrono_tz::Europe::Warsaw);
     for (date, hours) in [("2026-03-29", 23), ("2026-10-25", 25), ("2026-10-05", 24)] {

@@ -267,6 +267,8 @@ impl Logs {
     fn matches(&self, record: &Value) -> bool {
         LEVELS
             .iter()
+            // CRITICAL can be emitted even though it is not a configurable minimum.
+            .chain(std::iter::once(&"CRITICAL"))
             .position(|level| record["level"].as_str() == Some(*level))
             .is_some_and(|level| level >= self.level)
             && record["timestamp"]
