@@ -28,7 +28,7 @@ pub enum Event {
     Log(Value),
     LogPage(crate::logs::Request, Result<crate::logs::Page, String>),
     Notice(String),
-    Finished(String, Feedback),
+    Finished(Feedback),
     Copied(bool, ClipboardTarget),
     Exit,
 }
@@ -164,7 +164,7 @@ impl Api {
         Ok(command)
     }
 
-    async fn perform(&self, intent: Intent, events: &mpsc::Sender<Event>) -> (String, Feedback) {
+    async fn perform(&self, intent: Intent, events: &mpsc::Sender<Event>) -> Feedback {
         match intent {
             Intent::Output {
                 output,
@@ -186,19 +186,18 @@ impl Api {
                 let value = match response {
                     Ok(value) => value,
                     Err(error) if error.starts_with("API ") => {
-                        let feedback = Feedback::request_error(&error);
-                        return (error, feedback);
+                        return Feedback::request_error(&error);
                     }
-                    Err(_) => return admission_uncertain(&key),
+                    Err(_) => return outcome_uncertain(),
                 };
                 let Ok(mut command) = serde_json::from_value::<Command>(value) else {
-                    return admission_uncertain(&key);
+                    return outcome_uncertain();
                 };
                 if !command.valid()
                     || command.output != output
                     || command.requested_enabled != enabled
                 {
-                    return admission_uncertain(&key);
+                    return outcome_uncertain();
                 }
                 let _ = events.send(Event::Command(command.clone())).await;
                 let deadline = Instant::now() + Duration::from_secs(25);
@@ -212,30 +211,11 @@ impl Api {
                     match next {
                         Ok(Ok(next)) => command = next,
                         _ => {
-                            return (
-                                format!(
-                                    "Do not replay. Outcome uncertain | {}",
-                                    command.command_id
-                                ),
-                                Feedback::new(
-                                    "Command outcome uncertain; check station before retrying",
-                                    Severity::Warning,
-                                ),
-                            );
+                            return outcome_uncertain();
                         }
                     }
                 }
-                let mut message = format!(
-                    "{} {} | {}",
-                    output.to_uppercase(),
-                    command.status,
-                    command.command_id
-                );
-                let feedback = Feedback::command(&command);
-                if let Some(reason) = command.reason_code {
-                    message.push_str(&format!(" | {}", safe(&reason)));
-                }
-                (message, feedback)
+                Feedback::command(&command)
             }
             Intent::Retry => self
                 .request(
@@ -245,13 +225,8 @@ impl Api {
                     None,
                 )
                 .await
-                .map(|_| {
-                    (
-                        "Retry requested.".into(),
-                        Feedback::new("Reconnecting to station", Severity::Info),
-                    )
-                })
-                .unwrap_or_else(operation_error),
+                .map(|_| Feedback::new("Reconnecting to station", Severity::Info))
+                .unwrap_or_else(|error| Feedback::request_error(&error)),
             Intent::Connection(running) => self
                 .request(
                     reqwest::Method::PUT,
@@ -261,19 +236,16 @@ impl Api {
                 )
                 .await
                 .map(|_| {
-                    (
-                        "Connection request completed.".into(),
-                        Feedback::new(
-                            if running {
-                                "Station connection resumed"
-                            } else {
-                                "Station connection paused"
-                            },
-                            Severity::Info,
-                        ),
+                    Feedback::new(
+                        if running {
+                            "Station connection resumed"
+                        } else {
+                            "Station connection paused"
+                        },
+                        Severity::Info,
                     )
                 })
-                .unwrap_or_else(operation_error),
+                .unwrap_or_else(|error| Feedback::request_error(&error)),
             Intent::Debug(enabled) => self
                 .request(
                     if enabled {
@@ -293,12 +265,9 @@ impl Api {
                     let message = level
                         .map(|level| format!("Log level changed to {level}"))
                         .unwrap_or_else(|| "Log level updated".into());
-                    (
-                        "Runtime log level updated.".into(),
-                        Feedback::new(message, Severity::Info),
-                    )
+                    Feedback::new(message, Severity::Info)
                 })
-                .unwrap_or_else(operation_error),
+                .unwrap_or_else(|error| Feedback::request_error(&error)),
         }
     }
 
@@ -308,12 +277,8 @@ impl Api {
         events: mpsc::Sender<Event>,
     ) {
         while let Some(intent) = requests.recv().await {
-            let (details, feedback) = self.perform(intent, &events).await;
-            if events
-                .send(Event::Finished(details, feedback))
-                .await
-                .is_err()
-            {
+            let feedback = self.perform(intent, &events).await;
+            if events.send(Event::Finished(feedback)).await.is_err() {
                 return;
             }
         }
@@ -541,19 +506,11 @@ impl Api {
     }
 }
 
-fn admission_uncertain(key: &str) -> (String, Feedback) {
-    (
-        format!("Do not replay. Admission uncertain | key {key}"),
-        Feedback::new(
-            "Command outcome uncertain; check station before retrying",
-            Severity::Warning,
-        ),
+fn outcome_uncertain() -> Feedback {
+    Feedback::new(
+        "Command outcome uncertain; check station before retrying",
+        Severity::Warning,
     )
-}
-
-fn operation_error(error: String) -> (String, Feedback) {
-    let feedback = Feedback::request_error(&error);
-    (error, feedback)
 }
 
 #[cfg(test)]
@@ -637,9 +594,9 @@ mod tests {
                 &events,
             )
             .await;
-        assert!(result.0.contains(&key) && result.0.contains("Do not replay"));
-        assert!(!result.1.message.contains(&key));
-        assert_eq!(result.1.severity, Severity::Warning);
+        assert!(result.message.contains("Command outcome uncertain"));
+        assert!(!result.message.contains(&key));
+        assert_eq!(result.severity, Severity::Warning);
         server.await.unwrap();
     }
 }

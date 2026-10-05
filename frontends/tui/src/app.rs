@@ -1,6 +1,6 @@
 use crate::{
     feedback::{Feedback, Severity, output_name},
-    model::{Command, Status, safe},
+    model::{Command, Status},
     network::{ClipboardTarget, Event, Intent},
 };
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
@@ -33,7 +33,6 @@ pub struct App {
     pub selected: Option<usize>,
     pub title: Rect,
     pub feedback: Option<Feedback>,
-    pub notice: String,
     pub connection_notice: String,
     pub log_notice: String,
     pub pending: Option<String>,
@@ -71,7 +70,6 @@ impl App {
             selected: Some(0),
             title: Rect::default(),
             feedback: Some(Feedback::new("Connecting to daemon...", Severity::Info)),
-            notice: String::new(),
             connection_notice: "Connecting to daemon...".into(),
             log_notice: String::new(),
             pending: None,
@@ -184,12 +182,8 @@ impl App {
                 }
                 self.log_notice = message;
             }
-            Event::Finished(message, feedback) => {
+            Event::Finished(feedback) => {
                 self.pending = None;
-                if self.view == View::Logs {
-                    self.logs.action = Some((message.clone(), Instant::now()));
-                }
-                self.notice = message;
                 self.feedback = Some(feedback);
             }
             Event::Log(record) => {
@@ -206,13 +200,20 @@ impl App {
             }
             Event::LogPage(request, page) => {
                 let current = request.generation == self.logs.generation();
+                let failed = page.is_err();
                 let feedback = if page.is_ok() {
                     Feedback::new("Logs loaded", Severity::Info)
                 } else {
                     Feedback::new("Could not load logs; see Logs", Severity::Error)
                 };
                 self.logs.accept(&request, page);
-                if current {
+                if current
+                    && (failed
+                        || self
+                            .feedback
+                            .as_ref()
+                            .is_none_or(|feedback| feedback.started <= request.started))
+                {
                     self.feedback = Some(feedback);
                 }
             }
@@ -241,15 +242,6 @@ impl App {
         }
         self.last_command = Some(identity);
         self.feedback = Some(Feedback::command(command));
-        self.notice = format!(
-            "{} {} | {}",
-            command.output.to_uppercase(),
-            command.status,
-            command.command_id
-        );
-        if let Some(reason) = &command.reason_code {
-            self.notice.push_str(&format!(" | {}", safe(reason)));
-        }
     }
 
     pub fn age(&self) -> Option<f64> {
@@ -323,8 +315,6 @@ impl App {
     pub fn toggle(&mut self, index: usize) -> Effect {
         self.selected = Some(index);
         if !self.allowed() {
-            self.notice =
-                "Controls unavailable: fresh data and no pending command required.".into();
             self.feedback = Some(Feedback::new(
                 if !self.live() {
                     "Controls unavailable: fresh station data required"
@@ -344,7 +334,6 @@ impl App {
             output.to_uppercase(),
             if enabled { "ON" } else { "OFF" }
         ));
-        self.notice = format!("Pending {}", self.pending.as_ref().unwrap());
         self.feedback = Some(Feedback::new(
             format!(
                 "Waiting for {} {} confirmation...",
@@ -363,7 +352,6 @@ impl App {
 
     fn operation(&mut self, key: char) -> Effect {
         if !self.connected || self.pending.is_some() {
-            self.notice = "Daemon unavailable or operation pending.".into();
             self.feedback = Some(Feedback::new(
                 "Daemon unavailable or operation pending",
                 Severity::Warning,

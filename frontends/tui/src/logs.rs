@@ -19,6 +19,7 @@ pub enum Load {
 
 #[derive(Clone, Debug)]
 pub struct Request {
+    pub started: Instant,
     pub generation: u64,
     pub kind: Load,
     pub since: String,
@@ -50,7 +51,6 @@ pub struct Logs {
     pub follow: bool,
     pub loading: bool,
     pub message: String,
-    pub action: Option<(String, std::time::Instant)>,
     pub unseen: usize,
     pub viewport: usize,
     pub scrollbar: Rect,
@@ -87,7 +87,6 @@ impl Logs {
             follow: false,
             loading: false,
             message: String::new(),
-            action: None,
             unseen: 0,
             viewport: 0,
             scrollbar: Rect::default(),
@@ -145,13 +144,13 @@ impl Logs {
         };
         self.generation += 1;
         self.loading = true;
-        self.action = None;
         self.message = "Loading logs...".into();
         self.drag = None;
         if matches!(kind, Load::Latest | Load::Oldest) {
             self.unseen = 0;
         }
         Some(Request {
+            started: Instant::now(),
             generation: self.generation,
             kind,
             since,

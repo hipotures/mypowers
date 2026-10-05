@@ -84,8 +84,8 @@ Local age uses a monotonic clock. Pending, stale, unavailable, or daemon-denied
 states block output requests. The API revalidates UUID/revision and owns command
 execution. Each request has a fresh idempotency UUID and a captured explicit
 boolean target. Mutations are never automatically replayed after errors or
-reconnection. Full details in Logs/API retain the command ID and ambiguous
-admission's idempotency key; the status strip shows only concise feedback.
+reconnection. Full command details remain in the API and structured log records;
+the status strip shows only concise feedback.
 Quitting leaves daemon collection and outputs running.
 
 Several clients can read the same daemon. Other clients' output changes and
@@ -112,6 +112,9 @@ and becomes empty after eight seconds. Success uses green, information muted
 cyan, warnings yellow, and errors red. The right region is reserved for future
 alerts and remains completely empty for now. Long messages are shortened with
 an ellipsis while preserving space for right-aligned indicators.
+The logs modal footer shows only archive loading/pagination information. Action
+results and pending feedback appear exclusively in the status strip. A response
+to an earlier log request cannot overwrite newer action feedback.
 
 Permanent age, history health, adapter, and logging diagnostics are absent from
 the normal dashboard. They remain available through the API; a future Settings

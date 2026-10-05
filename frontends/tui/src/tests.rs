@@ -77,10 +77,10 @@ fn commands_capture_revision_without_optimistic_state_changes_or_replay() {
     app.update(Event::Disconnected("Lost".into()));
     app.update(Event::Status(Box::new(status())));
     assert!(matches!(app.toggle(1), Effect::None));
-    app.update(Event::Finished(
-        "Outcome uncertain".into(),
-        Feedback::new("Command outcome uncertain", Severity::Warning),
-    ));
+    app.update(Event::Finished(Feedback::new(
+        "Command outcome uncertain",
+        Severity::Warning,
+    )));
     assert!(
         !app.status
             .as_ref()
@@ -642,10 +642,10 @@ fn click_activates_once_on_release_and_resize_or_revision_discards_old_press() {
         app.mouse(event(MouseEventKind::Up(MouseButton::Left))),
         Effect::None
     ));
-    app.update(Event::Finished(
-        "Done".into(),
-        Feedback::new("AC ON confirmed", Severity::Success),
-    ));
+    app.update(Event::Finished(Feedback::new(
+        "AC ON confirmed",
+        Severity::Success,
+    )));
     app.mouse(event(MouseEventKind::Down(MouseButton::Left)));
     app.resize();
     render(&mut app, 80, 24);
@@ -695,18 +695,14 @@ fn trends_use_timestamps_have_gap_columns_and_bounded_real_samples() {
 }
 
 #[test]
-fn stream_errors_keep_command_details_for_logs_but_replace_transient_feedback() {
+fn stream_errors_replace_transient_feedback() {
     let mut app = app();
-    app.update(Event::Finished(
-        "Do not replay. Outcome uncertain | command-id".into(),
-        Feedback::new(
-            "Command outcome uncertain; check station",
-            Severity::Warning,
-        ),
-    ));
+    app.update(Event::Finished(Feedback::new(
+        "Command outcome uncertain; check station",
+        Severity::Warning,
+    )));
     app.update(Event::Disconnected("Disconnected".into()));
     app.update(Event::Notice("Logs unavailable".into()));
-    assert!(app.notice.contains("Outcome uncertain"));
     assert!(
         app.feedback
             .as_ref()
@@ -718,21 +714,40 @@ fn stream_errors_keep_command_details_for_logs_but_replace_transient_feedback() 
 }
 
 #[test]
-fn concurrent_log_page_does_not_erase_runtime_action_feedback() {
+fn runtime_action_feedback_stays_only_in_status_strip_despite_concurrent_log_page() {
     let mut app = app();
     let Effect::Logs(request) = app.key(KeyEvent::new(KeyCode::F(3), KeyModifiers::NONE)) else {
         panic!("Expected log request");
     };
-    app.update(Event::Finished(
-        "Runtime log level updated.".into(),
-        Feedback::new("Log level changed to DEBUG", Severity::Info),
-    ));
+    app.update(Event::Finished(Feedback::new(
+        "Log level changed to DEBUG",
+        Severity::Info,
+    )));
     let page = serde_json::from_value(json!({
         "schema_version":1,"items":[],"previous_cursor":null,"next_cursor":null,
         "has_more_before":false,"has_more_after":false,"source":"files","gap":false,"skipped_lines":0,
     })).unwrap();
     app.update(Event::LogPage(request, Ok(page)));
-    assert!(text(&render(&mut app, 60, 19)).contains("Runtime log level updated."));
-    app.key(KeyEvent::new(KeyCode::Char('r'), KeyModifiers::NONE));
-    assert!(app.logs.action.is_none());
+    let screen = text(&render(&mut app, 60, 19));
+    assert_eq!(screen.matches("Log level changed to DEBUG").count(), 1);
+    assert!(
+        screen
+            .lines()
+            .last()
+            .unwrap()
+            .contains("Log level changed to DEBUG")
+    );
+    assert!(screen.contains("Logs loaded | 0 loaded"));
+    assert!(!screen.contains("Runtime log level updated"));
+    app.key(KeyEvent::new(KeyCode::Char('b'), KeyModifiers::NONE));
+    let screen = text(&render(&mut app, 60, 19));
+    assert_eq!(screen.matches("Sending request...").count(), 1);
+    assert!(
+        screen
+            .lines()
+            .last()
+            .unwrap()
+            .contains("Sending request...")
+    );
+    assert!(screen.contains("Logs loaded | 0 loaded"));
 }

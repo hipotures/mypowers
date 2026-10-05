@@ -103,7 +103,6 @@ fn run() -> Result<(), String> {
                     Effect::Request(intent) => {
                         if requests.try_send(intent).is_err() {
                             app.pending = None;
-                            app.notice = "Request queue unavailable; no command sent.".into();
                             app.feedback = Some(feedback::Feedback::new(
                                 "Request unavailable; no command sent",
                                 feedback::Severity::Error,

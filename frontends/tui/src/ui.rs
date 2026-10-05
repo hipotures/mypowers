@@ -14,7 +14,6 @@ use ratatui::{
         ScrollbarState, Sparkline, SparklineBar, Widget,
     },
 };
-use std::time::Duration;
 
 pub const MIN_WIDTH: u16 = 60;
 pub const MIN_HEIGHT: u16 = 19;
@@ -554,24 +553,16 @@ fn logs(frame: &mut Frame, area: Rect, app: &mut App) {
         }
     }
     frame.render_widget(
-        Paragraph::new(safe(&if app.pending.is_some() {
-            app.notice.clone()
-        } else if let Some((message, time)) = &app.logs.action
-            && time.elapsed() < Duration::from_secs(3)
-        {
-            message.clone()
-        } else {
-            format!(
-                "{} | {} loaded{}",
-                app.logs.message,
-                app.logs.records.len(),
-                if app.logs.unseen > 0 {
-                    format!(" | {} new", app.logs.unseen)
-                } else {
-                    String::new()
-                }
-            )
-        }))
+        Paragraph::new(safe(&format!(
+            "{} | {} loaded{}",
+            app.logs.message,
+            app.logs.records.len(),
+            if app.logs.unseen > 0 {
+                format!(" | {} new", app.logs.unseen)
+            } else {
+                String::new()
+            }
+        )))
         .style(Style::default().fg(MUTED)),
         parts[2],
     );

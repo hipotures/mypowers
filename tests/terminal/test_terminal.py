@@ -158,7 +158,8 @@ def test_native_controls_logs_paste_resize_and_restoration(
             session.write(b"\x1bOR")  # F3
             session.read(b"LOGS")
             session.write(b"f\x1b[A\x1b[Fb")
-            session.read(b"Runtime log level updated")
+            session.read(b"Log level changed to DEBUG")
+            assert "Runtime log level updated" not in "\n".join(session.screen.display)
             session.write(b"\x1bOQ")  # F2
             session.read(b"INPUT")
         if ending == "sigterm":
