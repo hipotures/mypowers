@@ -1252,6 +1252,110 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn daemon_restart_during_command_polling_preserves_the_new_snapshot() {
+        const ID: &str = "6147f85c-53ef-42f4-b3f2-c15b071320a5";
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let api = Arc::new(api_for(&listener));
+        let mut app = crate::app::App::new(false, Some(chrono_tz::UTC));
+        app.update(Event::Status(Box::new(crate::tests::status())));
+        let crate::app::Effect::Request(intent) = app.toggle(0) else {
+            panic!("Expected an AC ON command");
+        };
+        let (polling, polled) = tokio::sync::oneshot::channel();
+        let (restarted, restart) = tokio::sync::oneshot::channel();
+        let server = tokio::spawn(async move {
+            let (mut socket, request) = accept_http_request(&listener).await;
+            assert!(request.starts_with("PUT /api/v1/outputs/ac HTTP/1.1"));
+            let body = json!({
+                "schema_version": 1, "command_id": ID, "status": "accepted",
+                "output": "ac", "requested_enabled": true, "reason_code": null
+            })
+            .to_string();
+            socket.write_all(format!(
+                "HTTP/1.1 202 Accepted\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+                body.len()
+            ).as_bytes()).await.unwrap();
+            drop(socket);
+            let (mut socket, request) = accept_http_request(&listener).await;
+            assert!(request.starts_with(&format!("GET /api/v1/commands/{ID} HTTP/1.1")));
+            polling.send(()).unwrap();
+            restart.await.unwrap();
+            let body = json!({"schema_version": 1, "error": {
+                "code": "command_not_found", "message": "Unknown command after restart"
+            }})
+            .to_string();
+            socket.write_all(format!(
+                "HTTP/1.1 404 Not Found\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+                body.len()
+            ).as_bytes()).await.unwrap();
+            assert!(
+                timeout(Duration::from_millis(300), listener.accept())
+                    .await
+                    .is_err(),
+                "An old command must not be replayed against the new daemon"
+            );
+        });
+        let (events, mut incoming) = mpsc::channel(4);
+        let worker = tokio::spawn(async move { api.perform(intent, &events).await });
+        let admission = timeout(Duration::from_secs(3), incoming.recv())
+            .await
+            .unwrap()
+            .unwrap();
+        assert!(matches!(admission, Event::Command(_)));
+        app.update(admission);
+        timeout(Duration::from_secs(3), polled)
+            .await
+            .unwrap()
+            .unwrap();
+        let mut next = crate::tests::status();
+        next.server_instance_id = "69be0c88-45b3-479b-a6e2-867579f98e73".into();
+        next.connection.session_id = Some("new-session".into());
+        next.controls.outputs_revision = 18;
+        let sample = next.telemetry.sample.as_mut().unwrap();
+        sample.segment_id = "new-segment".into();
+        sample.sequence = 1;
+        sample.ac_enabled = true;
+        let new_snapshot = serde_json::to_value(&next).unwrap();
+        app.update(Event::Status(Box::new(next)));
+        assert_eq!(app.samples.len(), 1);
+        assert_eq!(app.samples[0].sample.segment_id, "new-segment");
+        assert!(matches!(app.toggle(0), crate::app::Effect::None));
+        restarted.send(()).unwrap();
+        let feedback = timeout(Duration::from_secs(3), worker)
+            .await
+            .unwrap()
+            .unwrap();
+        timeout(Duration::from_secs(3), server)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            feedback.message,
+            "Command outcome uncertain; check station before retrying"
+        );
+        assert_eq!(feedback.severity, Severity::Warning);
+        assert!(incoming.try_recv().is_err());
+        app.update(Event::Finished(feedback));
+        assert!(app.pending.is_none());
+        assert_eq!(
+            serde_json::to_value(app.status.as_ref().unwrap()).unwrap(),
+            new_snapshot
+        );
+        let crate::app::Effect::Request(Intent::Output {
+            snapshot, enabled, ..
+        }) = app.toggle(0)
+        else {
+            panic!("The new daemon's fresh snapshot should enable another user command");
+        };
+        assert!(!enabled);
+        assert_eq!(
+            snapshot.server_instance_id,
+            new_snapshot["server_instance_id"]
+        );
+        assert_eq!(snapshot.controls.outputs_revision, 18);
+    }
+
+    #[tokio::test]
     async fn state_conflicts_report_a_refreshable_failure_without_replaying_the_command() {
         const ID: &str = "6147f85c-53ef-42f4-b3f2-c15b071320a5";
         for admitted in [false, true] {

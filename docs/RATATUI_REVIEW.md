@@ -968,6 +968,34 @@ Formatting, Clippy with warnings denied, and diff checks passed. All 15 SVGs pas
 byte-identical and was inspected before and after. Updated the installed local
 frontend without restarting existing application processes.
 
+### 33. Verify daemon restart while a command outcome is being polled
+
+Rechecked the [event-handling models](https://ratatui.rs/concepts/event-handling/),
+and completed the [Block recipe](https://ratatui.rs/recipes/widgets/block/) and
+[Block example](https://ratatui.rs/examples/widgets/block/). The production central
+input loop with asynchronous message passing fits its independent status, logs,
+and operation workers. Rounded borders, integrated Line titles, and Block inner
+areas already use the documented primitives. No new loop or border renderer is
+needed.
+
+Added a regression for a daemon restart between command admission and completion.
+An isolated HTTP server accepts one PUT, waits until the frontend is polling its
+command ID, and then returns the actual `command_not_found` HTTP 404 contract.
+Before releasing that response, the test delivers a new daemon instance/session,
+revision, telemetry segment, and AC state to the production App.
+
+The existing implementation passes: old history is cleared, another command stays
+blocked until the pending operation finishes, a lost outcome produces uncertainty
+feedback, and neither another poll nor a replayed PUT is sent. The complete new
+snapshot remains unchanged by that feedback. A subsequent explicit user command
+captures the new instance/revision and derives its intention from the new AC state.
+No production change or speculative cancellation mechanism was required.
+
+The new regression passed in 0.56 seconds. Formatting, Clippy with warnings denied,
+and diff checks passed. All 15 SVGs pass `--check` and match the saved before set
+exactly; the command-pending PNG is byte-identical and was inspected before and
+after. Production code and the installed release binary remain unchanged.
+
 ## Remaining review
 
 - Review remaining applicable application examples and tutorial integration details.
