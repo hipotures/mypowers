@@ -151,6 +151,22 @@ class LogPage(Page):
     has_more_after: bool = False
 
 
+class HistoryBucket(DTO):
+    bucket_start_ms: int
+    input_power_w: float = Field(ge=0, le=65535, allow_inf_nan=False)
+    output_power_w: float = Field(ge=0, le=65535, allow_inf_nan=False)
+    sample_count: int = Field(ge=1)
+
+
+class HistoryAggregates(DTO):
+    schema_version: Literal[1] = 1
+    bucket_seconds: Literal[10, 60, 3600]
+    since_ms: int
+    until_ms: int
+    items: list[HistoryBucket]
+    source: Literal["database"] = "database"
+
+
 class StreamMessage(DTO):
     schema_version: Literal[1] = 1
     type: StreamKind

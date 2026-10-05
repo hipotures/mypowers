@@ -507,6 +507,158 @@
         }
       }
     },
+    "/api/v1/history/aggregates": {
+      "get": {
+        "summary": "History Aggregates",
+        "operationId": "history_aggregates",
+        "parameters": [
+          {
+            "name": "since",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Since"
+            }
+          },
+          {
+            "name": "until",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Until"
+            }
+          },
+          {
+            "name": "bucket_seconds",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "description": "Seconds per bucket: 10, 60 or 3600.",
+              "default": 10,
+              "title": "Bucket Seconds"
+            },
+            "description": "Seconds per bucket: 10, 60 or 3600."
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 256,
+              "minimum": 1,
+              "default": 256,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HistoryAggregates"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Content Too Large"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Content"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        }
+      }
+    },
     "/api/v1/outputs/{output}": {
       "put": {
         "summary": "Output",
@@ -1799,6 +1951,89 @@
           "error"
         ],
         "title": "ErrorResponse"
+      },
+      "HistoryAggregates": {
+        "properties": {
+          "schema_version": {
+            "type": "integer",
+            "const": 1,
+            "title": "Schema Version",
+            "default": 1
+          },
+          "bucket_seconds": {
+            "type": "integer",
+            "enum": [
+              10,
+              60,
+              3600
+            ],
+            "title": "Bucket Seconds"
+          },
+          "since_ms": {
+            "type": "integer",
+            "title": "Since Ms"
+          },
+          "until_ms": {
+            "type": "integer",
+            "title": "Until Ms"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/HistoryBucket"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "source": {
+            "type": "string",
+            "const": "database",
+            "title": "Source",
+            "default": "database"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "bucket_seconds",
+          "since_ms",
+          "until_ms",
+          "items"
+        ],
+        "title": "HistoryAggregates"
+      },
+      "HistoryBucket": {
+        "properties": {
+          "bucket_start_ms": {
+            "type": "integer",
+            "title": "Bucket Start Ms"
+          },
+          "input_power_w": {
+            "type": "number",
+            "maximum": 65535.0,
+            "minimum": 0.0,
+            "title": "Input Power W"
+          },
+          "output_power_w": {
+            "type": "number",
+            "maximum": 65535.0,
+            "minimum": 0.0,
+            "title": "Output Power W"
+          },
+          "sample_count": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Sample Count"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "bucket_start_ms",
+          "input_power_w",
+          "output_power_w",
+          "sample_count"
+        ],
+        "title": "HistoryBucket"
       },
       "Level": {
         "type": "string",

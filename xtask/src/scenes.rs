@@ -1,9 +1,10 @@
 //! Fixed data only. Layout and widgets live exclusively in the production TUI crate.
 use chrono::{DateTime, Duration as TimeDelta, Utc};
 use mypowers_tui::{
-    app::{App, Trend, View},
+    app::{App, View},
     clock::Clock,
     feedback::{Feedback, Severity},
+    history::{Point, Resolution},
     model::Status,
     ui,
 };
@@ -14,6 +15,8 @@ use std::time::Duration;
 #[derive(Clone, Copy)]
 pub enum Scene {
     Live,
+    LiveMinute,
+    LiveHour,
     LowLoad,
     Idle,
     Reconnecting,
@@ -29,6 +32,8 @@ pub enum Scene {
 
 pub const SCENES: &[(&str, Scene, u16, u16)] = &[
     ("dashboard-live.svg", Scene::Live, 120, 30),
+    ("dashboard-live-60s.svg", Scene::LiveMinute, 120, 30),
+    ("dashboard-live-1h.svg", Scene::LiveHour, 120, 30),
     ("dashboard-live-80x24.svg", Scene::Live, 80, 24),
     ("dashboard-live-60x19.svg", Scene::Live, 60, 19),
     ("dashboard-low-load.svg", Scene::LowLoad, 120, 30),
@@ -223,6 +228,8 @@ fn app(scene: Scene) -> Result<App, String> {
             app.feedback = None;
         }
         Scene::Live => {}
+        Scene::LiveMinute => app.graph.resolution = Resolution::Minute,
+        Scene::LiveHour => app.graph.resolution = Resolution::Hour,
     }
     if !status.valid() {
         return Err("Invalid snapshot status fixture".into());
@@ -230,19 +237,27 @@ fn app(scene: Scene) -> Result<App, String> {
     if let Some(sample) = &status.telemetry.sample {
         let input = [12, 18, 32, 48, 67, 83, 72, 57, 41, 29, 20, 16];
         let output = [38, 52, 84, 113, 164, 218, 256, 229, 197, 146, 97, 63];
-        for index in 0..40 {
-            let timestamp = now - TimeDelta::seconds(117 - index * 3);
-            let mut sample = sample.clone();
-            sample.sequence = index as u64;
-            sample.received_at = timestamp.to_rfc3339();
-            if !matches!(scene, Scene::Idle | Scene::LowLoad) {
-                sample.input_power_w = input[index as usize % input.len()];
-                sample.output_power_w = output[index as usize % output.len()];
-            }
-            app.samples.push_back(Trend::from_sample(&sample));
+        for index in 0..44 {
+            let timestamp = now - TimeDelta::seconds((43 - index) * app.graph.resolution.seconds());
+            let flat = matches!(scene, Scene::Idle | Scene::LowLoad);
+            app.graph.points.push(Point {
+                bucket_start_ms: timestamp.timestamp_millis(),
+                input_power_w: if flat {
+                    sample.input_power_w as f64
+                } else {
+                    input[index as usize % input.len()] as f64
+                },
+                output_power_w: if flat {
+                    sample.output_power_w as f64
+                } else {
+                    output[index as usize % output.len()] as f64
+                },
+                sample_count: (app.graph.resolution.seconds() / 10) as u64,
+            });
         }
-        // The latest graph column agrees with the current numeric readings.
-        *app.samples.back_mut().unwrap() = Trend::from_sample(sample);
+        let latest = app.graph.points.last_mut().unwrap();
+        latest.input_power_w = sample.input_power_w as f64;
+        latest.output_power_w = sample.output_power_w as f64;
     }
     app.status = Some(status);
     Ok(app)

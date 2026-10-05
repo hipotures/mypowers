@@ -110,6 +110,7 @@ def test_strict_booleans_unknown_fields_and_error_envelope(config, body):
         ("/api/v1/status", "get"),
         ("/api/v1/capabilities", "get"),
         ("/api/v1/history", "get"),
+        ("/api/v1/history/aggregates", "get"),
         ("/api/v1/logs", "get"),
         ("/api/v1/commands/" + str(uuid4()), "get"),
         ("/api/v1/outputs/ac", "put"),
@@ -366,3 +367,46 @@ def test_websocket_auth_deadline_and_disconnected_heartbeat(config):
         with client.websocket_connect("/api/v1/events", headers=headers) as ws:
             assert ws.receive_json()["type"] == "snapshot"
             assert ws.receive_json()["type"] == "heartbeat"
+
+
+@pytest.mark.parametrize("seconds", [10, 60, 3600])
+def test_history_aggregates_contract_and_request_validation(config, seconds):
+    from datetime import UTC, datetime, timedelta
+
+    from mypowers.contracts import HistoryAggregates
+
+    with TestClient(create_app(config)) as client:
+        ready(client)
+        deadline = time.monotonic() + 3
+        while time.monotonic() < deadline:
+            if client.get("/api/v1/status").json()["history"]["state"] == "ok":
+                break
+            time.sleep(0.02)
+        now = datetime.now(UTC)
+        params = {
+            "since": (now - timedelta(seconds=seconds)).isoformat(),
+            "until": (now + timedelta(seconds=1)).isoformat(),
+            "bucket_seconds": seconds,
+            "limit": 3,
+        }
+        response = client.get("/api/v1/history/aggregates", params=params)
+        assert response.status_code == 200
+        result = HistoryAggregates.model_validate(response.json())
+        assert result.bucket_seconds == seconds
+        assert result.since_ms == int((now - timedelta(seconds=seconds)).timestamp() * 1000)
+        assert result.until_ms == int((now + timedelta(seconds=1)).timestamp() * 1000)
+        assert len(result.items) <= 3
+        assert all(item.sample_count > 0 for item in result.items)
+        assert response.headers["cache-control"] == "no-store"
+        for change in [
+            {"bucket_seconds": 11},
+            {"limit": 0},
+            {"limit": 257},
+            {"since": "2026-10-05T12:00:00"},
+            {"since": params["until"]},
+            {"since": "1970-01-01T00:00:00Z"},
+        ]:
+            invalid = client.get("/api/v1/history/aggregates", params=params | change)
+            assert invalid.status_code == 422
+            assert "error" in invalid.json()
+        assert client.get("/api/v1/history/aggregates").status_code == 422

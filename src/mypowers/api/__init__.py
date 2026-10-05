@@ -23,6 +23,7 @@ from mypowers.contracts import (
     ConnectionRequest,
     Empty,
     ErrorResponse,
+    HistoryAggregates,
     Level,
     LogLevelRequest,
     LogPage,
@@ -226,6 +227,21 @@ def create_app(config: ServerConfig, service: Service | None = None) -> FastAPI:
         cursor: Annotated[str | None, Query(max_length=2048)] = None,
     ) -> Page:
         return await runtime.history.query(since, until, limit, cursor)
+
+    @app.get(
+        "/api/v1/history/aggregates",
+        response_model=HistoryAggregates,
+        operation_id="history_aggregates",
+    )
+    async def history_aggregates(
+        since: str,
+        until: str,
+        bucket_seconds: Annotated[
+            int, Query(description="Seconds per bucket: 10, 60 or 3600.")
+        ] = 10,
+        limit: Annotated[int, Query(ge=1, le=256)] = 256,
+    ) -> HistoryAggregates:
+        return await runtime.history.aggregates(since, until, bucket_seconds, limit)
 
     @app.put(
         "/api/v1/outputs/{output}",

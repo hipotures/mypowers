@@ -186,3 +186,135 @@ async def test_read_only_storage_preserves_live_service(core, tmp_path):
     finally:
         store.path.chmod(0o600)
         await store.close()
+
+
+@pytest.mark.parametrize("seconds", [10, 60, 3600])
+async def test_power_aggregates_include_zeros_skip_gaps_and_preserve_fractional_means(
+    core, tmp_path, seconds
+):
+    service = core[0]
+    store = HistoryStore(service, tmp_path, True, 10)
+    await store.open()
+    try:
+        start = (int(service.latest.epoch) // seconds - 4) * seconds
+        for offset, input_w, output_w in [(0, 0, 0), (1, 1, 3), (2 * seconds, 60, 180)]:
+            sample = service.latest.sample.model_copy(
+                update={"input_power_w": input_w, "output_power_w": output_w}
+            )
+            await store.insert(replace(service.latest, epoch=start + offset, sample=sample))
+        # A reading exactly at until belongs to the next request, not this one.
+        await store.insert(replace(service.latest, epoch=start + 3 * seconds))
+        page = await store.aggregates(timestamp(start), timestamp(start + 3 * seconds), seconds, 3)
+        assert page.bucket_seconds == seconds
+        assert page.since_ms == start * 1000 and page.until_ms == (start + 3 * seconds) * 1000
+        assert [item.bucket_start_ms for item in page.items] == [
+            start * 1000,
+            (start + 2 * seconds) * 1000,
+        ]
+        assert page.items[0].sample_count == 2
+        assert page.items[0].input_power_w == 0.5 and page.items[0].output_power_w == 1.5
+        assert page.items[1].sample_count == 1 and page.items[1].input_power_w == 60
+        empty = await store.aggregates(
+            timestamp(start + seconds), timestamp(start + 2 * seconds), seconds, 1
+        )
+        assert empty.items == []
+        zero = await store.aggregates(
+            timestamp(start + 3 * seconds), timestamp(start + 4 * seconds), seconds, 1
+        )
+        assert len(zero.items) == 1 and zero.items[0].input_power_w == 0
+        assert zero.items[0].sample_count == 1
+        async with store.db.execute(
+            "EXPLAIN QUERY PLAN SELECT * FROM telemetry WHERE device_id=? "
+            "AND received_at_ms>=? AND received_at_ms<?",
+            (store.device_id, start * 1000, (start + seconds) * 1000),
+        ) as query:
+            assert "telemetry_device_time_id" in str(await query.fetchall())
+        async with store.db.execute("PRAGMA integrity_check") as query:
+            assert (await query.fetchone())[0] == "ok"
+    finally:
+        await store.close()
+
+
+async def test_aggregate_validation_bounds_offsets_and_device_isolation(core, tmp_path):
+    service = core[0]
+    store = HistoryStore(service, tmp_path, True, 10)
+    await store.open()
+    try:
+        await store.insert(replace(service.latest, epoch=-0.001))
+        result = await store.aggregates("1969-12-31T23:59:50Z", "1970-01-01T00:00:00Z", 10, 1)
+        assert result.items[0].bucket_start_ms == -10_000
+        assert result.items[0].sample_count == 1
+        equivalent = await store.aggregates(
+            "1970-01-01T00:59:50+01:00", "1970-01-01T01:00:00+01:00", 10, 1
+        )
+        assert equivalent == result
+        async with store.db.execute(
+            "INSERT INTO devices(address,name,model,created_at_ms) "
+            "VALUES ('other','Other','S300',0)"
+        ) as query:
+            other = query.lastrowid
+        original = store.device_id
+        store.device_id = other
+        await store.insert(replace(service.latest, epoch=-0.002))
+        store.device_id = original
+        assert (
+            await store.aggregates("1969-12-31T23:59:50Z", "1970-01-01T00:00:00Z", 10, 1)
+        ).items[0].sample_count == 1
+        for start, end, seconds, limit in [
+            ("2026-10-05T12:00:00", "2026-10-05T12:01:00Z", 10, 10),
+            ("2026-10-05T12:00:00Z", "2026-10-05T12:00:00Z", 10, 1),
+            ("2026-10-05T12:00:00Z", "2026-10-05T13:00:00Z", 10, 256),
+            ("2026-10-05T12:00:00Z", "2026-10-05T12:00:10Z", 11, 1),
+            ("2026-10-05T12:00:00Z", "2026-10-05T12:00:10Z", 10, 0),
+        ]:
+            with pytest.raises(AppError) as caught:
+                await store.aggregates(start, end, seconds, limit)
+            assert caught.value.status == 422
+        store.queries = 4
+        with pytest.raises(AppError) as caught:
+            await store.aggregates("1969-12-31T23:59:50Z", "1970-01-01T00:00:00Z")
+        assert caught.value.status == 429
+        store.queries = 0
+        store.state = "degraded"
+        with pytest.raises(AppError) as caught:
+            await store.aggregates("1969-12-31T23:59:50Z", "1970-01-01T00:00:00Z")
+        assert caught.value.status == 503
+    finally:
+        await store.close()
+
+
+async def test_hourly_aggregates_return_bars_instead_of_thousands_of_raw_rows(core, tmp_path):
+    store = HistoryStore(core[0], tmp_path, True, 10)
+    await store.open()
+    try:
+        start = int(core[0].clock.time()) // 3600 * 3600 - 43 * 3600
+        sample = core[0].latest.sample
+        rows = [
+            (
+                store.device_id,
+                (start + index * 10) * 1000,
+                sample.segment_id,
+                71,
+                100 if index % 2 else 0,
+                300 if index % 2 else 0,
+                100,
+                int(sample.ac_enabled),
+                int(sample.dc_enabled),
+                int(sample.light_enabled),
+                sample.status_flags,
+            )
+            for index in range(43 * 360)
+        ]
+        await store.db.executemany(
+            "INSERT INTO telemetry(device_id,received_at_ms,segment_id,battery_percent,"
+            "input_power_w,output_power_w,remaining_minutes,ac_enabled,dc_enabled,"
+            "light_enabled,status_flags) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+            rows,
+        )
+        await store.db.commit()
+        result = await store.aggregates(timestamp(start), timestamp(start + 43 * 3600), 3600, 43)
+        assert len(result.items) == 43
+        assert all(item.input_power_w == 50 and item.output_power_w == 150 for item in result.items)
+        assert all(item.sample_count == 360 for item in result.items)
+    finally:
+        await store.close()

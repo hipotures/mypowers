@@ -12,6 +12,7 @@ the checked-in [OpenAPI artifact](openapi.json) describes typed requests and res
 | GET `/api/v1/status` | Complete immutable transport snapshot |
 | GET `/api/v1/capabilities` | Only qualified reads and AC/DC/common-lamp outputs |
 | GET `/api/v1/history` | UTC `[since,until)` raw sample page, limit/cursor |
+| GET `/api/v1/history/aggregates` | UTC power averages and sample counts per 10s / 60s / 1h bucket |
 | PUT `/api/v1/outputs/{ac,dc,light}` | One explicit boolean intention with idempotency UUID |
 | GET `/api/v1/commands/{uuid}` | Retained asynchronous result |
 | PUT `/api/v1/connection` | `{"desired":"paused"}` or `{"desired":"running"}` |
@@ -59,7 +60,30 @@ and wall-clock jumps. Zero is a real value; remaining_minutes=0 displays `0h 00m
 History default range is last hour ending at server time; limit defaults 1,000, maximum 10,000.
 Pages order by `(received_at_ms,id)` and keep a signed high-water ID to exclude subsequent inserts,
 including backward clock insertions. Pass the cursor with unchanged or omitted range filters.
-Disabled/degraded history is a 503, distinct from a successful empty page. No aggregate endpoints.
+Disabled/degraded history is a 503, distinct from a successful empty page.
+
+`GET /api/v1/history/aggregates` requires aware `since` and `until` timestamps.
+`bucket_seconds` is 10 (default), 60 or 3600; `limit` is the maximum number of
+potential buckets in the requested range, 1–256 (default 256). Oversized ranges
+return 422, even when little or no data exists; aggregate results are not paged
+or silently truncated. The current device's indexed receive-time range is
+aggregated in SQLite, without schema changes or additional database files.
+
+Buckets align to UTC epoch multiples of `bucket_seconds`. Filtering is exactly
+`[since,until)`, so an unaligned range can include partial first/last buckets.
+The response echoes `bucket_seconds`, `since_ms`, `until_ms` and `source=database`.
+Ordered `items` contain `bucket_start_ms`, fractional `input_power_w` and
+`output_power_w` averages, and `sample_count`. AVG includes recorded zeros;
+missing buckets are omitted and must remain gaps in a graph. COUNT distinguishes
+an observed zero from no data and describes the current bucket's sample population.
+This is the arithmetic mean of available persisted observations, not an energy
+integral or a time-weighted estimate across recording gaps. The same availability,
+authentication, four-query admission limit and six-second deadline apply to raw
+and aggregate history reads.
+
+```text
+GET /api/v1/history/aggregates?since=2026-10-05T00:00:00Z&until=2026-10-05T01:00:00Z&bucket_seconds=60&limit=60
+```
 
 Log default page is 100, maximum 1,000; CLI defaults tail 10. Tail and range/cursor are exclusive.
 Queries read only active/retained application files off-loop with a 3-second/64-MiB scan budget.

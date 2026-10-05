@@ -53,6 +53,7 @@ uv run mypowers tui
 | Left click, released over the same dashboard control | Activate that output |
 | F3 on dashboard | Open the logs modal |
 | s on dashboard | Open read-only Settings / Diagnostics |
+| t on dashboard | Cycle average per bar: 10 seconds, 60 seconds, 1 hour |
 | F1 / ? on dashboard, in logs, or in settings | Help for the active context |
 | f in logs | Cycle minimum log level |
 | Up/Down / PageUp/PageDown / mouse wheel / scrollbar drag in logs | Scroll records; lazily load adjacent pages |
@@ -105,35 +106,44 @@ Several clients can read the same daemon. Other clients' output changes and
 command events appear live; the daemon admits only one output operation at once.
 No client opens BLE or SQLite or launches/stops the daemon.
 
-On startup and after reconnecting to the daemon, trends asynchronously backfill
-their 120-second window through `GET /api/v1/history`, then merge the persisted
-records with incoming live notifications. Paginated requests preserve their time
-window and have a total timeout; obsolete responses cannot replace a newer
-connection's history. Failed requests retry after two seconds without stopping
-live telemetry or controls. Disabled/degraded server history is not queried.
-Persisted samples follow the server's history interval (10 seconds by default),
-so backfilled history can be sparser than the subsequent live stream.
+Graphs use server-computed SQLite averages from `GET /api/v1/history/aggregates`.
+Press `t` on the dashboard to cycle **10s → 60s → 1h per bar**; the footer shows the
+selected interval. INPUT/OUTPUT numeric labels always show current telemetry,
+independently of historical averages. Selection is local to each TUI session.
+For 43 columns, the visible history spans about 7 minutes, 43 minutes or 43 hours,
+including the unfinished current bucket. UTC epoch boundaries keep completed
+bars stable between redraws and shift the window by whole columns.
 
-Trends retain at most 120 seconds and 10,000 actual observations. Time buckets
-represent the last sample in each display column, with empty columns across
-missing intervals/segments. No synthetic history is generated. Scales remain
-0–100 W input and 0–300 W output; larger readings are displayed numerically while
-the graph saturates. Positive values always occupy at least one eighth-cell tick;
-zero remains empty. Oversized or malformed history is rejected as a complete
-request rather than silently accepting a partial window. Logs show history gaps.
+On startup, reconnect, resize or interval change, the client requests only the
+visible buckets (maximum 256). Successful queries refresh every five seconds;
+failed queries retry after two seconds and keep the existing graph without
+blocking live readings or controls. Changing interval clears old averages and
+cancels obsolete requests; responses from an older daemon, size or selection
+cannot replace current history. Disabled/degraded server history is not queried.
+The frontend does not download or aggregate raw sample pages.
+
+Each returned bucket contains SQL AVG(INPUT), AVG(OUTPUT) and COUNT(*). Measured
+zeros participate in the mean; intervals without observations stay empty.
+Persisted samples follow the server's history interval (10 seconds by default).
+The current bucket's average can change as additional recorded samples arrive;
+no interpolation or invented history fills recording gaps. Fractional averages
+are retained, including positive values below 1 W. Scales remain 0–100 W input
+and 0–300 W output; larger readings are displayed numerically while the graph
+saturates. Positive averages occupy at least one eighth-cell tick; zero stays
+empty. Malformed, unordered, mismatched or oversized responses are rejected
+as a complete request rather than partially displayed.
 Clipboard support is optional and
 requires `wl-copy` and an accessible Wayland session.
 Log copies are plain text with timestamps in the selected timezone, levels, and
 complete messages, without terminal width clipping. Pages not yet loaded are not
 included. Copy results appear in the status strip.
 
-When a live INPUT or OUTPUT reading is zero and its 120-second trend history has
-no positive samples left, that graph shows a dim eleven-cell `·····○·····` idle
+When a live INPUT or OUTPUT reading is zero and its selected history window has
+no positive averages left, that graph shows a dim eleven-cell `·····○·····` idle
 track. The marker moves one cell every two seconds and reverses at the ends.
 Each graph decides independently; nonzero readings immediately restore the real
-sparkline. Existing positive history delays the idle track until it leaves the
-120-second window, including samples overwritten by zero in a shared display
-column. Missing, stale, or disconnected telemetry never animates it.
+sparkline. Existing positive averages delay the idle track until they leave the
+selected window. Missing, stale, or disconnected telemetry never animates it.
 The track uses Ratatui Paragraph/Line/Span widgets and the existing render loop.
 
 The status strip shows one recent action or connection transition, without

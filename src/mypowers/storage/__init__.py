@@ -14,7 +14,7 @@ from uuid import uuid4
 
 import aiosqlite
 
-from mypowers.contracts import AppError, Page, aware_ms
+from mypowers.contracts import AppError, HistoryAggregates, HistoryBucket, Page, aware_ms
 from mypowers.core import Core, Observation
 
 SCHEMA = """
@@ -335,6 +335,58 @@ class HistoryStore:
                 }
             )
         return Page(items=items, next_cursor=next_cursor)
+
+    async def aggregates(
+        self, since: str, until: str, bucket_seconds: int = 10, limit: int = 256
+    ) -> HistoryAggregates:
+        if not self.enabled or self.db is None or self.state != "ok":
+            raise AppError("history_unavailable", "History is disabled or degraded.", 503)
+        if bucket_seconds not in (10, 60, 3600) or not 1 <= limit <= 256:
+            raise AppError(
+                "invalid_aggregation", "Use 10, 60 or 3600 seconds and limit 1..256.", 422
+            )
+        start, end = aware_ms(since), aware_ms(until)
+        if start >= end:
+            raise AppError("invalid_range", "since must be before until.", 422)
+        span = bucket_seconds * 1000
+        if (end - 1) // span - start // span + 1 > limit:
+            raise AppError("aggregate_range_too_large", "Range exceeds the bucket limit.", 422)
+        if self.queries >= 4:
+            raise AppError("history_busy", "Too many history queries.", 429, True)
+        self.queries += 1
+        try:
+            async with asyncio.timeout(6):
+                async with self.lock:
+                    # UTC epoch buckets, including correct floor division before 1970.
+                    # AVG includes measured zeros; absent buckets have no returned record.
+                    async with self.db.execute(
+                        "SELECT received_at_ms - ((received_at_ms % ? + ?) % ?) "
+                        "AS bucket_start_ms, AVG(input_power_w), AVG(output_power_w), COUNT(*) "
+                        "FROM telemetry WHERE device_id=? AND received_at_ms>=? "
+                        "AND received_at_ms<? GROUP BY bucket_start_ms ORDER BY bucket_start_ms",
+                        (span, span, span, self.device_id, start, end),
+                    ) as query:
+                        rows = await query.fetchall()
+                    return HistoryAggregates(
+                        bucket_seconds=bucket_seconds,
+                        since_ms=start,
+                        until_ms=end,
+                        items=[
+                            HistoryBucket(
+                                bucket_start_ms=row[0],
+                                input_power_w=row[1],
+                                output_power_w=row[2],
+                                sample_count=row[3],
+                            )
+                            for row in rows
+                        ],
+                    )
+        except TimeoutError:
+            raise AppError(
+                "query_deadline", "History query exceeded its deadline.", 503, True
+            ) from None
+        finally:
+            self.queries -= 1
 
     async def close(self) -> None:
         self.stopping = True

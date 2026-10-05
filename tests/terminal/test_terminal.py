@@ -17,6 +17,7 @@ import threading
 import time
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from urllib.parse import parse_qs, urlsplit
 
 import httpx
 import pyte
@@ -120,16 +121,18 @@ def wait_state(client, output, enabled):
 
 def empty_graph_history(connection, request):
     """Minimal history contract for fixtures that exercise only stream traffic."""
-    if request.path.startswith("/api/v1/history?"):
+    if request.path.startswith("/api/v1/history/aggregates?"):
+        query = parse_qs(urlsplit(request.path).query)
         return connection.respond(
             200,
             json.dumps(
                 {
                     "schema_version": 1,
                     "source": "database",
-                    "gap": False,
+                    "bucket_seconds": int(query["bucket_seconds"][0]),
+                    "since_ms": int(datetime.fromisoformat(query["since"][0]).timestamp() * 1000),
+                    "until_ms": int(datetime.fromisoformat(query["until"][0]).timestamp() * 1000),
                     "items": [],
-                    "next_cursor": None,
                 }
             ),
         )
@@ -165,18 +168,18 @@ def test_startup_backfills_the_live_graph_window_from_server_history(
                         int(sample["light_enabled"]),
                         sample["status_flags"],
                     )
-                    for offset in range(119, 4, -2)
+                    for offset in range(425, 4, -10)
                 ],
             )
         page = client.get(
             "/api/v1/history",
             params={
-                "since": datetime.fromtimestamp((now_ms - 120_000) / 1000, UTC).isoformat(),
+                "since": datetime.fromtimestamp((now_ms - 430_000) / 1000, UTC).isoformat(),
                 "until": snapshot["server_time"],
                 "limit": 1000,
             },
         ).json()
-        assert len(page["items"]) >= 58
+        assert len(page["items"]) >= 43
     session = Session(tui_binary, tmp_path, env, "--server", url)
     try:
         session.read(b"CONNECTED")
@@ -195,12 +198,34 @@ def test_startup_backfills_the_live_graph_window_from_server_history(
                 break
         else:
             pytest.fail(
-                f"Historical graphs did not fill their 120-second window: {counts}\n"
+                f"Historical graphs did not fill their 10-second bucket window: {counts}\n"
                 + "\n".join(rows)
             )
         # Historical 35 W / 3 W cannot overwrite the simulated live numeric readings.
         assert "INPUT 35 W" not in rows[label_row]
         assert "OUTPUT 3 W" not in rows[label_row]
+        # The actual client rotates per-bar aggregates without replacing live numbers.
+        for label, minimum, maximum in [("60s", 1, 10), ("1h", 1, 3), ("10s", 30, 43)]:
+            session.write(b"t")
+            session.read(f"t {label}".encode())
+            deadline = time.monotonic() + 5
+            while time.monotonic() < deadline:
+                if select.select([session.master], [], [], 0.1)[0]:
+                    session.stream.feed(session.decoder.decode(os.read(session.master, 65536)))
+                rows = session.screen.display
+                label_row = next(
+                    i for i, row in enumerate(rows) if "INPUT" in row and "OUTPUT" in row
+                )
+                graph = rows[label_row + 2 : label_row + 4]
+                counts = [
+                    sum(char in "▁▂▃▄▅▆▇█" for row in graph for char in row[start:end])
+                    for start, end in [(2, 45), (48, 92)]
+                ]
+                if all(minimum <= count <= maximum for count in counts):
+                    break
+            else:
+                pytest.fail(f"Unexpected {label} aggregate graph: {counts}")
+            assert "INPUT 0 W" in rows[label_row] and "OUTPUT 0 W" in rows[label_row]
         session.write(b"\x11")
         session.process.wait(timeout=3)
         assert session.process.returncode == 0

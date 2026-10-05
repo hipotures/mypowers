@@ -324,60 +324,45 @@ impl Api {
         &self,
         request: &crate::history::Request,
     ) -> Result<Vec<crate::history::Point>, String> {
-        let mut points = Vec::new();
-        let mut cursor: Option<String> = None;
-        let mut cursors = std::collections::HashSet::new();
-        let mut previous = None;
-        loop {
-            let mut url = self
-                .origin
-                .join("/history")
-                .map_err(|_| "Invalid history URL.")?;
-            url.query_pairs_mut()
-                .append_pair("since", &request.since.to_rfc3339())
-                .append_pair("until", &request.until.to_rfc3339())
-                .append_pair("limit", &crate::history::PAGE_SIZE.to_string());
-            if let Some(cursor) = &cursor {
-                url.query_pairs_mut().append_pair("cursor", cursor);
-            }
-            let value = self
-                .request(
-                    reqwest::Method::GET,
-                    &format!("/history?{}", url.query().unwrap()),
-                    None,
-                    None,
-                )
-                .await?;
-            let page: crate::history::Page =
-                serde_json::from_value(value).map_err(|_| "Invalid history response.")?;
-            if page.schema_version != 1
-                || page.source != "database"
-                || page.gap
-                || page.items.len() > crate::history::PAGE_SIZE
-                || points.len() + page.items.len() > crate::history::MAX_POINTS
-                || (page.next_cursor.is_some() && page.items.is_empty())
-            {
-                return Err("Invalid or oversized history page.".into());
-            }
-            for point in &page.items {
-                let order = (point.received_at_ms, point.id);
-                if !point.valid(request) || previous.is_some_and(|last| order <= last) {
-                    return Err("Invalid history sample or order.".into());
-                }
-                previous = Some(order);
-            }
-            points.extend(page.items);
-            let Some(next) = page.next_cursor else {
-                return Ok(points);
-            };
-            if next.is_empty() || next.len() > 2048 || !cursors.insert(next.clone()) {
-                return Err("Invalid history pagination cursor.".into());
-            }
-            cursor = Some(next);
+        let mut url = self
+            .origin
+            .join("/history/aggregates")
+            .map_err(|_| "Invalid history URL.")?;
+        url.query_pairs_mut()
+            .append_pair("since", &request.since.to_rfc3339())
+            .append_pair("until", &request.until.to_rfc3339())
+            .append_pair("bucket_seconds", &request.resolution.seconds().to_string())
+            .append_pair("limit", &request.width.to_string());
+        let value = self
+            .request(
+                reqwest::Method::GET,
+                &format!("/history/aggregates?{}", url.query().unwrap()),
+                None,
+                None,
+            )
+            .await?;
+        let response: crate::history::Response =
+            serde_json::from_value(value).map_err(|_| "Invalid history response.")?;
+        if response.schema_version != 1
+            || response.source != "database"
+            || response.bucket_seconds != request.resolution.seconds()
+            || response.since_ms != request.since.timestamp_millis()
+            || response.until_ms != request.until.timestamp_millis()
+            || response.items.len() > usize::from(request.width)
+        {
+            return Err("Invalid or oversized history response.".into());
         }
+        let mut previous = None;
+        for point in &response.items {
+            if !point.valid(request) || previous.is_some_and(|last| point.bucket_start_ms <= last) {
+                return Err("Invalid history bucket or order.".into());
+            }
+            previous = Some(point.bucket_start_ms);
+        }
+        Ok(response.items)
     }
 
-    pub async fn history_pages(
+    pub async fn history_aggregates(
         self: Arc<Self>,
         mut requests: tokio::sync::watch::Receiver<Option<crate::history::Request>>,
         events: mpsc::Sender<Event>,
@@ -1352,24 +1337,28 @@ mod tests {
     }
 
     fn graph_history_request(generation: u64) -> crate::history::Request {
-        let until = chrono::DateTime::parse_from_rfc3339("2026-10-05T12:00:00Z")
+        let now = chrono::DateTime::parse_from_rfc3339("2026-10-05T12:00:00Z")
             .unwrap()
-            .with_timezone(&chrono::Utc);
-        crate::history::Request {
+            .timestamp_millis();
+        let mut status = crate::tests::status();
+        status.server_instance_id = "test-daemon".into();
+        crate::history::Request::new(
+            &status,
             generation,
-            server_instance_id: "test-daemon".into(),
-            since: until - chrono::TimeDelta::seconds(120),
-            until,
-            started: std::time::Instant::now(),
-        }
+            crate::history::Resolution::TenSeconds,
+            3,
+            now,
+        )
+        .unwrap()
     }
 
-    fn graph_history_point(id: u64, offset: i64) -> Value {
-        json!({
-            "id": id,
-            "received_at_ms": graph_history_request(0).until.timestamp_millis() + offset,
-            "segment_id": "station-session", "input_power_w": 35, "output_power_w": 3
-        })
+    fn graph_history_point(start: i64) -> Value {
+        json!({"bucket_start_ms": start, "input_power_w": 0.5, "output_power_w": 1.5, "sample_count": 2})
+    }
+
+    fn graph_response(request: &crate::history::Request, items: Value) -> Value {
+        json!({"schema_version": 1, "source": "database", "bucket_seconds": request.resolution.seconds(),
+            "since_ms": request.since.timestamp_millis(), "until_ms": request.until.timestamp_millis(), "items": items})
     }
 
     async fn respond_json(socket: &mut tokio::net::TcpStream, value: Value) {
@@ -1387,196 +1376,197 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn graph_history_pages_preserve_the_window_and_encode_cursors() {
-        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
-        let api = api_for(&listener);
-        let request = graph_history_request(4);
-        let expected = request.clone();
-        let server =
-            tokio::spawn(async move {
-                for index in 0..2 {
-                    let (mut socket, headers) = accept_http_request(&listener).await;
-                    let path = headers
-                        .lines()
-                        .next()
-                        .unwrap()
-                        .split_whitespace()
-                        .nth(1)
-                        .unwrap();
-                    let url = reqwest::Url::parse(&format!("http://localhost{path}")).unwrap();
-                    assert_eq!(url.path(), "/api/v1/history");
-                    let query: std::collections::HashMap<_, _> = url.query_pairs().collect();
-                    assert_eq!(query["since"], expected.since.to_rfc3339());
-                    assert_eq!(query["until"], expected.until.to_rfc3339());
-                    assert_eq!(query["limit"], "1000");
-                    assert_eq!(
-                        query.get("cursor").map(|v| v.as_ref()),
-                        (index == 1).then_some("a+b/= signed")
-                    );
-                    respond_json(&mut socket, json!({
-                    "schema_version": 1, "source": "database", "gap": false,
-                    "items": [graph_history_point(index + 1, -119_000 + index as i64 * 1000)],
-                    "next_cursor": (index == 0).then_some("a+b/= signed")
-                })).await;
-                }
+    async fn graph_queries_request_visible_server_averages_at_all_resolutions() {
+        for resolution in [
+            crate::history::Resolution::TenSeconds,
+            crate::history::Resolution::Minute,
+            crate::history::Resolution::Hour,
+        ] {
+            let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+            let api = api_for(&listener);
+            let mut request = graph_history_request(4);
+            request.resolution = resolution;
+            request.since = request.until
+                - chrono::TimeDelta::milliseconds(1 + 2 * resolution.seconds() * 1000);
+            let expected = request.clone();
+            let server = tokio::spawn(async move {
+                let (mut socket, headers) = accept_http_request(&listener).await;
+                let target = headers
+                    .lines()
+                    .next()
+                    .unwrap()
+                    .split_whitespace()
+                    .nth(1)
+                    .unwrap();
+                let url = reqwest::Url::parse(&format!("http://localhost{target}")).unwrap();
+                assert_eq!(url.path(), "/api/v1/history/aggregates");
+                let query: std::collections::HashMap<_, _> =
+                    url.query_pairs().into_owned().collect();
+                assert_eq!(
+                    query["bucket_seconds"],
+                    expected.resolution.seconds().to_string()
+                );
+                assert_eq!(query["limit"], "3");
+                assert_eq!(query["since"], expected.since.to_rfc3339());
+                assert_eq!(query["until"], expected.until.to_rfc3339());
+                assert!(!query.contains_key("cursor"));
+                respond_json(
+                    &mut socket,
+                    graph_response(
+                        &expected,
+                        json!([graph_history_point(expected.since.timestamp_millis())]),
+                    ),
+                )
+                .await;
             });
-        let points = api.history(&request).await.unwrap();
-        assert_eq!(points.iter().map(|p| p.id).collect::<Vec<_>>(), vec![1, 2]);
-        server.await.unwrap();
+            let points = api.history(&request).await.unwrap();
+            assert_eq!(points.len(), 1);
+            assert_eq!(points[0].input_power_w, 0.5);
+            assert_eq!(points[0].sample_count, 2);
+            server.await.unwrap();
+        }
     }
 
     #[tokio::test]
-    async fn graph_history_rejects_invalid_pages_without_partial_results() {
-        let valid = json!({
-            "schema_version": 1, "source": "database", "gap": false,
-            "items": [graph_history_point(1, -1000)], "next_cursor": null
-        });
-        let mut invalid = Vec::new();
-        for (key, value) in [
+    async fn graph_history_rejects_wrong_ranges_resolutions_counts_and_unordered_buckets() {
+        let request = graph_history_request(0);
+        let start = request.since.timestamp_millis();
+        let valid = graph_response(&request, json!([graph_history_point(start)]));
+        let mut cases = Vec::new();
+        for (field, value) in [
             ("schema_version", json!(2)),
-            ("source", json!("files")),
-            ("gap", json!(true)),
+            ("source", json!("memory")),
+            ("bucket_seconds", json!(60)),
+            ("since_ms", json!(start - 10_000)),
+            ("until_ms", json!(request.until.timestamp_millis() + 1)),
         ] {
-            let mut page = valid.clone();
-            page[key] = value;
-            invalid.push(page);
+            let mut response = valid.clone();
+            response[field] = value;
+            cases.push(response);
         }
-        for (key, value) in [
-            ("id", json!(0)),
-            ("segment_id", json!("")),
-            ("input_power_w", json!(65536)),
-            ("output_power_w", json!(-1)),
+        for (field, value) in [
+            ("sample_count", json!(0)),
+            ("sample_count", json!(-1)),
+            ("input_power_w", json!(-0.1)),
+            ("output_power_w", json!(65535.1)),
+            ("input_power_w", json!("NaN")),
+            ("bucket_start_ms", json!(start + 1)),
+            ("bucket_start_ms", json!(start - 10_000)),
             (
-                "received_at_ms",
-                json!(graph_history_request(0).until.timestamp_millis()),
-            ),
-            (
-                "received_at_ms",
-                json!(graph_history_request(0).since.timestamp_millis() - 1),
+                "bucket_start_ms",
+                json!(request.until.timestamp_millis() + 9999),
             ),
         ] {
-            let mut page = valid.clone();
-            page["items"][0][key] = value;
-            invalid.push(page);
+            let mut response = valid.clone();
+            response["items"][0][field] = value;
+            cases.push(response);
         }
         let mut missing = valid.clone();
         missing["items"][0]
             .as_object_mut()
             .unwrap()
-            .remove("received_at_ms");
-        invalid.push(missing);
-        invalid.push(
-            json!({"schema_version": 1, "source": "database", "gap": false,
-            "items": [], "next_cursor": "loop"}),
-        );
-        for page in invalid {
+            .remove("sample_count");
+        cases.push(missing);
+        cases.push(graph_response(
+            &request,
+            json!([graph_history_point(start), graph_history_point(start)]),
+        ));
+        cases.push(graph_response(
+            &request,
+            json!([
+                graph_history_point(start + 10_000),
+                graph_history_point(start)
+            ]),
+        ));
+        for response in cases {
             let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
             let api = api_for(&listener);
             let server = tokio::spawn(async move {
                 let (mut socket, _) = accept_http_request(&listener).await;
-                respond_json(&mut socket, page).await;
+                respond_json(&mut socket, response).await;
             });
-            assert!(api.history(&graph_history_request(0)).await.is_err());
-            server.await.unwrap();
-        }
-        for repeat_cursor in [false, true] {
-            let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
-            let api = api_for(&listener);
-            let server = tokio::spawn(async move {
-                for index in 0..2 {
-                    let (mut socket, _) = accept_http_request(&listener).await;
-                    respond_json(&mut socket, json!({
-                        "schema_version": 1, "source": "database", "gap": false,
-                        "items": [graph_history_point(if index == 0 || !repeat_cursor { 1 } else { 2 }, -1000)],
-                        "next_cursor": if index == 0 || repeat_cursor { Some("loop") } else { None }
-                    })).await;
-                }
-            });
-            assert!(api.history(&graph_history_request(0)).await.is_err());
+            assert!(api.history(&request).await.is_err());
             server.await.unwrap();
         }
     }
 
     #[tokio::test]
-    async fn graph_history_accepts_the_complete_window_limit_and_rejects_one_more_row() {
+    async fn graph_history_accepts_the_bucket_limit_and_rejects_an_extra_bucket() {
         for extra in [0, 1] {
             let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
             let api = api_for(&listener);
-            let count = crate::history::MAX_POINTS + extra;
+            let mut request = graph_history_request(0);
+            request.width = crate::history::MAX_BUCKETS;
+            request.since = request.until
+                - chrono::TimeDelta::milliseconds(1 + i64::from(request.width - 1) * 10_000);
+            let expected = request.clone();
             let server = tokio::spawn(async move {
-                for start in (0..count).step_by(crate::history::PAGE_SIZE) {
-                    let (mut socket, _) = accept_http_request(&listener).await;
-                    let end = (start + crate::history::PAGE_SIZE).min(count);
-                    let points: Vec<_> = (start..end)
-                        .map(|index| graph_history_point(index as u64 + 1, -119_000 + index as i64))
-                        .collect();
-                    respond_json(&mut socket, json!({
-                        "schema_version": 1, "source": "database", "gap": false,
-                        "items": points, "next_cursor": (end < count).then(|| format!("page-{end}"))
-                    })).await;
-                }
+                let (mut socket, _) = accept_http_request(&listener).await;
+                let items: Vec<_> = (0..usize::from(expected.width) + extra)
+                    .map(|index| {
+                        graph_history_point(
+                            expected.since.timestamp_millis() + index as i64 * 10_000,
+                        )
+                    })
+                    .collect();
+                respond_json(&mut socket, graph_response(&expected, json!(items))).await;
             });
-            let result = api.history(&graph_history_request(0)).await;
+            let result = api.history(&request).await;
             if extra == 0 {
-                let points = result.unwrap();
-                assert_eq!(points.len(), crate::history::MAX_POINTS);
-                assert_eq!(points.first().unwrap().id, 1);
-                assert_eq!(points.last().unwrap().id, crate::history::MAX_POINTS as u64);
+                assert_eq!(
+                    result.unwrap().len(),
+                    usize::from(crate::history::MAX_BUCKETS)
+                );
             } else {
-                assert_eq!(result.unwrap_err(), "Invalid or oversized history page.");
+                assert_eq!(
+                    result.unwrap_err(),
+                    "Invalid or oversized history response."
+                );
             }
             server.await.unwrap();
         }
     }
 
     #[tokio::test]
-    async fn graph_history_timeout_covers_all_pages_without_delivering_partial_points() {
+    async fn partial_aggregate_response_times_out_without_delivering_partial_history() {
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
         let mut api = api_for(&listener);
-        api.timeout = Duration::from_millis(600);
-        let (second_page, queried) = tokio::sync::oneshot::channel();
+        api.timeout = Duration::from_millis(300);
         let server = tokio::spawn(async move {
             let (mut socket, _) = accept_http_request(&listener).await;
-            tokio::time::sleep(Duration::from_millis(400)).await;
-            respond_json(
-                &mut socket,
-                json!({
-                    "schema_version": 1, "source": "database", "gap": false,
-                    "items": [graph_history_point(1, -1000)], "next_cursor": "second"
-                }),
+            let request = graph_history_request(0);
+            let body = graph_response(
+                &request,
+                json!([graph_history_point(request.since.timestamp_millis())]),
             )
-            .await;
-            let (mut socket, _) = accept_http_request(&listener).await;
-            second_page.send(()).unwrap();
-            tokio::time::sleep(Duration::from_millis(400)).await;
-            respond_json(
-                &mut socket,
-                json!({
-                    "schema_version": 1, "source": "database", "gap": false,
-                    "items": [graph_history_point(2, -500)], "next_cursor": null
-                }),
-            )
-            .await;
+            .to_string();
+            socket
+                .write_all(
+                    format!(
+                        "HTTP/1.1 200 OK\r\nContent-Length: {}\r\n\r\n{}",
+                        body.len(),
+                        &body[..body.len() / 2]
+                    )
+                    .as_bytes(),
+                )
+                .await
+                .unwrap();
+            tokio::time::sleep(Duration::from_secs(5)).await;
         });
         let (requests, operations) = tokio::sync::watch::channel(None);
         let (events, mut incoming) = mpsc::channel(4);
-        let worker = tokio::spawn(Arc::new(api).history_pages(operations, events));
+        let worker = tokio::spawn(Arc::new(api).history_aggregates(operations, events));
         requests.send(Some(graph_history_request(1))).unwrap();
-        timeout(Duration::from_secs(2), queried)
-            .await
-            .unwrap()
-            .unwrap();
         let Event::History(_, result) = timeout(Duration::from_secs(2), incoming.recv())
             .await
             .unwrap()
             .unwrap()
         else {
-            panic!("Expected the complete request result");
+            panic!("Expected bounded response");
         };
         assert_eq!(result.unwrap_err(), "History request timed out.");
         assert!(incoming.try_recv().is_err());
         server.abort();
-        assert!(server.await.unwrap_err().is_cancelled());
         drop(requests);
         timeout(Duration::from_secs(1), worker)
             .await
@@ -1591,17 +1581,15 @@ mod tests {
         api.timeout = Duration::from_millis(300);
         let (requests, operations) = tokio::sync::watch::channel(None);
         let (events, mut incoming) = mpsc::channel(4);
-        let worker = tokio::spawn(Arc::new(api).history_pages(operations, events));
+        let worker = tokio::spawn(Arc::new(api).history_aggregates(operations, events));
         requests.send(Some(graph_history_request(1))).unwrap();
         let (_stalled, _) = accept_http_request(&listener).await;
-        requests.send(Some(graph_history_request(2))).unwrap();
+        let mut next = graph_history_request(2);
+        next.resolution = crate::history::Resolution::Minute;
+        next.since = next.until - chrono::TimeDelta::milliseconds(120_001);
+        requests.send(Some(next.clone())).unwrap();
         let (mut socket, _) = accept_http_request(&listener).await;
-        respond_json(
-            &mut socket,
-            json!({"schema_version": 1, "source": "database", "gap": false,
-            "items": [], "next_cursor": null}),
-        )
-        .await;
+        respond_json(&mut socket, graph_response(&next, json!([]))).await;
         let Event::History(request, result) = timeout(Duration::from_secs(1), incoming.recv())
             .await
             .unwrap()
@@ -1610,6 +1598,7 @@ mod tests {
             panic!("Expected history");
         };
         assert_eq!(request.generation, 2);
+        assert_eq!(request.resolution, crate::history::Resolution::Minute);
         assert!(result.unwrap().is_empty());
         assert!(incoming.try_recv().is_err());
         requests.send(Some(graph_history_request(3))).unwrap();
@@ -1933,8 +1922,18 @@ mod tests {
         sample.ac_enabled = true;
         let new_snapshot = serde_json::to_value(&next).unwrap();
         app.update(Event::Status(Box::new(next)));
-        assert_eq!(app.samples.len(), 1);
-        assert_eq!(app.samples[0].segment_id, "new-segment");
+        assert!(app.graph.points.is_empty());
+        assert_eq!(
+            app.status
+                .as_ref()
+                .unwrap()
+                .telemetry
+                .sample
+                .as_ref()
+                .unwrap()
+                .segment_id,
+            "new-segment"
+        );
         assert!(matches!(app.toggle(0), crate::app::Effect::None));
         restarted.send(()).unwrap();
         let feedback = timeout(Duration::from_secs(3), worker)

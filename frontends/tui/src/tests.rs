@@ -1,6 +1,7 @@
 use crate::{
     app::{App, Effect, View},
     feedback::{Feedback, Severity},
+    history::{Point, Resolution},
     model::{Command, Status},
     network::{ClipboardTarget, Event, Intent},
     ui,
@@ -28,6 +29,47 @@ pub(crate) fn status() -> Status {
 fn app() -> App {
     let mut app = App::new(false, None);
     app.update(Event::Status(Box::new(status())));
+    seed_current_graph(&mut app);
+    app
+}
+
+fn seed_current_graph(app: &mut App) {
+    let sample = app
+        .status
+        .as_ref()
+        .unwrap()
+        .telemetry
+        .sample
+        .as_ref()
+        .unwrap();
+    let span = app.graph.resolution.seconds() * 1000;
+    app.graph.points = vec![Point {
+        bucket_start_ms: app.timeline_now_ms().div_euclid(span) * span,
+        input_power_w: sample.input_power_w as f64,
+        output_power_w: sample.output_power_w as f64,
+        sample_count: 1,
+    }];
+}
+
+fn fixed_graph_app() -> App {
+    use crate::clock::Clock;
+    let now = "2026-10-05T12:00:00Z"
+        .parse::<chrono::DateTime<chrono::Utc>>()
+        .unwrap();
+    let mut app = App::with_clock(
+        false,
+        Some(chrono_tz::UTC),
+        Clock::Fixed {
+            now,
+            telemetry_elapsed: Duration::ZERO,
+            animation_elapsed: Duration::ZERO,
+            feedback_elapsed: Duration::ZERO,
+        },
+    );
+    let mut current = status();
+    current.server_time = now.to_rfc3339();
+    current.telemetry.sample.as_mut().unwrap().received_at = now.to_rfc3339();
+    app.update(Event::Status(Box::new(current)));
     app
 }
 
@@ -1318,350 +1360,254 @@ fn click_activates_once_on_release_and_resize_or_revision_discards_old_press() {
 }
 
 #[test]
-fn history_backfill_merges_live_samples_without_changing_current_telemetry() {
-    use crate::{clock::Clock, history::Point};
-    let now = "2026-10-05T12:00:00Z"
-        .parse::<chrono::DateTime<chrono::Utc>>()
-        .unwrap();
-    let mut app = App::with_clock(
-        false,
-        Some(chrono_tz::UTC),
-        Clock::Fixed {
-            now,
-            telemetry_elapsed: Duration::ZERO,
-            animation_elapsed: Duration::ZERO,
-            feedback_elapsed: Duration::ZERO,
-        },
-    );
-    let reading = |sequence, offset| {
-        let mut value = status();
-        value.server_time = (now + chrono::Duration::seconds(offset)).to_rfc3339();
-        let sample = value.telemetry.sample.as_mut().unwrap();
-        sample.received_at = value.server_time.clone();
-        sample.sequence = sequence;
-        value
-    };
-    app.update(Event::Status(Box::new(reading(1, 0))));
+fn aggregate_history_keeps_numeric_telemetry_independent_and_refreshes_are_bounded() {
+    let mut app = fixed_graph_app();
     let request = app.history_request().unwrap();
-    assert_eq!((request.until - request.since).num_seconds(), 120);
+    assert_eq!(request.resolution, Resolution::TenSeconds);
+    assert_eq!(request.width, 43);
+    assert_eq!(
+        request.since.timestamp_millis(),
+        app.timeline_now_ms() - 420_000
+    );
     assert!(
         app.history_request().is_none(),
-        "Do not fetch history on every state update"
+        "Only one query may be in flight"
     );
-    // Live data arrives while HTTP pagination is in progress.
-    app.update(Event::Status(Box::new(reading(2, 1))));
     let before = serde_json::to_value(app.status.as_ref().unwrap()).unwrap();
-    let points = (-119..=0)
-        .enumerate()
-        .map(|(index, offset)| Point {
-            id: index as u64 + 1,
-            received_at_ms: (now + chrono::Duration::seconds(offset)).timestamp_millis(),
-            segment_id: "segment".into(),
-            input_power_w: 35,
-            output_power_w: 3,
-        })
-        .collect();
-    app.update(Event::History(request.clone(), Ok(points)));
-    assert_eq!(app.samples.len(), 121);
-    assert_eq!(app.samples.back().unwrap().sequence, Some(2));
-    assert_eq!(
-        app.samples[119].sequence,
-        Some(1),
-        "Live data must win duplicate timestamps"
-    );
-    assert!(app.graph_data(40, true).iter().all(|&value| value > 0));
+    app.update(Event::History(
+        request.clone(),
+        Ok(vec![Point {
+            bucket_start_ms: request.since.timestamp_millis(),
+            input_power_w: 0.5,
+            output_power_w: 1.5,
+            sample_count: 2,
+        }]),
+    ));
+    assert_eq!(app.graph.points.len(), 1);
+    assert_eq!(app.graph_data(43, false)[0], 0.5);
     assert_eq!(
         serde_json::to_value(app.status.as_ref().unwrap()).unwrap(),
         before
     );
     assert!(app.allowed());
-    assert!(app.history_request().is_none());
-    // A disconnected/reconnected stream needs its missed measurements, even without a restart.
+    assert!(
+        app.history_request().is_none(),
+        "Do not query on every telemetry event"
+    );
     app.update(Event::Disconnected("Temporary disconnect".into()));
-    app.update(Event::Status(Box::new(reading(3, 2))));
+    app.update(Event::Status(Box::new(
+        app.status.as_ref().unwrap().clone(),
+    )));
     let recovered = app.history_request().unwrap();
     assert!(recovered.generation > request.generation);
-    let length = app.samples.len();
     app.update(Event::History(request, Ok(vec![])));
-    assert_eq!(app.samples.len(), length);
+    assert_eq!(app.graph.points.len(), 1);
     app.update(Event::History(recovered, Err("HTTP unavailable".into())));
     assert!(
         app.history_request().is_none(),
-        "Failed history loads must wait before retrying"
+        "Failed reads must wait before retrying"
     );
+    assert_eq!(
+        app.graph.points.len(),
+        1,
+        "Keep already loaded history on failure"
+    );
+    assert!(app.allowed());
+}
+
+#[test]
+fn time_shortcut_is_contextual_and_discards_obsolete_resolution_and_resize_responses() {
+    let mut app = fixed_graph_app();
+    let first = app.history_request().unwrap();
+    let before = serde_json::to_value(app.status.as_ref().unwrap()).unwrap();
+    for (label, resolution) in [
+        ("60s", Resolution::Minute),
+        ("1h", Resolution::Hour),
+        ("10s", Resolution::TenSeconds),
+    ] {
+        app.key(KeyEvent::new(KeyCode::Char('t'), KeyModifiers::NONE));
+        assert_eq!(app.graph.resolution, resolution);
+        let request = app.history_request().unwrap();
+        assert_eq!(request.resolution, resolution);
+        assert_eq!(
+            request.until.timestamp_millis() - request.since.timestamp_millis(),
+            42 * resolution.seconds() * 1000 + 1
+        );
+        assert!(text(&render(&mut app, 94, 29)).contains(&format!("t {label}")));
+        app.update(Event::History(
+            first.clone(),
+            Ok(vec![Point {
+                bucket_start_ms: first.since.timestamp_millis(),
+                input_power_w: 99.0,
+                output_power_w: 299.0,
+                sample_count: 1,
+            }]),
+        ));
+        assert!(app.graph.points.is_empty());
+    }
+    assert_eq!(
+        serde_json::to_value(app.status.as_ref().unwrap()).unwrap(),
+        before
+    );
+    for view in [View::Logs, View::Settings, View::Help, View::Quit] {
+        app.view = view;
+        app.key(KeyEvent::new(KeyCode::Char('t'), KeyModifiers::NONE));
+        assert_eq!(app.graph.resolution, Resolution::TenSeconds);
+    }
+    app.view = View::Dashboard;
+    app.key(KeyEvent::new(KeyCode::Char('t'), KeyModifiers::CONTROL));
+    assert_eq!(app.graph.resolution, Resolution::TenSeconds);
+    app.set_graph_width(27);
+    let resized = app.history_request().unwrap();
+    assert_eq!(resized.width, 27);
+    assert!(resized.generation > first.generation);
+    app.set_graph_width(27);
     assert!(
-        app.allowed(),
-        "History failures cannot disable fresh control telemetry"
+        app.history_request().is_none(),
+        "An unchanged width must not invalidate the request"
     );
 }
 
 #[test]
-fn history_backfill_ignores_old_daemons_and_preserves_segment_gaps_and_expiry() {
-    use crate::{clock::Clock, history::Point};
-    let now = "2026-10-05T12:00:00Z"
-        .parse::<chrono::DateTime<chrono::Utc>>()
-        .unwrap();
-    let mut app = App::with_clock(
-        false,
-        Some(chrono_tz::UTC),
-        Clock::Fixed {
-            now,
-            telemetry_elapsed: Duration::ZERO,
-            animation_elapsed: Duration::ZERO,
-            feedback_elapsed: Duration::ZERO,
-        },
-    );
-    let mut current = status();
-    current.server_time = now.to_rfc3339();
-    current.telemetry.sample.as_mut().unwrap().received_at = now.to_rfc3339();
-    app.update(Event::Status(Box::new(current.clone())));
-    let old = app.history_request().unwrap();
-    current.server_instance_id = "4621ca79-497e-411c-a959-080c7527c01a".into();
-    app.update(Event::Status(Box::new(current)));
-    let request = app.history_request().unwrap();
-    let point = |offset, segment: &str| Point {
-        id: 1,
-        received_at_ms: (now + chrono::Duration::seconds(offset)).timestamp_millis(),
-        segment_id: segment.into(),
-        input_power_w: 35,
-        output_power_w: 3,
-    };
-    app.update(Event::History(old, Ok(vec![point(-30, "old")])));
-    assert_eq!(app.samples.len(), 1);
-    app.update(Event::History(
-        request,
-        Ok(vec![
-            point(-121, "expired"),
-            point(-120, "old"),
-            point(-60, "segment"),
-            point(1, "future"),
-        ]),
-    ));
-    assert_eq!(app.samples.len(), 3);
-    let data = app.graph_data(40, false);
-    assert_eq!(data[0], 0, "Historical segments must retain a gap");
-    assert_eq!(data[19], 35);
-    assert_eq!(data[39], 63);
-    assert!(app.samples.iter().all(|point| point.segment_id != "future"));
-}
-
-#[test]
-fn trends_use_timestamps_have_gap_columns_and_bounded_real_samples() {
-    let mut app = app();
-    app.samples.clear();
-    let now = chrono::Utc::now();
-    for (index, seconds) in [110, 100, 10, 0].into_iter().enumerate() {
-        let mut current = status();
-        let sample = current.telemetry.sample.as_mut().unwrap();
-        sample.sequence = index as u64 + 1;
-        sample.received_at = (now - chrono::Duration::seconds(seconds)).to_rfc3339();
-        app.update(Event::Status(Box::new(current)));
-    }
-    let data = app.graph_data(40, false);
-    assert_eq!(data.iter().filter(|&&v| v != 0).count(), 4);
-    assert!(data[10..25].iter().all(|&v| v == 0));
-    for sequence in 5..crate::history::MAX_POINTS as u64 + 5 {
-        let mut current = status();
-        current.telemetry.sample.as_mut().unwrap().sequence = sequence;
-        app.update(Event::Status(Box::new(current)));
-    }
-    assert_eq!(app.samples.len(), crate::history::MAX_POINTS);
-    assert!(status().valid());
-    let mut invalid = status();
-    invalid.telemetry.sample.as_mut().unwrap().battery_percent = 101;
-    assert!(!invalid.valid());
-}
-
-#[test]
-fn completed_graph_bars_keep_their_values_and_colors_until_the_window_steps() {
-    use crate::{app::Trend, clock::Clock};
-
-    let now = "2026-10-05T12:00:00Z"
-        .parse::<chrono::DateTime<chrono::Utc>>()
-        .unwrap();
-    let clock = |elapsed| Clock::Fixed {
-        now,
-        telemetry_elapsed: elapsed,
-        animation_elapsed: Duration::ZERO,
-        feedback_elapsed: Duration::ZERO,
-    };
-    let mut app = App::with_clock(false, Some(chrono_tz::UTC), clock(Duration::ZERO));
-    let mut current = status();
-    current.server_time = now.to_rfc3339();
-    current.telemetry.sample.as_mut().unwrap().received_at = now.to_rfc3339();
-    app.update(Event::Status(Box::new(current)));
+fn completed_aggregate_bars_keep_values_and_colors_until_a_whole_column_shift() {
+    use crate::clock::Clock;
+    let mut app = fixed_graph_app();
+    let now_ms = app.timeline_now_ms();
+    let now = app.clock.now();
     app.selected = None;
     app.feedback = None;
-    app.samples = (-119..=0)
-        .enumerate()
-        .map(|(index, offset)| {
-            let low = index / 4 % 2 == 0;
-            Trend {
-                timestamp: (now + chrono::Duration::seconds(offset)).timestamp() as f64,
-                sequence: Some(index as u64 + 1),
-                segment_id: "segment".into(),
-                // Both pairs have equal quantized heights but different load colors.
-                input_power_w: if low { 44 } else { 47 },
-                output_power_w: if low { 134 } else { 141 },
+    for resolution in [Resolution::TenSeconds, Resolution::Minute, Resolution::Hour] {
+        app.graph.resolution = resolution;
+        let span = resolution.seconds() * 1000;
+        app.graph.points = (0..44)
+            .map(|index| {
+                let low = index % 2 == 0;
+                Point {
+                    bucket_start_ms: now_ms - (43 - index) * span,
+                    input_power_w: if low { 44.0 } else { 47.0 },
+                    output_power_w: if low { 134.0 } else { 141.0 },
+                    sample_count: 6,
+                }
+            })
+            .collect();
+        for width in [27, 40, 44] {
+            for output in [false, true] {
+                app.clock = Clock::Fixed {
+                    now,
+                    telemetry_elapsed: Duration::from_millis((span / 10) as u64),
+                    animation_elapsed: Duration::ZERO,
+                    feedback_elapsed: Duration::ZERO,
+                };
+                let first = app.graph_data(width, output);
+                app.clock = Clock::Fixed {
+                    now,
+                    telemetry_elapsed: Duration::from_millis((span * 8 / 10) as u64),
+                    animation_elapsed: Duration::ZERO,
+                    feedback_elapsed: Duration::ZERO,
+                };
+                assert_eq!(app.graph_data(width, output), first);
+                app.clock = Clock::Fixed {
+                    now,
+                    telemetry_elapsed: Duration::from_millis((span * 11 / 10) as u64),
+                    animation_elapsed: Duration::ZERO,
+                    feedback_elapsed: Duration::ZERO,
+                };
+                assert_eq!(
+                    app.graph_data(width, output)[..usize::from(width) - 1],
+                    first[1..]
+                );
             }
-        })
-        .collect();
-
-    for width in [27, 40, 44] {
-        let step = 120.0 / f64::from(width);
-        for output in [false, true] {
-            app.clock = clock(Duration::from_secs_f64(step * 0.1));
-            let first = app.graph_data(width, output);
-            assert!(first.contains(&if output { 134 } else { 44 }));
-            assert!(first.contains(&if output { 141 } else { 47 }));
-            app.clock = clock(Duration::from_secs_f64(step * 0.8));
-            assert_eq!(
-                app.graph_data(width, output),
-                first,
-                "Redrawing within a time bucket must not replace historical readings"
-            );
-            app.clock = clock(Duration::from_secs_f64(step * 1.1));
-            let shifted = app.graph_data(width, output);
-            assert_eq!(
-                shifted[1..width as usize - 1],
-                first[2..],
-                "Completed bars must shift left together by exactly one column"
-            );
         }
-    }
-
-    app.clock = clock(Duration::from_millis(250));
-    let first = render(&mut app, 94, 29);
-    app.clock = clock(Duration::from_millis(1000));
-    assert_eq!(
-        render(&mut app, 94, 29),
-        first,
-        "The production renderer must retain bar colors between column steps"
-    );
-
-    // New live telemetry changes the open rightmost bucket, not completed history.
-    let before = [app.graph_data(44, false), app.graph_data(44, true)];
-    app.clock = clock(Duration::ZERO);
-    let mut current = status();
-    current.server_time = (now + chrono::Duration::milliseconds(1500)).to_rfc3339();
-    let sample = current.telemetry.sample.as_mut().unwrap();
-    sample.received_at = current.server_time.clone();
-    sample.sequence = 121;
-    sample.input_power_w = 48;
-    sample.output_power_w = 142;
-    app.update(Event::Status(Box::new(current)));
-    for (index, output) in [false, true].into_iter().enumerate() {
-        let updated = app.graph_data(44, output);
-        assert_eq!(updated[..43], before[index][..43]);
-        assert_eq!(updated[43], if output { 142 } else { 48 });
+        app.clock = Clock::Fixed {
+            now,
+            telemetry_elapsed: Duration::from_millis(250),
+            animation_elapsed: Duration::ZERO,
+            feedback_elapsed: Duration::ZERO,
+        };
+        let first = render(&mut app, 94, 29);
+        app.clock = Clock::Fixed {
+            now,
+            telemetry_elapsed: Duration::from_millis(1000),
+            animation_elapsed: Duration::ZERO,
+            feedback_elapsed: Duration::ZERO,
+        };
+        assert_eq!(render(&mut app, 94, 29), first);
     }
 }
 
 #[test]
-fn trend_window_expires_at_the_same_boundary_as_the_idle_graph() {
+fn aggregate_graph_preserves_missing_buckets_measured_zeros_and_window_expiry() {
     use crate::clock::Clock;
-
-    let now = "2026-10-05T12:00:00Z"
-        .parse::<chrono::DateTime<chrono::Utc>>()
-        .unwrap();
-    let clock = |elapsed| Clock::Fixed {
-        now,
-        telemetry_elapsed: elapsed,
+    let mut app = fixed_graph_app();
+    let now_ms = app.timeline_now_ms();
+    app.set_graph_width(40);
+    app.graph.points = vec![
+        Point {
+            bucket_start_ms: now_ms - 390_000,
+            input_power_w: 0.5,
+            output_power_w: 1.5,
+            sample_count: 2,
+        },
+        Point {
+            bucket_start_ms: now_ms - 20_000,
+            input_power_w: 0.0,
+            output_power_w: 0.0,
+            sample_count: 1,
+        },
+    ];
+    let data = app.graph_data(40, false);
+    assert_eq!(data[0], 0.5);
+    assert!(data[1..].iter().all(|&value| value == 0.0));
+    assert_eq!(
+        app.graph.points[1].sample_count, 1,
+        "A measured zero remains a real bucket"
+    );
+    assert_eq!(app.graph_data(0, false), Vec::<f64>::new());
+    assert!(app.has_power_history(false) && app.has_power_history(true));
+    app.status
+        .as_mut()
+        .unwrap()
+        .telemetry
+        .sample
+        .as_mut()
+        .unwrap()
+        .input_power_w = 0;
+    app.status
+        .as_mut()
+        .unwrap()
+        .telemetry
+        .sample
+        .as_mut()
+        .unwrap()
+        .output_power_w = 0;
+    app.clock = Clock::Fixed {
+        now: app.clock.now(),
+        telemetry_elapsed: Duration::from_secs(10),
         animation_elapsed: Duration::ZERO,
         feedback_elapsed: Duration::ZERO,
     };
-    let mut app = App::with_clock(false, Some(chrono_tz::UTC), clock(Duration::ZERO));
-    let mut historical = status();
-    historical.server_time = now.to_rfc3339();
-    historical.telemetry.sample.as_mut().unwrap().received_at =
-        (now - chrono::Duration::seconds(120)).to_rfc3339();
-    app.update(Event::Status(Box::new(historical)));
-    let mut current = status();
-    current.server_time = now.to_rfc3339();
-    let sample = current.telemetry.sample.as_mut().unwrap();
-    sample.received_at = now.to_rfc3339();
-    sample.sequence = 2;
-    sample.input_power_w = 0;
-    sample.output_power_w = 0;
-    app.update(Event::Status(Box::new(current)));
-
-    app.prune_trends();
-    assert_eq!(app.samples.len(), 2);
-    assert_eq!(app.graph_data(0, false), Vec::<u64>::new());
-    for output in [false, true] {
-        assert!(app.has_power_history(output));
-        assert_eq!(app.graph_data(40, output)[0], if output { 181 } else { 63 });
-    }
-    assert!(!text(&render(&mut app, 94, 29)).contains('○'));
-
-    // One millisecond past the boundary, both the graph and idle predicate expire.
-    app.clock = clock(Duration::from_millis(1));
-    for output in [false, true] {
-        assert!(!app.has_power_history(output));
-        assert!(app.graph_data(40, output).iter().all(|value| *value == 0));
-    }
-    app.prune_trends();
-    assert_eq!(app.samples.len(), 1);
-    assert_eq!(text(&render(&mut app, 94, 29)).matches('○').count(), 2);
+    assert!(!app.has_power_history(false) && !app.has_power_history(true));
+    app.prune_graph();
+    assert_eq!(app.graph.points.len(), 1);
 }
 
 #[test]
-fn trend_identity_and_clock_changes_do_not_join_unrelated_history() {
-    use crate::clock::Clock;
-
-    let now = "2026-10-05T12:00:00Z"
-        .parse::<chrono::DateTime<chrono::Utc>>()
-        .unwrap();
-    let mut app = App::with_clock(
-        false,
-        Some(chrono_tz::UTC),
-        Clock::Fixed {
-            now,
-            telemetry_elapsed: Duration::ZERO,
-            animation_elapsed: Duration::ZERO,
-            feedback_elapsed: Duration::ZERO,
-        },
-    );
-    let reading = |sequence, offset, instance: &str, segment: &str| {
-        let mut current = status();
-        current.server_time = (now + chrono::Duration::seconds(offset)).to_rfc3339();
-        current.server_instance_id = instance.into();
-        let sample = current.telemetry.sample.as_mut().unwrap();
-        sample.sequence = sequence;
-        sample.received_at = current.server_time.clone();
-        sample.segment_id = segment.into();
-        current
-    };
-    let instance = "88767477-2a2a-481f-843b-30d56a5e3f10";
-    app.update(Event::Status(Box::new(reading(1, -10, instance, "first"))));
-    app.update(Event::Status(Box::new(reading(1, -10, instance, "first"))));
-    assert_eq!(app.samples.len(), 1);
-    app.update(Event::Status(Box::new(reading(2, 0, instance, "first"))));
-    assert_eq!(app.samples.len(), 2);
-
-    // A backwards clock jump starts a new ordered timeline.
-    app.update(Event::Status(Box::new(reading(3, -5, instance, "first"))));
-    assert_eq!(app.samples.len(), 1);
-    assert_eq!(app.samples.front().unwrap().sequence, Some(3));
-
-    // A daemon restart may reuse the previous sequence and segment identifiers.
-    let restarted = "4621ca79-497e-411c-a959-080c7527c01a";
-    app.update(Event::Status(Box::new(reading(3, 0, restarted, "first"))));
-    assert_eq!(app.samples.len(), 1);
-    assert_eq!(
-        app.samples.front().unwrap().timestamp,
-        now.timestamp() as f64
-    );
-
-    // A new station session retains time positions but breaks the connecting bar.
-    app.update(Event::Status(Box::new(reading(3, 20, restarted, "second"))));
-    assert_eq!(app.samples.len(), 2);
-    for output in [false, true] {
-        let data = app.graph_data(40, output);
-        assert_eq!(data[33], 0);
-        assert_eq!(data[39], if output { 181 } else { 63 });
-        assert_eq!(data.iter().filter(|value| **value != 0).count(), 1);
-    }
+fn daemon_restart_and_backwards_server_clock_discard_cached_aggregates() {
+    let mut app = fixed_graph_app();
+    seed_current_graph(&mut app);
+    let old = app.history_request().unwrap();
+    let mut restarted = app.status.as_ref().unwrap().clone();
+    restarted.server_instance_id = "4621ca79-497e-411c-a959-080c7527c01a".into();
+    app.update(Event::Status(Box::new(restarted.clone())));
+    assert!(app.graph.points.is_empty());
+    app.update(Event::History(old, Ok(vec![])));
+    let fresh = app.history_request().unwrap();
+    assert_eq!(fresh.server_instance_id, restarted.server_instance_id);
+    seed_current_graph(&mut app);
+    restarted.server_time = (app.clock.now() - chrono::Duration::seconds(1)).to_rfc3339();
+    app.update(Event::Status(Box::new(restarted)));
+    assert!(app.graph.points.is_empty());
+    assert!(app.history_request().unwrap().generation > fresh.generation);
 }
 
 #[test]
@@ -1912,8 +1858,9 @@ fn positive_power_samples_draw_at_least_one_tick_without_changing_fixed_scales()
             sample.sequence = 2;
             sample.input_power_w = value;
             sample.output_power_w = value;
-            app.samples.clear();
+            app.graph.points.clear();
             app.update(Event::Status(Box::new(current)));
+            seed_current_graph(&mut app);
             let buffer = render(&mut app, width, height);
             let screen = text(&buffer);
             let power_row = screen
@@ -1947,6 +1894,35 @@ fn positive_power_samples_draw_at_least_one_tick_without_changing_fixed_scales()
 }
 
 #[test]
+fn positive_fractional_averages_remain_visible_even_when_live_power_is_zero() {
+    let mut app = fixed_graph_app();
+    let sample = app
+        .status
+        .as_mut()
+        .unwrap()
+        .telemetry
+        .sample
+        .as_mut()
+        .unwrap();
+    sample.input_power_w = 0;
+    sample.output_power_w = 0;
+    app.graph.points = vec![Point {
+        bucket_start_ms: app.timeline_now_ms(),
+        input_power_w: 0.05,
+        output_power_w: 0.05,
+        sample_count: 20,
+    }];
+    for (width, height) in [(60, 19), (80, 24), (120, 30)] {
+        let screen = text(&render(&mut app, width, height));
+        assert!(screen.contains("INPUT 0 W") && screen.contains("OUTPUT 0 W"));
+        assert_eq!(screen.matches('▁').count(), 2);
+        assert!(!screen.contains('○'));
+    }
+    app.graph.points.clear();
+    assert_eq!(text(&render(&mut app, 120, 30)).matches('○').count(), 2);
+}
+
+#[test]
 fn idle_graphs_wait_for_history_and_resume_independently_on_new_power() {
     let mut app = App::new(false, None);
     let mut historical = status();
@@ -1955,6 +1931,8 @@ fn idle_graphs_wait_for_history_and_resume_independently_on_new_power() {
     sample.output_power_w = 0;
     sample.received_at = (chrono::Utc::now() - chrono::Duration::seconds(60)).to_rfc3339();
     app.update(Event::Status(Box::new(historical)));
+    seed_current_graph(&mut app);
+    app.graph.points[0].bucket_start_ms -= 60_000;
     let mut idle = status();
     let sample = idle.telemetry.sample.as_mut().unwrap();
     sample.sequence = 2;
@@ -1975,8 +1953,8 @@ fn idle_graphs_wait_for_history_and_resume_independently_on_new_power() {
             .collect::<Vec<_>>()
     };
     assert!(circles(&render(&mut app, 94, 29))[0] > 47);
-    app.samples.front_mut().unwrap().timestamp -= 61.0;
-    app.prune_trends();
+    app.graph.points[0].bucket_start_ms -= 440_000;
+    app.prune_graph();
     assert_eq!(text(&render(&mut app, 94, 29)).matches('○').count(), 2);
 
     let mut current = status();
@@ -1985,46 +1963,14 @@ fn idle_graphs_wait_for_history_and_resume_independently_on_new_power() {
     sample.input_power_w = 0;
     sample.output_power_w = 42;
     app.update(Event::Status(Box::new(current)));
+    seed_current_graph(&mut app);
     let screen = text(&render(&mut app, 94, 29));
     assert!(screen.contains("OUTPUT 42 W"));
     assert_eq!(screen.matches('○').count(), 1);
     assert!(circles(&render(&mut app, 94, 29))[0] < 47);
     // A positive current reading must suppress idle even before any graph samples exist.
-    app.samples.clear();
+    app.graph.points.clear();
     assert_eq!(text(&render(&mut app, 94, 29)).matches('○').count(), 1);
-}
-
-#[test]
-fn idle_graph_waits_even_when_zero_overwrites_positive_history_in_the_same_column() {
-    let now = chrono::DateTime::parse_from_rfc3339("2026-10-05T12:00:00.500Z")
-        .unwrap()
-        .with_timezone(&chrono::Utc);
-    let mut app = App::with_clock(
-        false,
-        None,
-        crate::clock::Clock::Fixed {
-            now,
-            telemetry_elapsed: Duration::ZERO,
-            animation_elapsed: Duration::ZERO,
-            feedback_elapsed: Duration::ZERO,
-        },
-    );
-    let mut current = status();
-    current.server_time = now.to_rfc3339();
-    current.telemetry.sample.as_mut().unwrap().received_at = now.to_rfc3339();
-    app.update(Event::Status(Box::new(current.clone())));
-    app.samples.front_mut().unwrap().timestamp -= 0.1;
-    let sample = current.telemetry.sample.as_mut().unwrap();
-    sample.sequence = 2;
-    sample.input_power_w = 0;
-    sample.output_power_w = 0;
-    app.update(Event::Status(Box::new(current)));
-    assert!(app.graph_data(40, false).iter().all(|value| *value == 0));
-    assert!(app.graph_data(40, true).iter().all(|value| *value == 0));
-    assert!(!text(&render(&mut app, 94, 29)).contains('○'));
-    app.samples.front_mut().unwrap().timestamp -= 121.0;
-    app.prune_trends();
-    assert_eq!(text(&render(&mut app, 94, 29)).matches('○').count(), 2);
 }
 
 #[test]
@@ -2040,7 +1986,7 @@ fn idle_marker_moves_slowly_and_reverses_without_affecting_layout() {
         .unwrap();
     sample.input_power_w = 0;
     sample.output_power_w = 0;
-    app.samples.clear();
+    app.graph.points.clear();
     let mut origin = Vec::new();
     for (seconds, offset) in [(0, 0), (1, 0), (2, 1), (20, 10), (22, 9), (40, 0)] {
         app.animation_started = Instant::now() - Duration::from_secs(seconds);
@@ -2090,7 +2036,7 @@ fn idle_marker_never_animates_missing_stale_or_disconnected_telemetry() {
         .unwrap();
     sample.input_power_w = 0;
     sample.output_power_w = 0;
-    app.samples.clear();
+    app.graph.points.clear();
     app.received -= Duration::from_secs(4);
     assert!(!text(&render(&mut app, 94, 29)).contains('○'));
     app.received = Instant::now();

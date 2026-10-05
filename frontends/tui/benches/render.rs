@@ -1,7 +1,8 @@
 //! Offline rendering measurement; no terminal, daemon, or benchmark dependencies.
 use mypowers_tui::{
-    app::{App, Trend, View},
+    app::{App, View},
     clock::Clock,
+    history::Point,
     model::Status,
     network::Event,
     ui,
@@ -83,10 +84,12 @@ fn fixture(view: View, idle: bool) -> App {
     })).unwrap();
     let sample = status.telemetry.sample.as_ref().unwrap().clone();
     app.update(Event::Status(Box::new(status)));
-    app.samples = (0..40)
-        .map(|index| Trend {
-            timestamp: now.timestamp() as f64 - f64::from(39 - index) * 3.0,
-            ..Trend::from_sample(&sample)
+    app.graph.points = (0..44)
+        .map(|index| Point {
+            bucket_start_ms: now.timestamp_millis() - i64::from(43 - index) * 10_000,
+            input_power_w: sample.input_power_w as f64,
+            output_power_w: sample.output_power_w as f64,
+            sample_count: 1,
         })
         .collect();
     app.view = view;

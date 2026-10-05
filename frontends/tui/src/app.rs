@@ -6,10 +6,7 @@ use crate::{
 };
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
 use ratatui::layout::{Position, Rect};
-use std::{
-    collections::VecDeque,
-    time::{Duration, Instant},
-};
+use std::time::{Duration, Instant};
 
 #[derive(Clone, Copy, PartialEq)]
 pub enum View {
@@ -20,29 +17,6 @@ pub enum View {
     Quit,
 }
 
-pub struct Trend {
-    pub timestamp: f64,
-    pub sequence: Option<u64>,
-    pub segment_id: String,
-    pub input_power_w: u64,
-    pub output_power_w: u64,
-}
-
-impl Trend {
-    pub fn from_sample(sample: &crate::model::Sample) -> Self {
-        Self {
-            timestamp: chrono::DateTime::parse_from_rfc3339(&sample.received_at)
-                .unwrap()
-                .timestamp_millis() as f64
-                / 1000.0,
-            sequence: Some(sample.sequence),
-            segment_id: sample.segment_id.clone(),
-            input_power_w: sample.input_power_w,
-            output_power_w: sample.output_power_w,
-        }
-    }
-}
-
 pub struct App {
     pub clock: Clock,
     pub warning_count: u32,
@@ -51,7 +25,7 @@ pub struct App {
     pub connected: bool,
     pub received: Instant,
     pub animation_started: Instant,
-    pub samples: VecDeque<Trend>,
+    pub graph: crate::history::Graph,
     pub controls: [Rect; 3],
     pub hovered: Option<usize>,
     pub selected: Option<usize>,
@@ -75,6 +49,7 @@ pub struct App {
     history_generation: u64,
     history_requested: bool,
     history_retry_after: Option<Instant>,
+    history_failed: bool,
 }
 
 pub enum Effect {
@@ -100,7 +75,7 @@ impl App {
             connected: false,
             received: Instant::now(),
             animation_started: Instant::now(),
-            samples: VecDeque::new(),
+            graph: crate::history::Graph::default(),
             controls: [Rect::default(); 3],
             hovered: None,
             selected: Some(0),
@@ -124,6 +99,7 @@ impl App {
             history_generation: 0,
             history_requested: false,
             history_retry_after: None,
+            history_failed: false,
         }
     }
 
@@ -137,7 +113,7 @@ impl App {
                     .as_ref()
                     .is_some_and(|old| old.server_instance_id != status.server_instance_id);
                 if changed {
-                    self.samples.clear();
+                    self.graph.points.clear();
                     self.reset_history();
                     self.press = None;
                     self.last_command = None;
@@ -149,35 +125,12 @@ impl App {
                 {
                     self.press = None;
                 }
-                if status.telemetry.state == "live"
-                    && let Some(sample) = &status.telemetry.sample
-                {
-                    let duplicate = self.samples.back().is_some_and(|old| {
-                        old.sequence == Some(sample.sequence) && old.segment_id == sample.segment_id
-                    });
-                    if !duplicate {
-                        let timestamp = chrono::DateTime::parse_from_rfc3339(&sample.received_at)
-                            .unwrap()
-                            .timestamp_millis() as f64
-                            / 1000.0;
-                        if self
-                            .samples
-                            .back()
-                            .is_some_and(|old| timestamp < old.timestamp)
-                        {
-                            self.samples.clear();
-                            self.reset_history();
-                        }
-                        self.samples.push_back(Trend::from_sample(sample));
-                        while self.samples.len() > crate::history::MAX_POINTS
-                            || self
-                                .samples
-                                .front()
-                                .is_some_and(|old| timestamp - old.timestamp > 120.0)
-                        {
-                            self.samples.pop_front();
-                        }
-                    }
+                if self.status.as_ref().is_some_and(|old| {
+                    chrono::DateTime::parse_from_rfc3339(&status.server_time).ok()
+                        < chrono::DateTime::parse_from_rfc3339(&old.server_time).ok()
+                }) {
+                    self.graph.points.clear();
+                    self.reset_history();
                 }
                 self.connection_notice = "Connected to daemon.".into();
                 self.received = Instant::now();
@@ -289,6 +242,7 @@ impl App {
         self.history_generation += 1;
         self.history_requested = false;
         self.history_retry_after = None;
+        self.history_failed = false;
     }
 
     pub fn history_request(&mut self) -> Option<crate::history::Request> {
@@ -304,7 +258,13 @@ impl App {
         if status.history["state"] != "ok" {
             return None;
         }
-        let request = crate::history::Request::new(status, self.history_generation)?;
+        let request = crate::history::Request::new(
+            status,
+            self.history_generation,
+            self.graph.resolution,
+            self.graph.width,
+            self.timeline_now_ms(),
+        )?;
         self.history_requested = true;
         Some(request)
     }
@@ -323,55 +283,37 @@ impl App {
         {
             return;
         }
-        let points = match result {
-            Ok(points) => points,
+        self.history_requested = false;
+        match result {
+            Ok(points) => {
+                self.graph.points = points;
+                self.graph.prune(self.timeline_now_ms());
+                self.history_failed = false;
+                self.history_retry_after = Some(Instant::now() + Duration::from_secs(5));
+            }
             Err(_) => {
-                if self.history_retry_after.is_none()
+                if !self.history_failed
                     && self
                         .feedback
                         .as_ref()
                         .is_none_or(|feedback| feedback.started <= request.started)
                 {
                     self.feedback = Some(Feedback::new(
-                        "Recent graph history unavailable; live samples continue",
+                        "Graph history unavailable; current readings remain live",
                         Severity::Warning,
                     ));
                 }
-                self.history_requested = false;
+                self.history_failed = true;
                 self.history_retry_after = Some(Instant::now() + Duration::from_secs(2));
-                return;
-            }
-        };
-        self.history_retry_after = None;
-        let now = self.timeline_now();
-        let mut trends: Vec<_> = points
-            .into_iter()
-            .map(|point| Trend {
-                timestamp: point.received_at_ms as f64 / 1000.0,
-                sequence: None,
-                segment_id: point.segment_id,
-                input_power_w: point.input_power_w,
-                output_power_w: point.output_power_w,
-            })
-            .collect();
-        // Stable ordering places current live observations after matching persisted rows.
-        trends.extend(self.samples.drain(..));
-        trends.sort_by(|left, right| left.timestamp.total_cmp(&right.timestamp));
-        for trend in trends {
-            if !(now - 120.0..=now).contains(&trend.timestamp) {
-                continue;
-            }
-            if let Some(last) = self.samples.back_mut()
-                && last.timestamp == trend.timestamp
-                && last.segment_id == trend.segment_id
-            {
-                *last = trend;
-            } else {
-                self.samples.push_back(trend);
             }
         }
-        while self.samples.len() > crate::history::MAX_POINTS {
-            self.samples.pop_front();
+    }
+
+    pub fn set_graph_width(&mut self, width: u16) {
+        let width = width.clamp(1, crate::history::MAX_BUCKETS);
+        if self.graph.width != width {
+            self.graph.width = width;
+            self.reset_history();
         }
     }
 
@@ -552,6 +494,15 @@ impl App {
                 KeyCode::Enter | KeyCode::Char(' ') => {
                     return self.toggle(self.selected.unwrap_or(0));
                 }
+                KeyCode::Char('t') => {
+                    self.graph.resolution = self.graph.resolution.next();
+                    self.graph.points.clear();
+                    self.reset_history();
+                    self.feedback = Some(Feedback::new(
+                        format!("Graph interval: {} per bar", self.graph.resolution.label()),
+                        Severity::Info,
+                    ));
+                }
                 KeyCode::Char(key @ ('r' | 'p')) => return self.operation(key),
                 _ => {}
             },
@@ -684,72 +635,28 @@ impl App {
         Effect::None
     }
 
-    pub fn graph_data(&self, width: u16, output: bool) -> Vec<u64> {
-        let mut data = vec![0; width as usize];
-        if width == 0 {
-            return data;
-        }
-        let now = self.timeline_now();
-        // Fixed time buckets retain their readings while the window moves by whole columns.
-        // Integer milliseconds also keep fractional-width bucket boundaries reproducible.
-        let bucket = |timestamp: f64| {
-            ((timestamp * 1000.0).round() as i128 * i128::from(width))
-                .div_euclid(i128::from(crate::history::WINDOW_SECONDS) * 1000)
-        };
-        let current_bucket = bucket(now);
-        let mut previous: Option<(&str, usize)> = None;
-        for trend in &self.samples {
-            if !(now - crate::history::WINDOW_SECONDS as f64..=now).contains(&trend.timestamp) {
-                continue;
-            }
-            let column = (bucket(trend.timestamp) - current_bucket + i128::from(width) - 1)
-                .clamp(0, i128::from(width) - 1) as usize;
-            if let Some((segment, old_column)) = previous
-                && segment != trend.segment_id
-            {
-                data[old_column] = 0;
-            }
-            data[column] = if output {
-                trend.output_power_w
-            } else {
-                trend.input_power_w
-            };
-            previous = Some((&trend.segment_id, column));
-        }
-        data
+    pub fn graph_data(&self, width: u16, output: bool) -> Vec<f64> {
+        self.graph.data(self.timeline_now_ms(), width, output)
     }
 
     pub fn has_power_history(&self, output: bool) -> bool {
-        let now = self.timeline_now();
-        self.samples.iter().any(|trend| {
-            (now - 120.0..=now).contains(&trend.timestamp)
-                && if output {
-                    trend.output_power_w > 0
-                } else {
-                    trend.input_power_w > 0
-                }
-        })
+        self.graph_data(self.graph.width, output)
+            .iter()
+            .any(|&value| value > 0.0)
     }
 
-    fn timeline_now(&self) -> f64 {
+    pub fn timeline_now_ms(&self) -> i64 {
         self.status
             .as_ref()
             .and_then(|status| chrono::DateTime::parse_from_rfc3339(&status.server_time).ok())
             .map(|time| {
-                time.timestamp_millis() as f64 / 1000.0
-                    + self.clock.telemetry_elapsed(self.received).as_secs_f64()
+                time.timestamp_millis()
+                    + self.clock.telemetry_elapsed(self.received).as_millis() as i64
             })
-            .unwrap_or(0.0)
+            .unwrap_or(0)
     }
 
-    pub fn prune_trends(&mut self) {
-        let cutoff = self.timeline_now() - 120.0;
-        while self
-            .samples
-            .front()
-            .is_some_and(|trend| trend.timestamp < cutoff)
-        {
-            self.samples.pop_front();
-        }
+    pub fn prune_graph(&mut self) {
+        self.graph.prune(self.timeline_now_ms());
     }
 }

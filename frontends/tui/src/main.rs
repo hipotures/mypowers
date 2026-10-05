@@ -57,7 +57,7 @@ fn run() -> Result<(), String> {
     runtime.spawn(api.clone().log_pages(log_operations, events.clone()));
     runtime.spawn(
         api.clone()
-            .history_pages(history_operations, events.clone()),
+            .history_aggregates(history_operations, events.clone()),
     );
     runtime.spawn(api.operations(operations, events.clone()));
     let signal_events = events.clone();
@@ -88,7 +88,7 @@ fn run() -> Result<(), String> {
                 let _ = log_requests.send(Some(request));
             }
             if std::time::Instant::now() >= next_frame {
-                app.prune_trends();
+                app.prune_graph();
                 terminal.draw(|frame| ui::draw(frame, &mut app))?;
                 next_frame = std::time::Instant::now() + Duration::from_millis(250);
             }

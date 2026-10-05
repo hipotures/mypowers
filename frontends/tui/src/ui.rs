@@ -68,7 +68,7 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
     if app.view == View::Dashboard {
         app.title = Rect::new(area.x + (area.width - 10) / 2 + 1, area.y, 8, 1);
     }
-    let footer = outer_footer(app.view, area.width);
+    let footer = outer_footer(app.view, area.width, app.graph.resolution.label());
     let outer = Block::default()
         .borders(Borders::ALL)
         .border_type(BorderType::Rounded)
@@ -79,7 +79,7 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
                 .centered(),
         )
         .title_bottom(
-            Line::from(footer)
+            Line::from(footer.as_str())
                 .style(Style::default().fg(MUTED))
                 .centered(),
         );
@@ -167,10 +167,10 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
     if app.view != View::Dashboard {
         // The footer belongs to the active context, so it stays readable over a dimmed dashboard.
         frame.render_widget(
-            Paragraph::new(footer).style(Style::default().fg(MUTED).bg(BACKGROUND)),
+            Paragraph::new(footer.as_str()).style(Style::default().fg(MUTED).bg(BACKGROUND)),
             centered(
                 Rect::new(area.x, area.bottom() - 1, area.width, 1),
-                Span::raw(footer).width() as u16,
+                Span::raw(footer.as_str()).width() as u16,
                 1,
             ),
         );
@@ -192,16 +192,18 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
     }
 }
 
-fn outer_footer(view: View, width: u16) -> &'static str {
+fn outer_footer(view: View, width: u16, interval: &str) -> String {
     match view {
-        View::Dashboard if width >= 80 => {
-            " a AC  d DC  l lamps  F3 logs  s settings  r retry  p pause  ? help  q quit "
+        View::Dashboard if width >= 80 => format!(
+            " a AC  d DC  l lamps  F3 logs  s settings  t {interval}  r retry  p pause  ? help  q quit "
+        ),
+        View::Dashboard => {
+            format!(" a/d/l outputs  F3 logs  s settings  t {interval}  ? help  q quit ")
         }
-        View::Dashboard => " a/d/l outputs  F3 logs  s settings  ? help  q quit ",
-        View::Logs => " Esc close  ? help  q quit  Ctrl-Q quit now ",
-        View::Settings => " b DEBUG  Esc close  ? help  q quit  Ctrl-Q quit now ",
-        View::Help => " Esc close  q quit  Ctrl-Q quit now ",
-        View::Quit => " Ctrl-Q quit now ",
+        View::Logs => " Esc close  ? help  q quit  Ctrl-Q quit now ".into(),
+        View::Settings => " b DEBUG  Esc close  ? help  q quit  Ctrl-Q quit now ".into(),
+        View::Help => " Esc close  q quit  Ctrl-Q quit now ".into(),
+        View::Quit => " Ctrl-Q quit now ".into(),
     }
 }
 
@@ -393,6 +395,13 @@ fn dashboard(frame: &mut Frame, content: Rect, app: &mut App) {
         .alignment(Alignment::Right),
         header[1],
     );
+    let power = Layout::horizontal([
+        Constraint::Fill(1),
+        Constraint::Length(4),
+        Constraint::Fill(1),
+    ])
+    .split(rows[6]);
+    app.set_graph_width(power[0].width.max(power[2].width));
     let sample = app
         .status
         .as_ref()
@@ -430,12 +439,6 @@ fn dashboard(frame: &mut Frame, content: Rect, app: &mut App) {
         .style(Style::default().fg(MUTED)),
         rows[4],
     );
-    let power = Layout::horizontal([
-        Constraint::Fill(1),
-        Constraint::Length(4),
-        Constraint::Fill(1),
-    ])
-    .split(rows[6]);
     for (rect, label, value, output, maximum) in [
         (
             power[0],
@@ -479,19 +482,24 @@ fn dashboard(frame: &mut Frame, content: Rect, app: &mut App) {
             continue;
         }
         // Sparkline floors to eighth-cell ticks; keep positive readings visible at fixed scales.
-        let minimum = maximum.div_ceil(8 * u64::from(parts[2].height.max(1)));
+        let scale = maximum * 1000;
+        let minimum = scale.div_ceil(8 * u64::from(parts[2].height.max(1)));
         let data = app
             .graph_data(parts[2].width, output)
             .into_iter()
             .map(|value| {
-                let visible = if value == 0 { 0 } else { value.max(minimum) };
+                let visible = if value == 0.0 {
+                    0
+                } else {
+                    ((value * 1000.0).round() as u64).max(minimum)
+                };
                 SparklineBar::from(visible).style(Style::default().fg(if live {
                     load_color(value, maximum)
                 } else {
                     DIM
                 }))
             });
-        frame.render_widget(Sparkline::default().data(data).max(maximum), parts[2]);
+        frame.render_widget(Sparkline::default().data(data).max(scale), parts[2]);
     }
     let controls = Layout::horizontal([Constraint::Ratio(1, 3); 3]).split(rows[8]);
     for (index, label) in ["AC", "DC", "LAMPS"].iter().enumerate() {
@@ -825,7 +833,7 @@ fn help(frame: &mut Frame, area: Rect, context: View) {
     } else if context == View::Logs {
         "HELP — LOGS\n\nUp/Down, PageUp/PageDown   Scroll records\nMouse wheel / scrollbar   Scroll or drag\nLeft/Right or [ / ]       Previous/next day\nf                        Change minimum log level\n+ / -                    Change page size\nHome                     Beginning of selected day\nEnd                      Today: latest records and live follow\nb                        Toggle runtime DEBUG override\nDouble-click LOGS        Copy all loaded records\n\nEsc close   q confirm quit   Ctrl-Q quit immediately"
     } else {
-        "HELP — DASHBOARD\n\na / d / l                Request AC / DC / lamps ON/OFF\nTab / Shift-Tab          Focus output control\nEnter / Space            Activate focused output\nF3                       Open Logs\ns                        Open Settings / Diagnostics\nr                        Retry station connection\np                        Pause/resume station connection\nF1 / ?                   Help for the active window\nDouble-click MYPOWERS    Copy current API snapshot\n\nEsc close   q confirm quit   Ctrl-Q quit immediately"
+        "HELP — DASHBOARD\n\na / d / l                Request AC / DC / lamps ON/OFF\nTab / Shift-Tab          Focus output control\nEnter / Space            Activate focused output\nF3                       Open Logs\ns                        Open Settings / Diagnostics\nt                        Cycle average per bar: 10s / 60s / 1h\nr                        Retry station connection\np                        Pause/resume station connection\nF1 / ?                   Help for the active window\nDouble-click MYPOWERS    Copy current API snapshot\n\nEsc close   q confirm quit   Ctrl-Q quit immediately"
     };
     frame.render_widget(Paragraph::new(text).style(Style::default().fg(MUTED)), area);
 }
@@ -839,13 +847,17 @@ fn centered(area: Rect, width: u16, height: u16) -> Rect {
         .split(column)[0]
 }
 
-fn load_color(value: u64, maximum: u64) -> Color {
-    match value * 100 / maximum {
-        0..=44 => GREEN,
-        45..=74 => YELLOW,
-        _ => ORANGE,
+fn load_color(value: f64, maximum: u64) -> Color {
+    let ratio = value / maximum as f64;
+    if ratio < 0.45 {
+        GREEN
+    } else if ratio < 0.75 {
+        YELLOW
+    } else {
+        ORANGE
     }
 }
+
 struct Battery {
     percent: u16,
     no_color: bool,

@@ -40,13 +40,14 @@ have no telemetry sample; daemon-offline retains explicitly unavailable readings
 keeps fixed 0–100 W / 0–300 W scales; positive samples below its first quantization
 step receive one visible eighth-cell tick, while zero stays empty. This is a
 visibility floor, not an independently autoscaled graph or a change to telemetry.
-History uses fixed time buckets across the 120-second window. Completed bars keep
-their readings and colors between redraws and move left together by one column at
-each bucket boundary. Only the open rightmost bucket changes with new telemetry;
-the oldest column is clipped as readings expire. Bucket widths depend on graph
-width, and missing observations remain empty rather than interpolated. This
-prevents green/yellow bars from flickering as a continuously sliding interval
-would select different observations on each redraw.
+History uses server-computed averages in fixed UTC buckets: 10 seconds, 60 seconds
+or one hour per bar (`t` on the dashboard). `dashboard-live-60s.svg` and
+`dashboard-live-1h.svg` capture the additional selections. Fixtures supply fixed
+averages and sample counts directly, without SQL or HTTP. Completed bars retain
+their values/colors between redraws and move left together at a bucket boundary.
+The current bucket can change as recorded samples arrive. Missing buckets stay
+empty; actual zeros participate in averages. Live numeric labels stay independent
+of graph history, and positive fractional averages remain visible at fixed scales.
 
 SVG is canonical. Each cell is 10x20 SVG units. Background rectangles cover every
 cell without gaps. Text preserves Unicode, RGB/ANSI colors, bold, and foreground
