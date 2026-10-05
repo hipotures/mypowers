@@ -789,6 +789,84 @@ fn log_pages_ignore_old_responses_and_keep_cursor_edges_when_cache_is_bounded() 
 }
 
 #[test]
+fn new_log_ranges_discard_previous_pagination_even_when_their_request_fails() {
+    use crate::logs::{Load, Logs, Page};
+
+    for transition in ["filter", "previous day", "today", "midnight"] {
+        let mut logs = Logs::new(Some(chrono_tz::UTC));
+        logs.layout(1);
+        if matches!(transition, "today" | "midnight") {
+            logs.day = logs.day.pred_opt().unwrap();
+        }
+        let initial = logs.open().unwrap();
+        let stamp = logs.day.format("%Y-%m-%dT12:00:00Z").to_string();
+        let page: Page = serde_json::from_value(json!({
+            "schema_version": 1, "items": [
+                {"sequence": 1, "message": "First archived record", "level": "INFO",
+                 "timestamp": stamp, "server_instance_id": "88767477-2a2a-481f-843b-30d56a5e3f10"},
+                {"sequence": 2, "message": "Second archived record", "level": "INFO",
+                 "timestamp": stamp, "server_instance_id": "88767477-2a2a-481f-843b-30d56a5e3f10"}
+            ],
+            "previous_cursor": "previous-range-before", "next_cursor": "previous-range-after",
+            "has_more_before": true, "has_more_after": true,
+            "source": "files", "gap": false, "skipped_lines": 0
+        }))
+        .unwrap();
+        logs.accept(&initial, Ok(page));
+        logs.offset = 1;
+        let request = match transition {
+            "filter" => logs.key(KeyCode::Char('f')),
+            "previous day" => logs.navigate(false),
+            "today" => logs.key(KeyCode::End),
+            "midnight" => {
+                logs.follow = true;
+                logs.maintenance()
+            }
+            _ => unreachable!(),
+        }
+        .unwrap();
+        assert!(request.cursor.is_none(), "{transition}");
+        logs.accept(&request, Err("HTTP temporarily unavailable".into()));
+        assert!(logs.records.is_empty(), "{transition}");
+        assert!(!logs.more_before && !logs.more_after, "{transition}");
+        assert_eq!(logs.offset, 0, "{transition}");
+        let older_day = logs.scroll(false, 1).unwrap();
+        assert_eq!(older_day.kind, Load::Latest, "{transition}");
+        assert!(older_day.cursor.is_none(), "{transition}");
+        assert_ne!(older_day.since, request.since, "{transition}");
+    }
+}
+
+#[test]
+fn failed_log_refresh_within_the_same_range_preserves_loaded_pagination() {
+    use crate::logs::{Load, Logs, Page};
+
+    for key in [KeyCode::Home, KeyCode::End, KeyCode::Char('+')] {
+        let mut logs = Logs::new(Some(chrono_tz::UTC));
+        let initial = logs.open().unwrap();
+        let stamp = logs.day.format("%Y-%m-%dT12:00:00Z").to_string();
+        let page: Page = serde_json::from_value(json!({
+            "schema_version": 1, "items": [{
+                "sequence": 1, "message": "Archived record", "level": "INFO", "timestamp": stamp,
+                "server_instance_id": "88767477-2a2a-481f-843b-30d56a5e3f10"
+            }],
+            "previous_cursor": "same-range-before", "next_cursor": "same-range-after",
+            "has_more_before": true, "has_more_after": true,
+            "source": "files", "gap": false, "skipped_lines": 0
+        }))
+        .unwrap();
+        logs.accept(&initial, Ok(page));
+        let request = logs.key(key).unwrap();
+        logs.accept(&request, Err("HTTP temporarily unavailable".into()));
+        assert_eq!(logs.records.len(), 1);
+        assert!(logs.more_before && logs.more_after);
+        let older = logs.scroll(false, 1).unwrap();
+        assert_eq!(older.kind, Load::Older);
+        assert_eq!(older.cursor.as_deref(), Some("same-range-before"));
+    }
+}
+
+#[test]
 fn live_log_cache_stays_bounded_when_page_refresh_fails_and_recovers_from_the_server() {
     let stamp = chrono::Utc::now().to_rfc3339();
     let mut logs = crate::logs::Logs::new(Some(chrono_tz::UTC));

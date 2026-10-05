@@ -337,14 +337,23 @@ impl Logs {
         }
     }
 
+    fn clear_cache(&mut self) {
+        self.records.clear();
+        self.pages.clear();
+        self.offset = 0;
+        self.previous_cursor = None;
+        self.next_cursor = None;
+        self.more_before = false;
+        self.more_after = false;
+    }
+
     pub fn maintenance(&mut self) -> Option<Request> {
         if self.follow
             && !self.loading
             && (self.records.len() > self.page_size * MAX_CACHED_PAGES || self.day != self.today())
         {
             if self.day != self.today() {
-                self.records.clear();
-                self.pages.clear();
+                self.clear_cache();
             }
             self.day = self.today();
             self.load(Load::Latest)
@@ -418,11 +427,7 @@ impl Logs {
         }
         self.day = day;
         self.follow = false;
-        self.records.clear();
-        self.pages.clear();
-        self.offset = 0;
-        self.more_before = false;
-        self.more_after = false;
+        self.clear_cache();
         self.load(if next { Load::Oldest } else { Load::Latest })
     }
 
@@ -468,8 +473,7 @@ impl Logs {
             KeyCode::Char(']') | KeyCode::Right => self.navigate(true),
             KeyCode::End => {
                 if self.day != self.today() {
-                    self.records.clear();
-                    self.pages.clear();
+                    self.clear_cache();
                 }
                 self.day = self.today();
                 self.follow = true;
@@ -494,8 +498,7 @@ impl Logs {
             ),
             KeyCode::Char('f') => {
                 self.level = (self.level + 1) % LEVELS.len();
-                self.records.clear();
-                self.pages.clear();
+                self.clear_cache();
                 self.start_archive()
             }
             KeyCode::Char('+' | '=') | KeyCode::Char('-') => {

@@ -643,6 +643,33 @@ command-pending PNG bytes match the before set exactly. Inspected that scene
 before and after. This cycle changes only tests/documentation, so cycle 20's
 28 terminal-suite cases and installed release binary remain current.
 
+### 22. Discard log pagination when its range changes
+
+Checked the local log API's signed-cursor contract and the frontend's failed-page
+handling. Cursors retain the day boundaries and minimum severity; the server
+rejects a cursor paired with another range. Changing the severity cleared the
+rows but retained old cursors, edge flags and scroll offset. If the replacement
+request failed, scrolling could submit the previous filter's cursor. Returning
+to today or crossing midnight also retained pagination from the previous day.
+The new range regression failed before the fix.
+
+Added one private cache-clear operation for the existing four range-changing
+paths: filter changes, day navigation, End from another day, and live midnight
+rollover. It clears rows, cached page boundaries, cursors, edge flags and offset
+together. The recent live catch-up buffer and request-generation checks remain
+unchanged. Home, End within today, and page-size changes keep valid loaded rows
+and cursors when their refresh fails. Two regressions cover all four transitions
+and these three same-range failure cases; subsequent scrolling cannot carry a
+cursor from the discarded range.
+
+All 50 Rust tests passed in 35.11 seconds; the final fixture refinements also
+passed their targeted tests. Formatting, Clippy with warnings denied, and diff
+checks passed. All 15 SVGs pass `--check`; regenerated SVGs and Logs PNG bytes
+match the before set exactly. Inspected Logs before and after.
+All 28 terminal-suite cases passed in 84.72 seconds against isolated simulated
+services. Built the release frontend and updated the local installed binary;
+existing application processes were not restarted.
+
 ## Remaining review
 
 - Review remaining applicable application examples and tutorial integration details.
