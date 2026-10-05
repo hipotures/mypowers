@@ -618,6 +618,31 @@ pass `--check`; regenerated SVGs and Settings PNG bytes match the before set
 exactly. Inspected Settings before and after. Built the release frontend and
 updated the local installed binary without restarting existing processes.
 
+### 21. Verify total HTTP deadlines for partial command responses
+
+Reviewed the installed [Reqwest 0.12.28 timeout contract](https://docs.rs/reqwest/0.12.28/reqwest/struct.ClientBuilder.html#method.timeout)
+and its response-body implementation. The configured timeout is a total deadline
+from connection through body completion; a per-read timeout would instead reset
+after each successful read. The existing client already uses the total timeout
+and explicitly disables request retries. No additional timeout layer is needed.
+
+Added a regression using the production output-intention builder, command
+performer, generic HTTP reader and App completion update. An isolated server
+receives the captured AC PUT/revision/idempotency key, sends HTTP 202 and starts
+a chunked JSON body, then continues supplying whitespace every 250 ms without
+finishing the JSON. Despite continuing reads, the client returns after its
+two-second total deadline with warning feedback that the outcome is uncertain.
+No partial response becomes a command event and no optimistic AC state change
+occurs. The next connection must be the caller's explicit GET, which succeeds;
+a replayed PUT or additional request fails the test. The targeted regression
+passed in 2.26 seconds without changing production code.
+
+All 48 Rust tests passed in 35.12 seconds. Formatting, Clippy with warnings
+denied, and diff checks passed. All 15 SVGs pass `--check`; regenerated SVGs and
+command-pending PNG bytes match the before set exactly. Inspected that scene
+before and after. This cycle changes only tests/documentation, so cycle 20's
+28 terminal-suite cases and installed release binary remain current.
+
 ## Remaining review
 
 - Review remaining applicable application examples and tutorial integration details.

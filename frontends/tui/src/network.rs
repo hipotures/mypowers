@@ -1073,6 +1073,120 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn slow_admission_body_times_out_without_replay_and_the_next_read_still_works() {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let api = api_for(&listener);
+        let mut app = crate::app::App::new(false, Some(chrono_tz::UTC));
+        app.update(Event::Status(Box::new(crate::tests::status())));
+        let crate::app::Effect::Request(intent) = app.toggle(0) else {
+            panic!("Expected an AC command");
+        };
+        let Intent::Output { key, .. } = &intent else {
+            panic!("Expected an output intention");
+        };
+        let expected_key = key.clone();
+        let (done, mut stopped) = tokio::sync::oneshot::channel();
+        let server = tokio::spawn(async move {
+            let (mut socket, request) = accept_http_request(&listener).await;
+            let (headers, initial_body) = request.split_once("\r\n\r\n").unwrap();
+            assert!(headers.starts_with("PUT /api/v1/outputs/ac HTTP/1.1"));
+            assert!(
+                headers
+                    .to_ascii_lowercase()
+                    .contains(&format!("idempotency-key: {expected_key}"))
+            );
+            let length: usize = headers
+                .lines()
+                .find_map(|line| {
+                    let (name, value) = line.split_once(':')?;
+                    name.eq_ignore_ascii_case("content-length")
+                        .then(|| value.trim().parse().unwrap())
+                })
+                .unwrap();
+            let mut body = initial_body.as_bytes().to_vec();
+            while body.len() < length {
+                let mut chunk = [0; 4096];
+                let count = socket.read(&mut chunk).await.unwrap();
+                assert!(count > 0);
+                body.extend_from_slice(&chunk[..count]);
+            }
+            let body: Value = serde_json::from_slice(&body).unwrap();
+            assert_eq!(body["enabled"], true);
+            assert_eq!(body["expected_outputs_revision"], 2);
+            socket
+                .write_all(b"HTTP/1.1 202 Accepted\r\nTransfer-Encoding: chunked\r\n\r\n1\r\n{\r\n")
+                .await
+                .unwrap();
+            let mut interval = tokio::time::interval(Duration::from_millis(250));
+            interval.tick().await;
+            let mut chunks = 0;
+            loop {
+                tokio::select! {
+                    _ = &mut stopped => break,
+                    _ = interval.tick() => {
+                        if socket.write_all(b"1\r\n \r\n").await.is_err() { break; }
+                        chunks += 1;
+                    }
+                }
+            }
+            // Only the caller's later read may open another connection, never a replayed PUT.
+            let (mut next, request) = accept_http_request(&listener).await;
+            assert!(request.starts_with("GET /api/v1/status HTTP/1.1"));
+            next.write_all(b"HTTP/1.1 200 OK\r\nContent-Length: 2\r\nConnection: close\r\n\r\n{}")
+                .await
+                .unwrap();
+            assert!(
+                timeout(Duration::from_millis(200), listener.accept())
+                    .await
+                    .is_err()
+            );
+            chunks
+        });
+        let (events, mut incoming) = mpsc::channel(4);
+        let started = Instant::now();
+        let feedback = timeout(Duration::from_secs(4), api.perform(intent, &events))
+            .await
+            .unwrap();
+        assert!(started.elapsed() >= Duration::from_secs(2));
+        assert_eq!(
+            feedback.message,
+            "Command outcome uncertain; check station before retrying"
+        );
+        assert!(matches!(feedback.severity, Severity::Warning));
+        assert!(
+            incoming.try_recv().is_err(),
+            "Partial admission must not become a command event"
+        );
+        app.update(Event::Finished(feedback));
+        assert!(app.pending.is_none());
+        assert!(
+            !app.status
+                .as_ref()
+                .unwrap()
+                .telemetry
+                .sample
+                .as_ref()
+                .unwrap()
+                .ac_enabled
+        );
+        let _ = done.send(());
+        assert_eq!(
+            api.request(reqwest::Method::GET, "/status", None, None)
+                .await
+                .unwrap(),
+            json!({})
+        );
+        let chunks = timeout(Duration::from_secs(3), server)
+            .await
+            .unwrap()
+            .unwrap();
+        assert!(
+            chunks >= 2,
+            "The response must keep delivering data before the total timeout"
+        );
+    }
+
+    #[tokio::test]
     async fn uncertain_admission_is_one_put_with_captured_revision_and_key() {
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
         let api = api_for(&listener);
