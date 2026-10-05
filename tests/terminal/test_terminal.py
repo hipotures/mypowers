@@ -369,6 +369,106 @@ def test_stream_bursts_do_not_starve_modal_resize_or_quit(
             assert not worker.is_alive()
 
 
+def test_wide_station_names_clear_in_the_actual_terminal_stream(
+    daemon_process, tui_binary, tmp_path
+):
+    from websockets.exceptions import ConnectionClosed
+    from websockets.sync.server import serve
+
+    _, url, env = daemon_process
+    with httpx.Client(base_url=url, trust_env=False) as client:
+        snapshot = client.get("/api/v1/status").json()
+    names = ["電源電源電源", "NARROW", "界界界界界界", "OK"]
+    stage = [0]
+    stopped = threading.Event()
+
+    def stream(connection):
+        logs = connection.request.path.startswith("/api/v1/logs/stream")
+        current = json.loads(json.dumps(snapshot))
+        sequence = 0
+        try:
+            while not stopped.is_set():
+                sequence += 1
+                index = stage[0]
+                stamp = datetime.now(UTC).isoformat()
+                current["device"]["name"] = names[index]
+                current["server_time"] = stamp
+                current["telemetry"]["sample"].update(
+                    sequence=sequence, received_at=stamp, battery_percent=70 + index
+                )
+                connection.send(
+                    json.dumps(
+                        {
+                            "schema_version": 1,
+                            "server_instance_id": snapshot["server_instance_id"],
+                            "server_time": stamp,
+                            "stream_sequence": sequence,
+                            "type": "snapshot"
+                            if sequence == 1
+                            else "heartbeat"
+                            if logs
+                            else "state",
+                            "data": None if logs and sequence > 1 else current,
+                        }
+                    )
+                )
+                stopped.wait(0.05)
+        except ConnectionClosed:
+            pass
+
+    with serve(stream, "127.0.0.1", 0, compression=None, close_timeout=1) as server:
+        worker = threading.Thread(target=server.serve_forever)
+        worker.start()
+        session = None
+        try:
+            origin = f"http://127.0.0.1:{server.socket.getsockname()[1]}"
+            session = Session(tui_binary, tmp_path, env, "--server", origin)
+
+            def read_frame(percent):
+                deadline = time.monotonic() + 2
+                while time.monotonic() < deadline:
+                    if select.select([session.master], [], [], 0.1)[0]:
+                        raw = os.read(session.master, 65536)
+                        session.stream.feed(session.decoder.decode(raw))
+                        rows = [
+                            "".join(session.screen.buffer[y][x].data for x in range(94))
+                            for y in range(24)
+                        ]
+                        if any(percent in line for line in rows):
+                            return rows
+                pytest.fail(f"Missing battery frame {percent}")
+
+            rows = read_frame("70%")
+            row = next(y for y, line in enumerate(rows) if names[0] in line)
+            column = rows[row].index("電")
+            for index, name in enumerate(names[1:], 1):
+                stage[0] = index
+                # The later battery render acts as a frame barrier for the preceding header.
+                rows = read_frame(f"{70 + index}%")
+                assert name in rows[row]
+                if name.isascii():
+                    anchor = session.screen.buffer[row][column]
+                    # Pyte does not erase wide-cell stubs when their head is overwritten.
+                    # Verify actual emitted head cells without normalizing its backing array.
+                    for x in range(column + len(name), column + 12, 2):
+                        cell = session.screen.buffer[row][x]
+                        assert cell.data == " "
+                        assert cell.fg == anchor.fg and cell.bg == anchor.bg
+                        assert cell.bold == anchor.bold and cell.italics == anchor.italics
+                    assert not any(character in rows[row] for character in "電源界")
+            session.write(b"\x11")
+            session.read(b"\x1b[?1049l", budget=2)
+            assert session.process.wait(timeout=2) == 0
+            assert termios.tcgetattr(session.slave) == session.original
+        finally:
+            stopped.set()
+            if session is not None:
+                session.close()
+            server.shutdown()
+            worker.join(timeout=2)
+            assert not worker.is_alive()
+
+
 def test_native_pause_resume_retry_and_runtime_logging_receipts(
     daemon_process, tui_binary, tmp_path
 ):

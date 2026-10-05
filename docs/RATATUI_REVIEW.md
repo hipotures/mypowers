@@ -1202,17 +1202,48 @@ byte-identical and was inspected before and after. The installed Rust release,
 standard build, and immutable terminal-tested copy still have identical hashes.
 No native renderer, installed binary, or existing daemon process changed.
 
-## Remaining review
+### 41. Verify wide-character updates through production ANSI output
 
-- Review remaining applicable application examples and tutorial integration details.
-- Further task lifetime/cancellation checks; terminal cleanup and signals now have PTY coverage.
-- Key/mouse routing, resize handling, input bursts, and operation responsiveness.
-- Production widgets: Block, Paragraph, Sparkline, Scrollbar, and custom battery Buffer writes.
-- Unicode widths, control-character sanitation, and status-line truncation.
-- History retention, archived log pagination, cancellation, and live stream validation.
-- Layout bounds, cached layout work, render allocation cost, and measurement before optimization.
-- Feature flags, version-specific APIs, and testing practices relevant to this frontend.
+Rechecked [Ratatui 0.30.2 highlights](https://ratatui.rs/highlights/v0302/) and the
+installed Buffer diff implementation. Wide-cell cleanup is relevant to station
+names and log text, but TestBackend's backing array is not a terminal emulator.
+Added a native PTY regression using the unchanged terminal-tested release and an
+isolated WS fixture. It changes a station name from six CJK glyphs to NARROW,
+back to six CJK glyphs, and finally OK, with fresh telemetry throughout.
 
-Each modification cycle must have before images, targeted tests, after images,
-an exact comparison proving visual preservation, and its own commit. Review-only
-findings do not justify speculative abstractions or cosmetic changes.
+The first attempt encountered an independent Pyte limitation: its draw method
+writes a narrow head without erasing the old wide-character stub, and its display
+property then indexes an empty string. The corrected test feeds the actual ANSI
+stream and reads the untouched cell array without invoking that property or
+normalizing any cells. It checks emitted head-cell blanks and their foreground,
+background, bold and italic attributes after shortening, and confirms no old CJK
+head glyph remains. It also verifies immediate quit and original terminal modes.
+This is evidence about actual emitted updates, not a claim that Pyte reproduces
+all physical-terminal wide-cell behavior.
+
+The native regression passed in 2.28 seconds; formatting, lint, and diff checks
+passed. All 15 SVGs pass `--check` and match the saved before set exactly. The live
+PNG is byte-identical and was inspected before and after. No production renderer,
+backend workaround, dependency, or release binary changed.
+
+## Review closure
+
+The applicable documentation map, tutorials, rendering/layout/widgets, application
+patterns, events, terminal lifecycle, feature flags, release behavior and testing
+practices have been reviewed. The numbered cycles distinguish implemented fixes,
+measured optimizations, and verification-only findings. No visual redesign or new
+UI framework was introduced. Deployment/settings/connectors/alerts remain outside
+this internal-renderer review; no speculative backlog features were implemented.
+
+Verification uses the shared production renderer for all 15 canonical scenes,
+byte-exact before/after comparisons, complete-frame/resize/transition tests, and
+real PTY/socket tests for behavior TestBackend cannot emulate. Native tests use
+isolated simulated services; existing user daemons, devices and desktop sessions
+were not restarted or manipulated. The installed release matches the immutable
+terminal-tested executable. Each completed change cycle has its own commit.
+
+Local checks do not constitute a remote CI result or real-hardware acceptance.
+The remaining practical limits are terminal-dependent font/Unicode behavior,
+TestBackend/Pyte emulation gaps described above, and platform coverage limited to
+this Linux environment. Existing oversized archive lines retain the scanner's
+explicit skipped-line handling. Nothing in this review claims production readiness.
