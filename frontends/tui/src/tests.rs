@@ -149,6 +149,75 @@ fn layouts_preserve_inline_values_two_row_graphs_and_unknown_values() {
 }
 
 #[test]
+fn repeated_resize_matches_fresh_frames_and_keeps_hitboxes_in_bounds() {
+    use crate::clock::Clock;
+    let now = "2026-10-05T12:00:00Z".parse().unwrap();
+    for view in [
+        View::Dashboard,
+        View::Logs,
+        View::Help,
+        View::Settings,
+        View::Quit,
+    ] {
+        let mut app = App::with_clock(
+            false,
+            Some(chrono_tz::UTC),
+            Clock::Fixed {
+                now,
+                telemetry_elapsed: Duration::ZERO,
+                animation_elapsed: Duration::ZERO,
+                feedback_elapsed: Duration::ZERO,
+            },
+        );
+        let mut current = status();
+        current.server_time = "2026-10-05T12:00:00Z".into();
+        current.telemetry.sample.as_mut().unwrap().received_at = current.server_time.clone();
+        app.update(Event::Status(Box::new(current)));
+        app.view = view;
+        for sequence in 0..100 {
+            app.logs.records.push_back(json!({
+                "timestamp": "2026-10-05T12:00:00Z", "level": "INFO",
+                "sequence": sequence,
+                "server_instance_id": "88767477-2a2a-481f-843b-30d56a5e3f10",
+                "message": format!("Record {sequence:03}")
+            }));
+        }
+        let mut terminal = Terminal::new(TestBackend::new(120, 40)).unwrap();
+        for width in [0, 1, 2, 20, 59, 60, 61, 80, 94, 95, 120] {
+            for height in [0, 1, 2, 10, 18, 19, 24, 28, 29, 40] {
+                terminal.backend_mut().resize(width, height);
+                app.resize();
+                terminal.draw(|frame| ui::draw(frame, &mut app)).unwrap();
+                let actual = terminal.backend().buffer().clone();
+                for hitbox in app
+                    .controls
+                    .iter()
+                    .chain(&app.quit_buttons)
+                    .chain(&app.logs.buttons)
+                    .chain([
+                        &app.title,
+                        &app.logs.title,
+                        &app.logs.scrollbar,
+                        &app.logs.thumb,
+                    ])
+                    .filter(|rect| !rect.is_empty())
+                {
+                    assert_eq!(hitbox.intersection(actual.area), *hitbox);
+                }
+                if width < ui::MIN_WIDTH || height < ui::MIN_HEIGHT {
+                    assert!(app.controls.iter().all(|rect| rect.is_empty()));
+                    assert!(app.quit_buttons.iter().all(|rect| rect.is_empty()));
+                    assert!(app.logs.buttons.iter().all(|rect| rect.is_empty()));
+                    assert!(app.title.is_empty() && app.logs.title.is_empty());
+                    assert!(app.logs.scrollbar.is_empty() && app.logs.thumb.is_empty());
+                }
+                assert_eq!(actual, render(&mut app, width, height));
+            }
+        }
+    }
+}
+
+#[test]
 fn status_strip_is_outside_border_fades_and_leaves_no_reassuring_noise() {
     let mut app = app();
     let mut colors = Vec::new();

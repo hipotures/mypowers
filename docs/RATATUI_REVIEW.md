@@ -332,6 +332,30 @@ Inspected the after PNG. Existing PTY coverage separately verifies quitting
 during an output operation leaves the daemon and its station state independent
 of the client.
 
+### 11. Exercise repeated resize and collapsed terminal areas
+
+Reviewed [buffer/diff rendering](https://ratatui.rs/concepts/rendering/under-the-hood/),
+[dynamic layouts](https://ratatui.rs/recipes/layout/dynamic/), and the
+[FAQ's buffer-bound guidance](https://ratatui.rs/faq/#how-do-i-avoid-panics-due-to-out-of-range-calls-on-the-buffer).
+The renderer obtains its area from `Frame`, paints a complete frame, and returns
+through the minimum-size path before computing dashboard/modal offsets. Its
+private battery widget is only passed in-bounds layout regions.
+
+Existing layout tests rendered separate fresh terminals. Added a regression that
+reuses one Terminal while repeatedly resizing its TestBackend and calling the
+production resize handler. It covers 550 combinations: all five views, 11 widths
+from zero through 120, and 10 heights from zero through 40. These include 0x0,
+single-cell areas, minimum-size boundaries, and the dashboard's maximum-size
+boundaries. Each frame's cells/styles must equal a fresh render, preventing stale
+content from surviving shrink/expand transitions. Every active hitbox must fit
+the frame; all dashboard/modal hitboxes must clear below the minimum size. A
+fixed clock keeps freshness, animation and feedback consistent throughout.
+
+The regression passed without changing production rendering or adding defensive
+layout wrappers. All 37 Rust tests, formatting, Clippy with warnings denied, and
+diff checks passed. All 15 SVGs pass `--check`; regenerated SVG hashes and the
+too-small-terminal PNG bytes match the before set exactly. Inspected the after PNG.
+
 ## Remaining review
 
 - Review remaining applicable application examples and tutorial integration details.
