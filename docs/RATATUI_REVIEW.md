@@ -1352,3 +1352,26 @@ seconds. Formatting, Ruff, Clippy with warnings denied and diff checks passed.
 All 16 SVGs pass `--check`; all 18 saved SVG/PNG images remain byte-identical.
 The dashboard PNG was inspected before and after. The installed release matches
 the immutable terminal-tested candidate; existing user processes were untouched.
+
+### 45. Rearm repeated log-stream warnings after recovery
+
+The asynchronous state-transition review found that `log_notice` remembered an
+outage forever. After the log stream recovered, a later outage with the same
+reason was suppressed as a duplicate even if the user had received newer action
+feedback. Added one internal lifecycle event after a log connection's valid
+initial snapshot. Application state clears only its deduplication marker; it
+does not replace user feedback, restart its fade timer, or introduce a permanent
+diagnostic/status value. Duplicate warnings within the same outage remain quiet.
+
+The application regression covers failure, action feedback, repeated failure,
+recovery and a new identical failure. Real loopback WebSocket tests require a
+valid initial snapshot before emitting the recovery event and reject malformed
+schema, timestamps and daemon identities. Existing record tests explicitly
+consume the lifecycle event before examining records.
+
+All 71 Rust tests passed in 35.08 seconds, nine xtask tests in 0.38 seconds,
+and all 34 native terminal tests, including isolated HTTPS/WSS, passed in 98.62
+seconds. Formatting, Clippy with warnings denied and diff checks passed. All
+16 snapshots pass `--check`; the 16 SVGs and Logs PNG are byte-identical before
+and after, and the PNG was inspected. The installed release matches the tested
+immutable candidate. No user process, daemon or desktop session was changed.

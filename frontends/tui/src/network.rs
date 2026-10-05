@@ -25,6 +25,7 @@ pub enum ClipboardTarget {
 }
 
 pub enum Event {
+    LogStreamReady,
     Status(Box<Status>),
     Disconnected(String),
     Command(Command),
@@ -547,6 +548,7 @@ impl Api {
             {
                 return Err("Invalid API stream sequence or schema.".into());
             }
+            let initial = instance.is_none();
             if let Some(expected) = &instance {
                 if expected != &message.server_instance_id {
                     return Err("Daemon instance changed within stream.".into());
@@ -569,6 +571,11 @@ impl Api {
                     if !logs {
                         events
                             .send(Event::Status(Box::new(status)))
+                            .await
+                            .map_err(|_| "UI closed.")?;
+                    } else if initial {
+                        events
+                            .send(Event::LogStreamReady)
                             .await
                             .map_err(|_| "UI closed.")?;
                     }
@@ -759,6 +766,7 @@ mod tests {
             .await
             .unwrap();
         server.await.unwrap();
+        assert!(matches!(incoming.try_recv(), Ok(Event::LogStreamReady)));
         let received = match incoming.try_recv() {
             Ok(Event::Log(record)) => Some(record),
             Err(mpsc::error::TryRecvError::Empty) => None,
@@ -766,6 +774,47 @@ mod tests {
         };
         assert!(incoming.try_recv().is_err());
         (result, received)
+    }
+
+    #[tokio::test]
+    async fn log_stream_recovery_requires_a_valid_initial_snapshot() {
+        for invalid in [
+            None,
+            Some("/data/schema_version"),
+            Some("/data/server_time"),
+            Some("/server_instance_id"),
+        ] {
+            let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+            let api = api_for(&listener);
+            let mut snapshot = status_envelope(1, "snapshot");
+            if let Some(path) = invalid {
+                *snapshot.pointer_mut(path).unwrap() = json!("invalid");
+            }
+            let server = tokio::spawn(async move {
+                let (socket, _) = listener.accept().await.unwrap();
+                let mut socket = tokio_tungstenite::accept_async(socket).await.unwrap();
+                socket
+                    .send(Message::Text(snapshot.to_string().into()))
+                    .await
+                    .unwrap();
+                let _ = socket.close(None).await;
+            });
+            let (events, mut incoming) = mpsc::channel(4);
+            assert!(
+                timeout(Duration::from_secs(2), api.stream_once(true, &events))
+                    .await
+                    .unwrap()
+                    .is_err()
+            );
+            server.await.unwrap();
+            if invalid.is_none() {
+                assert!(matches!(incoming.try_recv(), Ok(Event::LogStreamReady)));
+            }
+            assert!(
+                incoming.try_recv().is_err(),
+                "Invalid snapshots cannot rearm notices"
+            );
+        }
     }
 
     fn status_envelope(sequence: u64, kind: &str) -> Value {

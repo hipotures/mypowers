@@ -129,6 +129,7 @@ impl App {
 
     pub fn update(&mut self, event: Event) {
         match event {
+            Event::LogStreamReady => self.log_notice.clear(),
             Event::Status(status) => {
                 self.connection_feedback(&status);
                 let changed = self

@@ -1599,6 +1599,42 @@ fn stream_errors_replace_transient_feedback() {
 }
 
 #[test]
+fn recovered_log_stream_rearms_notices_without_replacing_user_feedback() {
+    let mut app = app();
+    let notice = "Logs: Daemon stream closed. Reconnecting...";
+    app.update(Event::Notice(notice.into()));
+    assert_eq!(
+        app.feedback.as_ref().unwrap().message,
+        "Log stream unavailable; reconnecting"
+    );
+    app.update(Event::Finished(Feedback::new(
+        "AC ON confirmed",
+        Severity::Success,
+    )));
+    let started = app.feedback.as_ref().unwrap().started;
+    app.update(Event::Notice(notice.into()));
+    assert_eq!(app.feedback.as_ref().unwrap().message, "AC ON confirmed");
+    assert_eq!(app.feedback.as_ref().unwrap().started, started);
+    app.update(Event::LogStreamReady);
+    assert!(app.log_notice.is_empty());
+    assert_eq!(app.feedback.as_ref().unwrap().message, "AC ON confirmed");
+    assert_eq!(app.feedback.as_ref().unwrap().started, started);
+    app.update(Event::Notice(notice.into()));
+    assert_eq!(
+        app.feedback.as_ref().unwrap().message,
+        "Log stream unavailable; reconnecting"
+    );
+    app.update(Event::Finished(Feedback::new(
+        "DC OFF confirmed",
+        Severity::Success,
+    )));
+    let started = app.feedback.as_ref().unwrap().started;
+    app.update(Event::Notice(notice.into()));
+    assert_eq!(app.feedback.as_ref().unwrap().message, "DC OFF confirmed");
+    assert_eq!(app.feedback.as_ref().unwrap().started, started);
+}
+
+#[test]
 fn runtime_action_feedback_stays_only_in_status_strip_despite_concurrent_log_page() {
     let mut app = app();
     let Effect::Logs(request) = app.key(KeyEvent::new(KeyCode::F(3), KeyModifiers::NONE)) else {
