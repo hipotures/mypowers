@@ -186,6 +186,22 @@ def test_native_controls_logs_paste_resize_and_restoration(
         session.close()
 
 
+def test_keyboard_burst_does_not_starve_immediate_quit(daemon_process, tui_binary, tmp_path):
+    _, url, env = daemon_process
+    session = Session(tui_binary, tmp_path, env, "--server", url)
+    try:
+        session.read(b"CONNECTED")
+        # Focus changes are local and cannot send hardware commands.
+        payload = b"\t" * 2048 + b"\x11"
+        assert os.write(session.master, payload) == len(payload)
+        # A terminal emulator drains output while the application processes input.
+        session.read(b"\x1b[?1049l", budget=2)
+        assert session.process.wait(timeout=2) == 0
+        assert termios.tcgetattr(session.slave) == session.original
+    finally:
+        session.close()
+
+
 def test_status_strip_confirmations_fade_and_debug_does_not_keep_it_alive(
     daemon_process, tui_binary, tmp_path
 ):

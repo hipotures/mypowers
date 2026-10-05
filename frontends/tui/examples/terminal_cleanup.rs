@@ -8,6 +8,27 @@ fn main() -> std::io::Result<()> {
     eprintln!("SESSION READY");
     match mode.as_str() {
         "normal" => {}
+        "input-burst" => {
+            use crossterm::event::{Event, KeyCode, KeyModifiers, read};
+            let mut count = 0;
+            loop {
+                if let Event::Key(key) = read()? {
+                    match key.code {
+                        KeyCode::Tab => {
+                            count += 1;
+                            if count % 512 == 0 {
+                                eprintln!("INPUT COUNT {count}");
+                            }
+                        }
+                        KeyCode::Char('q') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+                            break;
+                        }
+                        _ => {}
+                    }
+                }
+            }
+            eprintln!("INPUT COMPLETE {count}");
+        }
         "main-panic" => panic!("Main-thread cleanup test"),
         "worker-panic" => {
             let result = std::thread::spawn(|| panic!("Worker cleanup test")).join();

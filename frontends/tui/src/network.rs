@@ -622,6 +622,107 @@ mod tests {
         assert_eq!(received, Some(record));
     }
 
+    async fn accept_http_request(
+        listener: &tokio::net::TcpListener,
+    ) -> (tokio::net::TcpStream, String) {
+        timeout(Duration::from_secs(3), async {
+            let (mut socket, _) = listener.accept().await.unwrap();
+            let mut bytes = Vec::new();
+            loop {
+                let mut chunk = [0u8; 4096];
+                let count = socket.read(&mut chunk).await.unwrap();
+                assert!(count > 0);
+                bytes.extend_from_slice(&chunk[..count]);
+                if bytes.windows(4).any(|window| window == b"\r\n\r\n") {
+                    break;
+                }
+            }
+            (socket, String::from_utf8(bytes).unwrap())
+        })
+        .await
+        .unwrap()
+    }
+
+    #[tokio::test]
+    async fn log_queries_replace_a_stalled_request_with_the_latest_navigation() {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let api = Arc::new(api_for(&listener));
+        let (requests, operations) = tokio::sync::watch::channel(None);
+        let (events, mut incoming) = mpsc::channel(4);
+        let worker = tokio::spawn(api.log_pages(operations, events));
+        let mut logs = crate::logs::Logs::new(Some(chrono_tz::UTC));
+        let first = logs.open().unwrap();
+        requests.send(Some(first)).unwrap();
+        // Keep the first connection open without a response throughout the next query.
+        let (_stalled, _) = accept_http_request(&listener).await;
+        requests.send(logs.navigate(false)).unwrap();
+        let newest = logs.navigate(false).unwrap();
+        requests.send(Some(newest.clone())).unwrap();
+        let (mut socket, headers) = accept_http_request(&listener).await;
+        let path = headers
+            .lines()
+            .next()
+            .unwrap()
+            .split_whitespace()
+            .nth(1)
+            .unwrap();
+        let url = reqwest::Url::parse(&format!("http://localhost{path}")).unwrap();
+        assert_eq!(url.path(), "/api/v1/logs");
+        assert_eq!(
+            url.query_pairs().find(|(key, _)| key == "since").unwrap().1,
+            newest.since
+        );
+        let body = json!({
+            "schema_version": 1, "items": [], "previous_cursor": null, "next_cursor": null,
+            "has_more_before": false, "has_more_after": false, "source": "files",
+            "gap": false, "skipped_lines": 0
+        })
+        .to_string();
+        socket
+            .write_all(
+                format!(
+                    "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+                    body.len()
+                )
+                .as_bytes(),
+            )
+            .await
+            .unwrap();
+        let Event::LogPage(request, page) = timeout(Duration::from_secs(1), incoming.recv())
+            .await
+            .unwrap()
+            .unwrap()
+        else {
+            panic!("Expected the latest log page");
+        };
+        assert_eq!(request.generation, newest.generation);
+        assert!(page.unwrap().items.is_empty());
+        assert!(incoming.try_recv().is_err());
+        drop(requests);
+        timeout(Duration::from_secs(1), worker)
+            .await
+            .unwrap()
+            .unwrap();
+    }
+
+    #[tokio::test]
+    async fn closing_log_requests_cancels_an_in_flight_query() {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let api = Arc::new(api_for(&listener));
+        let (requests, operations) = tokio::sync::watch::channel(None);
+        let (events, mut incoming) = mpsc::channel(4);
+        let worker = tokio::spawn(api.log_pages(operations, events));
+        let mut logs = crate::logs::Logs::new(Some(chrono_tz::UTC));
+        requests.send(logs.open()).unwrap();
+        let (_stalled, _) = accept_http_request(&listener).await;
+        drop(requests);
+        timeout(Duration::from_secs(1), worker)
+            .await
+            .unwrap()
+            .unwrap();
+        assert!(incoming.recv().await.is_none());
+    }
+
     #[tokio::test]
     async fn uncertain_admission_is_one_put_with_captured_revision_and_key() {
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();

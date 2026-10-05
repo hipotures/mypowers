@@ -52,6 +52,20 @@ def test_guard_restores_terminal_and_panics_stop_the_process(
         session.close()
 
 
+def test_crossterm_consumes_the_entire_input_burst(cleanup_binary, tmp_path):
+    session = Session(cleanup_binary, tmp_path, os.environ.copy(), "input-burst")
+    try:
+        session.read(b"SESSION READY")
+        payload = b"\t" * 2048 + b"\x11"
+        assert os.write(session.master, payload) == len(payload)
+        captured = session.read(b"\x1b[?25h", budget=2)
+        assert b"INPUT COMPLETE 2048" in captured
+        assert session.process.wait(timeout=2) == 0
+        assert termios.tcgetattr(session.slave) == session.original
+    finally:
+        session.close()
+
+
 def test_setup_write_failure_restores_raw_mode(cleanup_binary, tmp_path):
     master, slave = pty.openpty()
     original = termios.tcgetattr(slave)

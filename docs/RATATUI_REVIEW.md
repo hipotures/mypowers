@@ -207,6 +207,39 @@ drawing, and diagnostics have a separate view. Cargo resolves one Crossterm
 version (0.29.0) shared by direct input handling and Ratatui's backend. No widget
 replacement, terminal backend change, or dependency upgrade is justified.
 
+### 7. Prevent large Unix keyboard bursts from stalling
+
+A native regression test sent 2,048 local Tab focus changes followed by Ctrl-Q
+in one PTY write. The frontend failed to quit even while the test drained its
+output. A daemon-free fixture using only Crossterm `read()` reproduced the
+failure: it consumed exactly 1,024 events and then waited with input still
+pending. This isolates the problem from the frontend's event budget and network
+workers. Inspection of the installed Crossterm 0.29.0 Mio source found its
+1,024-byte read buffer and return-before-draining behavior.
+
+Enabled Crossterm's documented
+[`use-dev-tty` feature](https://docs.rs/crate/crossterm/0.29.0/source/Cargo.toml.orig),
+which selects raw file-descriptor polling on Unix. Both reproductions now consume
+the complete burst and quit successfully. The production event loop, Ratatui
+backend, and render cadence are unchanged. The feature adds `filedescriptor` and
+its `thiserror` dependencies to both lockfiles; resolution/builds used the offline
+crate cache. No dependency fork or custom input parser was introduced.
+
+Also reviewed Tokio's
+[`watch::Receiver::changed`](https://docs.rs/tokio/latest/tokio/sync/watch/struct.Receiver.html)
+and [`select!` cancellation safety](https://docs.rs/tokio/latest/tokio/macro.select.html).
+Two new tests confirm that log navigation cancels an HTTP request whose response
+has stalled, processes the latest queued navigation, and exits if the request
+channel closes during an in-flight query. This behavior already works correctly;
+the log worker needed no implementation change.
+
+Validation: all 34 Rust tests, 9 xtask tests, and 20 native PTY cases passed.
+The full PTY suite covers resize, controls, mouse/modal behavior, bracketed paste,
+TLS transport, input bursts, signals, and terminal restoration against isolated
+simulated daemons. Formatting, Ruff, Clippy with warnings denied, and diff checks
+passed. All 15 SVGs pass `--check`; regenerated SVG hashes and Logs PNG bytes
+match the before set exactly. Inspected the after PNG.
+
 ## Remaining review
 
 - Finish Counter error-handling and JSON Editor tutorial details; review applicable examples.
