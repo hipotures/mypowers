@@ -491,6 +491,33 @@ and live dashboard PNG bytes match the before set exactly. Inspected the live
 PNG before and after. The installed binary from cycle 15 remains current because
 this cycle changes only tests and documentation.
 
+### 17. Verify heartbeat liveness and telemetry expiration
+
+Reviewed the remaining [component event-loop and teardown template](https://ratatui.rs/templates/component/tui-rs/),
+the [JSON editor's finished UI](https://ratatui.rs/tutorials/json-editor/closing-thoughts/),
+and the installed [Tungstenite WebSocket contract](https://docs.rs/tungstenite/0.30.0/tungstenite/protocol/struct.WebSocket.html).
+The frontend keeps one synchronous terminal reader and bounds network work per
+iteration; existing native burst tests cover responsiveness. Adopting the
+template's unbounded event channel or additional cancellation layer would not
+improve this application. Pong frames echo Ping payloads without replacing
+application-level receive deadlines.
+
+Added an isolated WebSocket regression using the production stream consumer and
+App updates. Valid heartbeats arrive every five seconds through second 20,
+while Ping frames continue each second. The API remains reachable after station
+telemetry expires, but output commands become unavailable. After the final
+heartbeat, the stream times out after 15 seconds despite continuing Pings.
+The server checks matching Pong payloads in send order; no heartbeat or Ping
+becomes a telemetry update. This uses the real timeout without extra Tokio
+features, daemon access, or hardware. The existing implementation passed;
+no production change was warranted.
+
+All 44 Rust tests passed in 35.12 seconds. Formatting, Clippy with warnings
+denied, and diff checks passed. All 15 SVGs pass `--check`; regenerated SVGs
+and reconnecting PNG bytes match the before set exactly. Inspected the
+reconnecting PNG before and after. The installed frontend remains current
+because this cycle changes only tests and documentation.
+
 ## Remaining review
 
 - Review remaining applicable application examples and tutorial integration details.

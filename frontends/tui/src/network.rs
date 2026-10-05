@@ -633,6 +633,102 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn heartbeats_extend_api_liveness_but_pings_do_not_refresh_telemetry_or_the_deadline() {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let api = api_for(&listener);
+        let server = tokio::spawn(async move {
+            let (socket, _) = listener.accept().await.unwrap();
+            let mut socket = tokio_tungstenite::accept_async(socket).await.unwrap();
+            let status = crate::tests::status();
+            socket
+                .send(Message::Text(
+                    json!({
+                        "schema_version": 1, "server_instance_id": status.server_instance_id,
+                        "server_time": status.server_time, "stream_sequence": 1,
+                        "type": "snapshot", "data": status
+                    })
+                    .to_string()
+                    .into(),
+                ))
+                .await
+                .unwrap();
+            let mut interval = tokio::time::interval(Duration::from_secs(1));
+            interval.tick().await;
+            let (mut ticks, mut sequence, mut heartbeats, mut pongs) = (0u8, 1, 0, 0);
+            let mut pending_pings = std::collections::VecDeque::new();
+            loop {
+                tokio::select! {
+                    _ = interval.tick() => {
+                        ticks += 1;
+                        if ticks <= 20 && ticks % 5 == 0 {
+                            sequence += 1;
+                            let message = json!({
+                                "schema_version": 1, "server_instance_id": status.server_instance_id,
+                                "server_time": chrono::Utc::now().to_rfc3339(),
+                                "stream_sequence": sequence, "type": "heartbeat", "data": null
+                            });
+                            if socket.send(Message::Text(message.to_string().into())).await.is_err() {
+                                break;
+                            }
+                            heartbeats += 1;
+                        }
+                        if socket.send(Message::Ping(vec![ticks].into())).await.is_err() {
+                            break;
+                        }
+                        pending_pings.push_back(ticks);
+                    }
+                    frame = socket.next() => {
+                        match frame {
+                            Some(Ok(Message::Pong(payload))) => {
+                                assert_eq!(payload.as_ref(), &[pending_pings.pop_front().unwrap()]);
+                                pongs += 1;
+                            }
+                            _ => break,
+                        }
+                    }
+                }
+            }
+            (heartbeats, pongs)
+        });
+        let (events, mut incoming) = mpsc::channel(4);
+        let started = Instant::now();
+        let worker = tokio::spawn(async move { api.stream_once(false, &events).await });
+        let first = timeout(Duration::from_secs(2), incoming.recv())
+            .await
+            .unwrap()
+            .unwrap();
+        assert!(matches!(first, Event::Status(_)));
+        let mut app = crate::app::App::new(false, Some(chrono_tz::UTC));
+        app.update(first);
+        assert!(app.allowed());
+        tokio::time::sleep(Duration::from_secs(4)).await;
+        assert!(!worker.is_finished());
+        assert!(app.connected);
+        assert!(!app.live() && !app.allowed());
+        assert!(matches!(app.toggle(0), crate::app::Effect::None));
+        let result = timeout(Duration::from_secs(36), worker)
+            .await
+            .unwrap()
+            .unwrap();
+        let error = result.unwrap_err();
+        assert_eq!(error, "Daemon stream timed out. Reconnecting...");
+        assert!(started.elapsed() >= Duration::from_secs(35));
+        assert!(started.elapsed() < Duration::from_secs(40));
+        let (heartbeats, pongs) = timeout(Duration::from_secs(2), server)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(heartbeats, 4);
+        assert!(pongs >= 25);
+        assert!(
+            incoming.try_recv().is_err(),
+            "Heartbeat or Ping became a telemetry update"
+        );
+        app.update(Event::Disconnected(error));
+        assert!(!app.connected && !app.allowed());
+    }
+
+    #[tokio::test]
     async fn log_stream_rejects_malformed_records_before_queueing() {
         let valid = json!({
             "timestamp": "2026-10-05T12:00:00Z", "sequence": 4,
