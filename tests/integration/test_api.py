@@ -9,7 +9,7 @@ from fastapi.testclient import TestClient
 from starlette.websockets import WebSocketDisconnect
 
 from mypowers.api import create_app
-from mypowers.contracts import Status, StreamMessage
+from mypowers.contracts import Settings, Status, StreamMessage
 from mypowers.daemon.service import Service
 
 
@@ -422,7 +422,7 @@ def test_settings_api_validates_partial_updates_and_persists_across_restart(conf
             if response.status_code == 200:
                 break
             time.sleep(0.02)
-        assert response.json() == {"schema_version": 1, "graph_interval_seconds": 10}
+        assert response.json() == Settings().model_dump()
         assert (
             client.put("/api/v1/settings", json={"graph_interval_seconds": 60}).json()[
                 "graph_interval_seconds"
@@ -439,11 +439,42 @@ def test_settings_api_validates_partial_updates_and_persists_across_restart(conf
             client.put("/api/v1/settings", json={"telegram_token": "not-a-real-token"}).status_code
             == 422
         )
-        assert client.get("/api/v1/settings").json()["graph_interval_seconds"] == 60
+        preferences = {
+            "graph_interval_seconds": 30,
+            "graph_visualization": "chart",
+            "graph_base_scale_w": 300,
+            "timezone": "Europe/Warsaw",
+            "logs_page_size": 250,
+        }
+        assert client.put("/api/v1/settings", json=preferences).json() == {
+            **preferences,
+            "schema_version": 1,
+        }
+        for field, invalid in [
+            ("graph_visualization", "other"),
+            ("graph_base_scale_w", 0),
+            ("graph_base_scale_w", 100.0),
+            ("timezone", "Not/AZone"),
+            ("timezone", "a" * 200),
+            ("logs_page_size", 0),
+            ("logs_page_size", "250"),
+        ]:
+            assert (
+                client.put(
+                    "/api/v1/settings", json={field: invalid, "graph_interval_seconds": 10}
+                ).status_code
+                == 422
+            )
+            assert client.get("/api/v1/settings").json() == {**preferences, "schema_version": 1}
+        assert client.put("/api/v1/settings", json={"logs_page_size": 500}).json() == {
+            **preferences,
+            "logs_page_size": 500,
+            "schema_version": 1,
+        }
     with TestClient(create_app(config)) as client:
         for _ in range(100):
             response = client.get("/api/v1/settings")
             if response.status_code == 200:
                 break
             time.sleep(0.02)
-        assert response.json() == {"schema_version": 1, "graph_interval_seconds": 60}
+        assert response.json() == {**preferences, "logs_page_size": 500, "schema_version": 1}

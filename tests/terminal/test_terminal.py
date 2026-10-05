@@ -636,9 +636,9 @@ def test_native_pause_resume_retry_and_runtime_logging_receipts(
             session.write(b"\t\t\t\t")
             session.read(b"Debug / Diagnostics")
             for key, message in [
-                (b"p", b"Station connection paused"),
-                (b"r", b"Reconnecting to station"),
-                (b"p", b"CONNECTED"),
+                (b"\x1b[B\r", b"Station connection paused"),
+                (b"\x1b[A\r", b"Reconnecting to station"),
+                (b"\x1b[B\r", b"CONNECTED"),
             ]:
                 session.write(key)
                 captured = session.read(message)
@@ -646,8 +646,9 @@ def test_native_pause_resume_retry_and_runtime_logging_receipts(
                 desired = "running" if message == b"CONNECTED" else "paused"
                 assert client.get("/api/v1/status").json()["connection"]["desired"] == desired
             session.read(b"Log: INFO")
+            session.write(b"\x1b[B")
             for level in ["DEBUG", "INFO"]:
-                session.write(b"b")
+                session.write(b"\r")
                 captured = session.read(f"Log level changed to {level}".encode())
                 assert b"Request failed" not in captured
                 session.read(f"Log: {level}".encode())
@@ -1316,35 +1317,59 @@ def test_stalled_clipboard_helper_is_stopped_without_blocking_the_tui(
         session.close()
 
 
-def test_settings_startup_interval_is_saved_on_daemon_and_applied_on_next_tui_start(
+def test_settings_form_saves_all_preferences_and_restores_them_on_next_tui_start(
     daemon_process, tui_binary, tmp_path
 ):
     _, url, env = daemon_process
     with httpx.Client(base_url=url, trust_env=False) as client:
-        assert (
-            client.put("/api/v1/settings", json={"graph_interval_seconds": 60}).status_code == 200
-        )
         session = Session(tui_binary, tmp_path, env, "--server", url)
         try:
-            session.read(b"t 60s")
+            session.read(b"CONNECTED")
             session.write(b"s")
-            session.read(b"SETTINGS")
+            session.read(b"Save changes")
+            session.write(b"\r")
+            session.read(b"Search:")
+            session.write(b"Europe/Warsaw\r")
+            session.read(b"Europe/Warsaw")
+            session.write(b"\x1b[B\r")
+            session.read(b"Available values")
+            session.write(b"\x1b[B\r")
             session.write(b"\t")
             session.read(b"Power graphs")
-            session.read(b"Startup interval")
-            session.write(b"d")
-            session.read(b"(unsaved)")
-            session.write(b"s")
+            session.write(b"\r")
+            session.read(b"Available values")
+            session.write(b"\x1b[B\r")
+            session.write(b"\x1b[B\r")
+            session.read(b"Available values")
+            session.read(b"30s")
+            session.write(b"\x1b[B\r")
+            session.write(b"\x1b[B\r")
+            session.read(b"Available values")
+            session.write(b"\x1b[B\r")
+            session.write(b"\x1b[B\r")
             session.read(b"Settings saved")
-            assert client.get("/api/v1/settings").json()["graph_interval_seconds"] == 3600
-            current = next(row for row in session.screen.display if "Current interval" in row)
-            assert "60s" in current
+            expected = {
+                "schema_version": 1,
+                "graph_interval_seconds": 30,
+                "graph_visualization": "chart",
+                "graph_base_scale_w": 300,
+                "timezone": "Europe/Warsaw",
+                "logs_page_size": 250,
+            }
+            assert client.get("/api/v1/settings").json() == expected
             session.write(b"\x1b")
-            session.read(b"t 60s")
+            session.read(b"t 30s")
+            assert any("300" in row for row in session.screen.display)
         finally:
             session.close()
         restarted = Session(tui_binary, tmp_path, env, "--server", url)
         try:
-            restarted.read(b"t 1h")
+            restarted.read(b"t 30s")
+            restarted.write(b"s")
+            restarted.read(b"Europe/Warsaw")
+            restarted.read(b"250")
+            restarted.write(b"\t")
+            restarted.read(b"Chart")
+            restarted.read(b"300")
         finally:
             restarted.close()

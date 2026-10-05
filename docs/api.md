@@ -14,7 +14,7 @@ the checked-in [OpenAPI artifact](openapi.json) describes typed requests and res
 | GET `/api/v1/settings` | Persisted application settings and defaults |
 | PUT `/api/v1/settings` | Validate and persist supplied settings fields; omitted fields stay unchanged |
 | GET `/api/v1/history` | UTC `[since,until)` raw sample page, limit/cursor |
-| GET `/api/v1/history/aggregates` | UTC power averages and sample counts per 10s / 60s / 1h bucket |
+| GET `/api/v1/history/aggregates` | UTC power averages and sample counts per 10s / 30s / 60s / 1h bucket |
 | PUT `/api/v1/outputs/{ac,dc,light}` | One explicit boolean intention with idempotency UUID |
 | GET `/api/v1/commands/{uuid}` | Retained asynchronous result |
 | PUT `/api/v1/connection` | `{"desired":"paused"}` or `{"desired":"running"}` |
@@ -131,16 +131,34 @@ command IDs. Slow queues close 1013; command results remain queryable. No durabl
 
 ## Application settings
 
-`GET /api/v1/settings` returns `{"schema_version":1,"graph_interval_seconds":10}`
-until a startup interval is saved. `PUT /api/v1/settings` accepts, for example,
-`{"graph_interval_seconds":60}` and returns the complete saved settings document.
-The supported intervals are integer **10, 60, 3600** seconds. Unknown fields,
-null, booleans, strings, and fractional numbers return 422; an empty object keeps
-all saved values. Settings use the same authentication and request policies as
-other API endpoints. Unavailable SQLite storage returns 503.
+`GET /api/v1/settings` returns the complete public preferences document:
 
-Values survive daemon restarts in the `settings` table, independently of telemetry
-recording being enabled. They do not rewrite YAML or dotenv. The TUI loads the
-saved default at startup; its `t` shortcut changes only the current session.
-Settings contain only explicitly declared public preference fields. Connector
-credentials must not be added to this client-visible document.
+```json
+{"schema_version":1,"graph_interval_seconds":10,"graph_visualization":"sparkline","graph_base_scale_w":100,"timezone":"system","logs_page_size":100}
+```
+
+`PUT /api/v1/settings` writes only supplied fields and returns the complete saved
+settings. Supported values:
+
+| Field | Values |
+|---|---|
+| `graph_interval_seconds` | Integer 10, 30, 60, 3600 seconds per bar |
+| `graph_visualization` | `sparkline`, `chart` |
+| `graph_base_scale_w` | Integer 100 or 300 W; automatic doubling above the base |
+| `timezone` | `system` or a valid IANA timezone |
+| `logs_page_size` | Integer 50, 100, 250, 500, 1000 |
+
+Unknown fields, null, invalid types and unsupported values return 422 without
+changing any preference. An empty object leaves saved values untouched. Settings
+use the same authentication and request policies as other endpoints. Unavailable
+SQLite storage returns 503.
+
+Values survive daemon restarts in the existing `settings(key,value_json)` table,
+independently of telemetry recording. No table alteration is needed for new
+preference fields. YAML and dotenv are not rewritten. The TUI Settings form offers
+visible lists and a Save changes button; a confirmed save applies all preferences
+immediately and future TUI sessions load them at startup. Unsaved edits remain a
+draft. Explicit TUI timezone flags override the saved timezone at startup.
+Dashboard graph shortcuts change only that session. Debug connection controls
+and the runtime log override are actions, separate from persisted preferences.
+Connector credentials must not be added to this client-visible document.

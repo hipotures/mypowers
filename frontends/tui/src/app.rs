@@ -3,7 +3,7 @@ use crate::{
     feedback::{Feedback, Severity, output_name},
     model::{Command, Status},
     network::{ClipboardTarget, Event, Intent},
-    settings::{Settings, SettingsTab},
+    settings::{Field, Picker, Settings, SettingsTab},
 };
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
 use ratatui::layout::{Position, Rect};
@@ -38,7 +38,17 @@ pub struct App {
     pub settings_tab: SettingsTab,
     pub settings_tabs: [Rect; 5],
     pub settings: Option<Settings>,
-    pub startup_interval: crate::history::Resolution,
+    pub settings_draft: Settings,
+    pub settings_selected: usize,
+    pub settings_fields: Vec<(Rect, Field)>,
+    pub settings_choices: Vec<(Rect, usize)>,
+    pub settings_actions: [Rect; 3],
+    pub settings_save: Rect,
+    pub settings_picker: Option<Picker>,
+    settings_press: Option<usize>,
+    pub graph_base_scale_w: u64,
+    graph_view_overridden: bool,
+    timezone_overridden: bool,
     pub settings_error: bool,
     graph_interval_overridden: bool,
     pub view: View,
@@ -94,7 +104,17 @@ impl App {
             settings_tab: SettingsTab::default(),
             settings_tabs: [Rect::default(); 5],
             settings: None,
-            startup_interval: crate::history::Resolution::TenSeconds,
+            settings_draft: Settings::default(),
+            settings_selected: 0,
+            settings_fields: Vec::new(),
+            settings_choices: Vec::new(),
+            settings_actions: [Rect::default(); 3],
+            settings_save: Rect::default(),
+            settings_picker: None,
+            settings_press: None,
+            graph_base_scale_w: 100,
+            graph_view_overridden: false,
+            timezone_overridden: timezone.is_some(),
             settings_error: false,
             graph_interval_overridden: false,
             view: View::Dashboard,
@@ -119,20 +139,16 @@ impl App {
     pub fn update(&mut self, event: Event) {
         match event {
             Event::Settings(settings) => {
-                let Some(resolution) = settings.resolution() else {
+                if !settings.valid() {
                     return;
-                };
-                let unchanged = self
-                    .settings
-                    .as_ref()
-                    .is_none_or(|old| old.resolution() == Some(self.startup_interval));
-                if self.settings.is_none() && !self.graph_interval_overridden {
-                    self.graph.resolution = resolution;
-                    self.graph.points.clear();
-                    self.reset_history();
                 }
-                if unchanged || self.pending.as_deref() == Some("settings request") {
-                    self.startup_interval = resolution;
+                let saving = self.pending.as_deref() == Some("settings request");
+                let first = self.settings.is_none();
+                if first || saving {
+                    self.apply_settings(&settings, saving);
+                }
+                if first || saving || self.settings.as_ref() == Some(&self.settings_draft) {
+                    self.settings_draft = settings.clone();
                 }
                 self.settings = Some(settings);
                 self.settings_error = false;
@@ -495,6 +511,9 @@ impl App {
         {
             return Effect::None;
         }
+        if self.view == View::Settings && self.settings_picker.is_some() {
+            return self.picker_key(key);
+        }
         if key.code == KeyCode::Esc {
             if self.view != View::Dashboard {
                 self.view = View::Dashboard;
@@ -551,43 +570,21 @@ impl App {
             },
             View::Settings => match key.code {
                 KeyCode::F(1) | KeyCode::Char('?') => self.open_help(),
-                KeyCode::Tab | KeyCode::Right => {
-                    self.select_settings_tab(self.settings_tab.next(false))
-                }
-                KeyCode::BackTab | KeyCode::Left => {
-                    self.select_settings_tab(self.settings_tab.next(true))
-                }
-                KeyCode::Char(key @ ('r' | 'p' | 'b'))
-                    if self.settings_tab == SettingsTab::Debug =>
-                {
-                    return self.operation(key);
-                }
-                KeyCode::Char('t') if self.settings_tab == SettingsTab::Charts => {
-                    self.cycle_graph_interval()
-                }
-                KeyCode::Char('g') if self.settings_tab == SettingsTab::Charts => {
-                    self.toggle_graph_view()
-                }
-                KeyCode::Char('d')
-                    if self.settings_tab == SettingsTab::Charts
-                        && self.settings.is_some()
-                        && self.pending.is_none() =>
-                {
-                    self.startup_interval = self.startup_interval.next();
-                }
-                KeyCode::Char('s') if self.settings_tab == SettingsTab::Charts => {
-                    if self.connected && self.settings.is_some() && self.pending.is_none() {
-                        self.pending = Some("settings request".into());
-                        self.feedback = Some(Feedback::new("Saving settings...", Severity::Info));
-                        return Effect::Request(Intent::SaveSettings(
-                            self.startup_interval.seconds(),
-                        ));
+                KeyCode::Tab => self.select_settings_tab(self.settings_tab.next(false)),
+                KeyCode::BackTab => self.select_settings_tab(self.settings_tab.next(true)),
+                KeyCode::Up | KeyCode::Down => {
+                    let count = self.settings_count();
+                    if count > 0 {
+                        self.settings_selected = (self.settings_selected
+                            + if key.code == KeyCode::Up {
+                                count - 1
+                            } else {
+                                1
+                            })
+                            % count;
                     }
-                    self.feedback = Some(Feedback::new(
-                        "Settings unavailable or operation pending",
-                        Severity::Warning,
-                    ));
                 }
+                KeyCode::Enter | KeyCode::Char(' ') => return self.edit_setting(),
                 _ => {}
             },
             View::Help => {}
@@ -610,6 +607,136 @@ impl App {
         Effect::None
     }
 
+    fn apply_settings(&mut self, settings: &Settings, saving: bool) {
+        if saving || !self.graph_interval_overridden {
+            self.graph.resolution = settings.resolution().unwrap();
+        }
+        if saving || !self.graph_view_overridden {
+            self.graph.visualization = settings.graph_visualization;
+        }
+        self.graph_base_scale_w = settings.graph_base_scale_w;
+        if saving || !self.timezone_overridden {
+            self.timezone = settings.timezone.parse().ok();
+        }
+        self.logs
+            .configure(self.timezone, settings.logs_page_size, self.clock.now());
+        self.graph.points.clear();
+        self.resize();
+    }
+
+    fn settings_count(&self) -> usize {
+        match self.settings_tab {
+            SettingsTab::Preferences => 3,
+            SettingsTab::Charts => 4,
+            SettingsTab::Debug => 3,
+            _ => 0,
+        }
+    }
+
+    fn edit_setting(&mut self) -> Effect {
+        if self.settings_count() == 0 {
+            return Effect::None;
+        }
+        if self.settings_tab == SettingsTab::Debug {
+            return self.operation(['r', 'p', 'b'][self.settings_selected]);
+        }
+        if self.settings.is_none() || self.pending.is_some() {
+            return Effect::None;
+        }
+        if self.settings_selected == self.settings_count() - 1 {
+            return self.save_settings();
+        }
+        let field = match self.settings_tab {
+            SettingsTab::Preferences => Field::PREFERENCES[self.settings_selected],
+            SettingsTab::Charts => Field::CHARTS[self.settings_selected],
+            _ => return Effect::None,
+        };
+        let selected = field
+            .choices()
+            .iter()
+            .position(|value| *value == self.settings_draft.value(field))
+            .unwrap_or(0);
+        self.settings_picker = Some(Picker {
+            field,
+            selected,
+            query: String::new(),
+        });
+        self.resize();
+        Effect::None
+    }
+
+    fn save_settings(&mut self) -> Effect {
+        if self.connected && self.settings.is_some() && self.pending.is_none() {
+            self.pending = Some("settings request".into());
+            self.feedback = Some(Feedback::new("Saving settings...", Severity::Info));
+            Effect::Request(Intent::SaveSettings(self.settings_draft.clone()))
+        } else {
+            self.feedback = Some(Feedback::new(
+                "Settings unavailable or operation pending",
+                Severity::Warning,
+            ));
+            Effect::None
+        }
+    }
+
+    fn picker_key(&mut self, key: KeyEvent) -> Effect {
+        if key.code == KeyCode::Char('q') {
+            self.settings_picker = None;
+            self.view = View::Quit;
+            self.quit_yes = true;
+            self.resize();
+            return Effect::None;
+        }
+        let picker = self.settings_picker.as_mut().unwrap();
+        let options = picker.options();
+        match key.code {
+            KeyCode::Esc => {
+                self.settings_picker = None;
+                self.resize();
+            }
+            KeyCode::Up
+            | KeyCode::Down
+            | KeyCode::PageUp
+            | KeyCode::PageDown
+            | KeyCode::Home
+            | KeyCode::End => {
+                if !options.is_empty() {
+                    let step = match key.code {
+                        KeyCode::PageUp | KeyCode::PageDown => 8,
+                        _ => 1,
+                    };
+                    picker.selected = match key.code {
+                        KeyCode::Home => 0,
+                        KeyCode::End => options.len() - 1,
+                        KeyCode::Up | KeyCode::PageUp => picker.selected.saturating_sub(step),
+                        _ => (picker.selected + step).min(options.len() - 1),
+                    };
+                }
+            }
+            KeyCode::Enter => {
+                if let Some((index, _)) = options.get(picker.selected) {
+                    self.settings_draft.choose(picker.field, *index);
+                    self.settings_picker = None;
+                    self.resize();
+                }
+            }
+            KeyCode::Char(character)
+                if picker.field == Field::Timezone
+                    && !character.is_control()
+                    && picker.query.len() < 128 =>
+            {
+                picker.query.push(character);
+                picker.selected = 0;
+            }
+            KeyCode::Backspace if picker.field == Field::Timezone => {
+                picker.query.pop();
+                picker.selected = 0;
+            }
+            _ => {}
+        }
+        Effect::None
+    }
+
     fn cycle_graph_interval(&mut self) {
         self.graph_interval_overridden = true;
         self.graph.resolution = self.graph.resolution.next();
@@ -622,6 +749,7 @@ impl App {
     }
 
     fn toggle_graph_view(&mut self) {
+        self.graph_view_overridden = true;
         self.graph.visualization = self.graph.visualization.next();
         self.resize();
         self.feedback = Some(Feedback::new(
@@ -632,6 +760,8 @@ impl App {
 
     fn select_settings_tab(&mut self, tab: SettingsTab) {
         self.settings_tab = tab;
+        self.settings_selected = 0;
+        self.settings_picker = None;
         self.resize();
     }
 
@@ -647,6 +777,11 @@ impl App {
         self.title = Rect::default();
         self.quit_buttons = [Rect::default(); 2];
         self.settings_tabs = [Rect::default(); 5];
+        self.settings_fields.clear();
+        self.settings_choices.clear();
+        self.settings_actions = [Rect::default(); 3];
+        self.settings_save = Rect::default();
+        self.settings_press = None;
         self.title_click = None;
         self.press = None;
         self.logs.resize();
@@ -678,14 +813,54 @@ impl App {
                 .unwrap_or(Effect::None);
         }
         if self.view == View::Settings {
+            let position = Position::new(mouse.column, mouse.row);
+            if let Some(picker) = &mut self.settings_picker {
+                if mouse.kind == MouseEventKind::Down(MouseButton::Left)
+                    && let Some((_, index)) = self
+                        .settings_choices
+                        .iter()
+                        .find(|(rect, _)| rect.contains(position))
+                {
+                    self.settings_draft.choose(picker.field, *index);
+                    self.settings_picker = None;
+                    self.resize();
+                }
+                return Effect::None;
+            }
             if mouse.kind == MouseEventKind::Down(MouseButton::Left) {
-                let position = Position::new(mouse.column, mouse.row);
                 if let Some(index) = self
                     .settings_tabs
                     .iter()
                     .position(|rect| rect.contains(position))
                 {
                     self.select_settings_tab(SettingsTab::ALL[index]);
+                } else if let Some(index) = self
+                    .settings_fields
+                    .iter()
+                    .position(|(rect, _)| rect.contains(position))
+                {
+                    self.settings_selected = index;
+                    return self.edit_setting();
+                } else if self.settings_save.contains(position) {
+                    self.settings_selected = self.settings_count() - 1;
+                    self.settings_press = Some(3);
+                } else if let Some(index) = self
+                    .settings_actions
+                    .iter()
+                    .position(|rect| rect.contains(position))
+                {
+                    self.settings_selected = index;
+                    self.settings_press = Some(index);
+                }
+            } else if mouse.kind == MouseEventKind::Up(MouseButton::Left)
+                && let Some(index) = self.settings_press.take()
+            {
+                if index == 3 {
+                    if self.settings_save.contains(position) {
+                        return self.save_settings();
+                    }
+                } else if self.settings_actions[index].contains(position) {
+                    return self.operation(['r', 'p', 'b'][index]);
                 }
             }
             return Effect::None;

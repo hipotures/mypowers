@@ -250,7 +250,7 @@ def create_app(config: ServerConfig, service: Service | None = None) -> FastAPI:
         since: str,
         until: str,
         bucket_seconds: Annotated[
-            int, Query(description="Seconds per bucket: 10, 60 or 3600.")
+            int, Query(description="Seconds per bucket: 10, 30, 60 or 3600.")
         ] = 10,
         limit: Annotated[int, Query(ge=1, le=256)] = 256,
     ) -> HistoryAggregates:

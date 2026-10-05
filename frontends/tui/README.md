@@ -62,12 +62,11 @@ uv run mypowers tui
 | + / - in logs | Change records per request: 50, 100, 250, 500, 1,000 |
 | Home in logs | Load the beginning of the selected day |
 | End in logs | Return to today and follow its live bottom |
-| r in Settings → Debug | Request connection retry |
-| p in Settings → Debug | Pause/resume daemon BLE acquisition |
-| b in Logs or Settings → Debug | Toggle runtime DEBUG override |
-| Tab / Shift-Tab, Left/Right, or click in Settings | Select Preferences / Charts / Alerts / Notify / Debug |
-| d / s in Settings → Charts | Cycle / save the startup interval on the daemon |
-| g / t in Settings → Charts | Change the current session graph / interval |
+| b in Logs | Toggle runtime DEBUG override |
+| Retry / Pause or Resume / Debug buttons in Settings → Debug | Click or focus with Up/Down and activate with Enter |
+| Tab / Shift-Tab or click in Settings | Select Preferences / Charts / Alerts / Notify / Debug |
+| Up/Down, Enter or click in Settings | Select a field, open its value list and confirm a value |
+| Save changes in Preferences or Charts | Persist all preference fields and apply them now |
 | Double-click MYPOWERS | Copy current rendered API snapshot through Wayland `wl-copy` |
 | Double-click LOGS title | Copy every currently loaded log record, including rows outside the viewport |
 
@@ -86,7 +85,7 @@ modal dims the dashboard while telemetry updates continue underneath.
 Help and Settings are overlays using the same margins. Settings separates
 Preferences, Charts, Alerts, Notify and Debug into tabs. Debug shows daemon,
 station phase, BLE adapter, telemetry age/state, history, and effective logging.
-Connection retry and pause/resume are available only in Settings → Debug (`r` / `p`).
+Connection retry and pause/resume are buttons in Settings → Debug.
 Resize invalidates old mouse presses and
 hitboxes. Bracketed paste never activates controls. Drawing is limited to 4 FPS;
 HTTP and the independent event/log streams run outside the input/render loop.
@@ -112,7 +111,7 @@ command events appear live; the daemon admits only one output operation at once.
 No client opens BLE or SQLite or launches/stops the daemon.
 
 Graphs use server-computed SQLite averages from `GET /api/v1/history/aggregates`.
-Press `t` on the dashboard to cycle **10s → 60s → 1h per bar**; the footer shows the
+Press `t` on the dashboard to cycle **10s → 30s → 60s → 1h per bar**; the footer shows the
 selected interval. INPUT/OUTPUT numeric labels always show current telemetry,
 independently of historical averages. Selection is local to each TUI session.
 Sparkline is the default. Press `g` to switch to a shared built-in
@@ -127,19 +126,22 @@ zero at the axes’ intersection, half-scale and maximum, in W. The chart does
 not repeat this range above the plot. Seven plot rows (six at minimum terminal
 height) remain above two additional rows for the horizontal axis and time labels.
 Three or four equally spaced ticks are anchored
-to UTC intervals at full minutes (10s/60s buckets) or hours (1h buckets). Labels
+to UTC intervals at full minutes (10s/30s/60s buckets) or hours (1h buckets). Labels
 use the selected timezone: HH:MM or month-day/hour. Ticks move with the history
 window and remain at their actual timestamps, rather than relabeling fixed
 endpoints. Axes remain visible during idle. When both channels are idle it shows
 one shared idle marker.
-Visualization selection is local to the current process. The startup interval
-is persisted on the daemon via `GET` / `PUT /api/v1/settings` and loaded when a
-TUI starts. In Settings → Charts, `d` cycles its draft and `s` saves it. Saving
-does not change the current interval; dashboard `t` never saves a default. A
-late startup response preserves an interval already selected with `t`. Failed
-saves retain the draft and show an error; unavailable settings are retried.
+Settings provides editable Preferences and Charts forms. Click a field or focus
+it with Up/Down and press Enter to see its available values. Timezone supports
+text search over the IANA list. Save changes commits visualization, interval,
+base scale, timezone and log page size together through the daemon API. Confirmed
+saves apply immediately and are used on subsequent starts; failures retain the
+draft and existing active values. Dashboard `g` and `t` remain session choices,
+so a late settings response never overrides an explicit graph shortcut. Debug
+has clickable Retry, Pause/Resume and Debug ON/OFF buttons, activated by Enter
+when focused. No dedicated per-setting hotkeys are used inside Settings.
 
-For 43 columns, the visible history spans about 7 minutes, 43 minutes or 43 hours,
+For 43 columns, the visible history spans about 7 minutes, 21 minutes, 43 minutes or 43 hours,
 including the unfinished current bucket. UTC epoch boundaries keep completed
 bars stable between redraws and shift the window by whole columns.
 
@@ -157,7 +159,7 @@ Persisted samples follow the server's history interval (10 seconds by default).
 The current bucket's average can change as additional recorded samples arrive;
 no interpolation or invented history fills recording gaps. Fractional averages
 are retained, including positive values below 1 W. Both visualizations start at
-0–100 W and double the maximum until visible averages and current readings fit:
+the saved 0–100 W or 0–300 W base and double the maximum until visible averages and current readings fit:
 100 → 200 → 400 W, etc. The scale returns to a smaller step when the peak leaves
 the window. Sparklines scale independently; the shared chart uses one maximum
 for INPUT and OUTPUT. The current range appears above each plot. Positive
@@ -202,7 +204,7 @@ at the maximum dashboard size.
 Permanent age, history health, adapter, and logging diagnostics are absent from
 the normal dashboard and appear in Settings → Debug / Diagnostics. Full command details
 remain in Logs and the API. Settings has five contextual tabs. Preferences displays the current timezone
-and logs page size; Charts controls graphs and the persisted startup interval;
+and logs page size; Charts edits visualization, interval and base scale;
 Debug contains diagnostics and connection/logging actions. Alerts and Notify
 show that those features are not available yet. The snapshot tool exercises the
 same settings renderer with deterministic fixtures, without an API or database.

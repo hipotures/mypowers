@@ -115,6 +115,20 @@ impl Logs {
         }
     }
 
+    pub fn configure(
+        &mut self,
+        timezone: Option<chrono_tz::Tz>,
+        page_size: usize,
+        now: DateTime<Utc>,
+    ) {
+        if self.timezone != timezone || self.page_size != page_size {
+            let generation = self.generation + 1;
+            *self = Self::new_at(timezone, now);
+            self.page_size = page_size;
+            self.generation = generation;
+        }
+    }
+
     pub fn today(&self) -> NaiveDate {
         local_date(Utc::now(), self.timezone)
     }

@@ -359,9 +359,9 @@ class HistoryStore:
     ) -> HistoryAggregates:
         if not self.enabled or self.db is None or self.state != "ok":
             raise AppError("history_unavailable", "History is disabled or degraded.", 503)
-        if bucket_seconds not in (10, 60, 3600) or not 1 <= limit <= 256:
+        if bucket_seconds not in (10, 30, 60, 3600) or not 1 <= limit <= 256:
             raise AppError(
-                "invalid_aggregation", "Use 10, 60 or 3600 seconds and limit 1..256.", 422
+                "invalid_aggregation", "Use 10, 30, 60 or 3600 seconds and limit 1..256.", 422
             )
         start, end = aware_ms(since), aware_ms(until)
         if start >= end:

@@ -5,6 +5,7 @@ from datetime import UTC, datetime
 from enum import StrEnum
 from typing import Any, Literal
 from uuid import UUID
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from pydantic import BaseModel, ConfigDict, Field, StrictBool, field_validator
 
@@ -45,21 +46,39 @@ class LogLevelRequest(DTO):
     duration_seconds: float | None = Field(default=None, gt=0, le=86400, allow_inf_nan=False)
 
 
-class Settings(DTO):
-    schema_version: Literal[1] = 1
-    graph_interval_seconds: Literal[10, 60, 3600] = 10
+class Preferences(DTO):
+    graph_interval_seconds: Literal[10, 30, 60, 3600] = 10
+    graph_visualization: Literal["sparkline", "chart"] = "sparkline"
+    graph_base_scale_w: Literal[100, 300] = 100
+    timezone: str = Field(default="system", max_length=128)
+    logs_page_size: Literal[50, 100, 250, 500, 1000] = 100
 
-
-class SettingsUpdate(DTO):
-    # Omitted fields retain their values, so clients never overwrite unrelated preferences.
-    graph_interval_seconds: Literal[10, 60, 3600] = 10
-
-    @field_validator("graph_interval_seconds", mode="before")
+    @field_validator(
+        "graph_interval_seconds", "graph_base_scale_w", "logs_page_size", mode="before"
+    )
     @classmethod
-    def integer_interval(cls, value: Any) -> int:
+    def integer_value(cls, value: Any) -> int:
         if type(value) is not int:
-            raise ValueError("Use an integer interval.")
+            raise ValueError("Use an integer value.")
         return value
+
+    @field_validator("timezone")
+    @classmethod
+    def valid_timezone(cls, value: str) -> str:
+        if value != "system":
+            try:
+                ZoneInfo(value)
+            except (ValueError, ZoneInfoNotFoundError):
+                raise ValueError("Use system or an IANA timezone.") from None
+        return value
+
+
+class Settings(Preferences):
+    schema_version: Literal[1] = 1
+
+
+class SettingsUpdate(Preferences):
+    """Only explicitly supplied fields are written to SQLite."""
 
 
 class Sample(DTO):
@@ -177,7 +196,7 @@ class HistoryBucket(DTO):
 
 class HistoryAggregates(DTO):
     schema_version: Literal[1] = 1
-    bucket_seconds: Literal[10, 60, 3600]
+    bucket_seconds: Literal[10, 30, 60, 3600]
     since_ms: int
     until_ms: int
     items: list[HistoryBucket]

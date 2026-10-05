@@ -1,11 +1,12 @@
 //! Bounded server-computed power averages; the frontend never reads raw history.
 use chrono::{DateTime, Utc};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::time::Instant;
 
 pub const MAX_BUCKETS: u16 = 256;
 
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(rename_all = "lowercase")]
 pub enum Visualization {
     #[default]
     Sparkline,
@@ -38,8 +39,12 @@ impl Visualization {
 
 /// Start at 100 W and double until every visible value fits.
 pub fn power_scale(values: impl IntoIterator<Item = f64>) -> u64 {
+    power_scale_from(100, values)
+}
+
+pub fn power_scale_from(base: u64, values: impl IntoIterator<Item = f64>) -> u64 {
     let peak = values.into_iter().fold(0.0_f64, f64::max);
-    let mut maximum = 100;
+    let mut maximum = base;
     while peak > maximum as f64 {
         maximum *= 2;
     }
@@ -50,6 +55,7 @@ pub fn power_scale(values: impl IntoIterator<Item = f64>) -> u64 {
 pub enum Resolution {
     #[default]
     TenSeconds,
+    ThirtySeconds,
     Minute,
     Hour,
 }
@@ -58,6 +64,7 @@ impl Resolution {
     pub fn seconds(self) -> i64 {
         match self {
             Self::TenSeconds => 10,
+            Self::ThirtySeconds => 30,
             Self::Minute => 60,
             Self::Hour => 3600,
         }
@@ -66,6 +73,7 @@ impl Resolution {
     pub fn label(self) -> &'static str {
         match self {
             Self::TenSeconds => "10s",
+            Self::ThirtySeconds => "30s",
             Self::Minute => "60s",
             Self::Hour => "1h",
         }
@@ -73,7 +81,8 @@ impl Resolution {
 
     pub fn next(self) -> Self {
         match self {
-            Self::TenSeconds => Self::Minute,
+            Self::TenSeconds => Self::ThirtySeconds,
+            Self::ThirtySeconds => Self::Minute,
             Self::Minute => Self::Hour,
             Self::Hour => Self::TenSeconds,
         }

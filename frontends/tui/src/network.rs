@@ -44,7 +44,7 @@ pub enum Event {
 }
 
 pub enum Intent {
-    SaveSettings(i64),
+    SaveSettings(crate::settings::Settings),
     Output {
         output: &'static str,
         enabled: bool,
@@ -186,18 +186,18 @@ impl Api {
 
     async fn perform(&self, intent: Intent, events: &mpsc::Sender<Event>) -> Feedback {
         match intent {
-            Intent::SaveSettings(interval) => {
+            Intent::SaveSettings(draft) => {
                 let result = self
                     .request(
                         reqwest::Method::PUT,
                         "/settings",
-                        Some(json!({"graph_interval_seconds": interval})),
+                        Some(json!({"graph_interval_seconds": draft.graph_interval_seconds, "graph_visualization": draft.graph_visualization, "graph_base_scale_w": draft.graph_base_scale_w, "timezone": draft.timezone, "logs_page_size": draft.logs_page_size})),
                         None,
                     )
                     .await
                     .and_then(Self::settings_response);
                 match result {
-                    Ok(settings) if settings.graph_interval_seconds == interval => {
+                    Ok(settings) if settings == draft => {
                         let _ = events.send(Event::Settings(settings)).await;
                         Feedback::new("Settings saved", Severity::Success)
                     }
@@ -332,7 +332,7 @@ impl Api {
     fn settings_response(value: Value) -> Result<crate::settings::Settings, String> {
         let settings: crate::settings::Settings =
             serde_json::from_value(value).map_err(|_| "Invalid settings response.")?;
-        if settings.resolution().is_none() {
+        if !settings.valid() {
             return Err("Invalid settings interval or schema.".into());
         }
         Ok(settings)
@@ -1431,6 +1431,7 @@ mod tests {
     async fn graph_queries_request_visible_server_averages_at_all_resolutions() {
         for resolution in [
             crate::history::Resolution::TenSeconds,
+            crate::history::Resolution::ThirtySeconds,
             crate::history::Resolution::Minute,
             crate::history::Resolution::Hour,
         ] {
@@ -2425,7 +2426,12 @@ mod tests {
             let server = tokio::spawn(async move {
                 let (mut socket, request) = accept_http_request(&listener).await;
                 assert!(request.starts_with("GET /api/v1/settings HTTP/1.1"));
-                respond_json(&mut socket, body).await;
+                let mut complete =
+                    serde_json::to_value(crate::settings::Settings::default()).unwrap();
+                for (key, value) in body.as_object().unwrap() {
+                    complete[key] = value.clone();
+                }
+                respond_json(&mut socket, complete).await;
             });
             let (events, mut incoming) = mpsc::channel(8);
             let task = tokio::spawn(api.load_settings(events));
@@ -2451,7 +2457,12 @@ mod tests {
             let server = tokio::spawn(async move {
                 let (mut socket, request) = accept_http_request(&listener).await;
                 assert!(request.starts_with("PUT /api/v1/settings HTTP/1.1"));
-                respond_json(&mut socket, body).await;
+                let mut complete =
+                    serde_json::to_value(crate::settings::Settings::default()).unwrap();
+                for (key, value) in body.as_object().unwrap() {
+                    complete[key] = value.clone();
+                }
+                respond_json(&mut socket, complete).await;
                 assert!(
                     timeout(Duration::from_millis(200), listener.accept())
                         .await
@@ -2459,7 +2470,15 @@ mod tests {
                 );
             });
             let (events, mut incoming) = mpsc::channel(8);
-            let feedback = api.perform(Intent::SaveSettings(3600), &events).await;
+            let feedback = api
+                .perform(
+                    Intent::SaveSettings(crate::settings::Settings {
+                        graph_interval_seconds: 3600,
+                        ..crate::settings::Settings::default()
+                    }),
+                    &events,
+                )
+                .await;
             if valid {
                 assert_eq!(feedback.message, "Settings saved");
                 assert!(matches!(incoming.try_recv().unwrap(), Event::Settings(_)));

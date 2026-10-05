@@ -35,6 +35,8 @@ pub enum Scene {
     Logs,
     Settings,
     SettingsCharts,
+    SettingsIntervalPicker,
+    SettingsVisualizationPicker,
     SettingsAlerts,
     SettingsNotify,
     SettingsDebug,
@@ -85,6 +87,18 @@ pub const SCENES: &[(&str, Scene, u16, u16)] = &[
     ("logs-modal-80x24.svg", Scene::Logs, 80, 24),
     ("settings-modal.svg", Scene::Settings, 120, 30),
     ("settings-charts.svg", Scene::SettingsCharts, 120, 30),
+    (
+        "settings-interval-picker.svg",
+        Scene::SettingsIntervalPicker,
+        120,
+        30,
+    ),
+    (
+        "settings-visualization-picker.svg",
+        Scene::SettingsVisualizationPicker,
+        120,
+        30,
+    ),
     ("settings-alerts.svg", Scene::SettingsAlerts, 120, 30),
     ("settings-notify.svg", Scene::SettingsNotify, 120, 30),
     ("settings-debug.svg", Scene::SettingsDebug, 120, 30),
@@ -248,6 +262,8 @@ fn app(scene: Scene) -> Result<App, String> {
         }
         Scene::Settings
         | Scene::SettingsCharts
+        | Scene::SettingsIntervalPicker
+        | Scene::SettingsVisualizationPicker
         | Scene::SettingsAlerts
         | Scene::SettingsNotify
         | Scene::SettingsDebug
@@ -256,15 +272,33 @@ fn app(scene: Scene) -> Result<App, String> {
             app.settings = Some(Settings {
                 schema_version: 1,
                 graph_interval_seconds: 60,
+                timezone: "UTC".into(),
+                ..Settings::default()
             });
-            app.startup_interval = Resolution::Minute;
+            app.settings_draft = app.settings.as_ref().unwrap().clone();
             app.settings_tab = match scene {
-                Scene::SettingsCharts => SettingsTab::Charts,
+                Scene::SettingsCharts
+                | Scene::SettingsIntervalPicker
+                | Scene::SettingsVisualizationPicker => SettingsTab::Charts,
                 Scene::SettingsAlerts => SettingsTab::Alerts,
                 Scene::SettingsNotify => SettingsTab::Notify,
                 Scene::SettingsDebug | Scene::SettingsHelp => SettingsTab::Debug,
                 _ => SettingsTab::Preferences,
             };
+            if matches!(
+                scene,
+                Scene::SettingsIntervalPicker | Scene::SettingsVisualizationPicker
+            ) {
+                app.settings_picker = Some(mypowers_tui::settings::Picker {
+                    field: if matches!(scene, Scene::SettingsIntervalPicker) {
+                        mypowers_tui::settings::Field::Interval
+                    } else {
+                        mypowers_tui::settings::Field::Visualization
+                    },
+                    selected: 0,
+                    query: String::new(),
+                });
+            }
             if matches!(scene, Scene::SettingsHelp) {
                 app.view = View::Help;
                 app.help_context = View::Settings;
@@ -448,10 +482,10 @@ mod tests {
                 && settings.contains("hci2")
         );
         let charts = text(&render(Scene::SettingsCharts, 60, 19).unwrap());
-        assert!(charts.contains("Startup interval") && charts.contains("60s"));
+        assert!(charts.contains("Interval per bar") && charts.contains("60s"));
         let footer = charts
             .lines()
-            .find(|row| row.contains("d default"))
+            .find(|row| row.contains("Enter choose"))
             .unwrap();
         assert!(footer.starts_with('╰') && footer.ends_with('╯'));
         assert!(

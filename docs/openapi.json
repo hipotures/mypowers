@@ -760,11 +760,11 @@
             "required": false,
             "schema": {
               "type": "integer",
-              "description": "Seconds per bucket: 10, 60 or 3600.",
+              "description": "Seconds per bucket: 10, 30, 60 or 3600.",
               "default": 10,
               "title": "Bucket Seconds"
             },
-            "description": "Seconds per bucket: 10, 60 or 3600."
+            "description": "Seconds per bucket: 10, 30, 60 or 3600."
           },
           {
             "name": "limit",
@@ -2188,6 +2188,7 @@
             "type": "integer",
             "enum": [
               10,
+              30,
               60,
               3600
             ],
@@ -2527,21 +2528,58 @@
       },
       "Settings": {
         "properties": {
-          "schema_version": {
-            "type": "integer",
-            "const": 1,
-            "title": "Schema Version",
-            "default": 1
-          },
           "graph_interval_seconds": {
             "type": "integer",
             "enum": [
               10,
+              30,
               60,
               3600
             ],
             "title": "Graph Interval Seconds",
             "default": 10
+          },
+          "graph_visualization": {
+            "type": "string",
+            "enum": [
+              "sparkline",
+              "chart"
+            ],
+            "title": "Graph Visualization",
+            "default": "sparkline"
+          },
+          "graph_base_scale_w": {
+            "type": "integer",
+            "enum": [
+              100,
+              300
+            ],
+            "title": "Graph Base Scale W",
+            "default": 100
+          },
+          "timezone": {
+            "type": "string",
+            "maxLength": 128,
+            "title": "Timezone",
+            "default": "system"
+          },
+          "logs_page_size": {
+            "type": "integer",
+            "enum": [
+              50,
+              100,
+              250,
+              500,
+              1000
+            ],
+            "title": "Logs Page Size",
+            "default": 100
+          },
+          "schema_version": {
+            "type": "integer",
+            "const": 1,
+            "title": "Schema Version",
+            "default": 1
           }
         },
         "additionalProperties": false,
@@ -2554,16 +2592,54 @@
             "type": "integer",
             "enum": [
               10,
+              30,
               60,
               3600
             ],
             "title": "Graph Interval Seconds",
             "default": 10
+          },
+          "graph_visualization": {
+            "type": "string",
+            "enum": [
+              "sparkline",
+              "chart"
+            ],
+            "title": "Graph Visualization",
+            "default": "sparkline"
+          },
+          "graph_base_scale_w": {
+            "type": "integer",
+            "enum": [
+              100,
+              300
+            ],
+            "title": "Graph Base Scale W",
+            "default": 100
+          },
+          "timezone": {
+            "type": "string",
+            "maxLength": 128,
+            "title": "Timezone",
+            "default": "system"
+          },
+          "logs_page_size": {
+            "type": "integer",
+            "enum": [
+              50,
+              100,
+              250,
+              500,
+              1000
+            ],
+            "title": "Logs Page Size",
+            "default": 100
           }
         },
         "additionalProperties": false,
         "type": "object",
-        "title": "SettingsUpdate"
+        "title": "SettingsUpdate",
+        "description": "Only explicitly supplied fields are written to SQLite."
       },
       "Status": {
         "properties": {

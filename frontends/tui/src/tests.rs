@@ -130,7 +130,7 @@ fn settings_tabs_wrap_route_contextual_keys_and_mouse_without_dashboard_actions(
     assert_eq!(app.settings_tab, SettingsTab::Charts);
     app.key(KeyEvent::new(KeyCode::Char('?'), KeyModifiers::NONE));
     let help = text(&render(&mut app, 94, 29));
-    assert!(help.contains("HELP — SETTINGS / Charts") && help.contains("Save startup interval"));
+    assert!(help.contains("HELP — SETTINGS / Charts") && help.contains("confirm / save"));
     assert!(!help.contains("Retry station connection"));
     app.key(KeyEvent::new(KeyCode::Esc, KeyModifiers::NONE));
     assert!(app.view == View::Dashboard);
@@ -141,66 +141,201 @@ fn settings_tabs_wrap_route_contextual_keys_and_mouse_without_dashboard_actions(
 }
 
 #[test]
-fn startup_interval_load_and_save_do_not_overwrite_session_choices_or_failed_drafts() {
-    let settings = |seconds| {
-        Event::Settings(Settings {
-            schema_version: 1,
-            graph_interval_seconds: seconds,
-        })
-    };
+fn settings_form_lists_values_saves_every_field_and_preserves_failed_drafts() {
     let mut app = app();
-    app.update(settings(60));
+    let original = Settings {
+        graph_interval_seconds: 60,
+        ..Settings::default()
+    };
+    app.update(Event::Settings(original.clone()));
     assert_eq!(app.graph.resolution, Resolution::Minute);
     app.key(KeyEvent::new(KeyCode::Char('s'), KeyModifiers::NONE));
     app.key(KeyEvent::new(KeyCode::Tab, KeyModifiers::NONE));
-    app.key(KeyEvent::new(KeyCode::Char('d'), KeyModifiers::NONE));
-    assert_eq!(app.startup_interval, Resolution::Hour);
-    assert_eq!(app.graph.resolution, Resolution::Minute);
-    assert!(text(&render(&mut app, 94, 29)).contains("1h  (unsaved)"));
-    assert!(matches!(
-        app.key(KeyEvent::new(KeyCode::Char('s'), KeyModifiers::NONE)),
-        Effect::Request(Intent::SaveSettings(3600))
-    ));
-    assert!(matches!(
-        app.key(KeyEvent::new(KeyCode::Char('s'), KeyModifiers::NONE)),
-        Effect::None
-    ));
+    app.key(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE));
+    let picker = text(&render(&mut app, 60, 19));
+    assert!(picker.contains("Sparkline") && picker.contains("Chart"));
+    app.key(KeyEvent::new(KeyCode::Down, KeyModifiers::NONE));
+    app.key(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE));
+    assert_eq!(
+        app.settings_draft.graph_visualization,
+        crate::history::Visualization::Chart
+    );
+    assert_eq!(
+        app.graph.visualization,
+        crate::history::Visualization::Sparkline
+    );
+    app.key(KeyEvent::new(KeyCode::Down, KeyModifiers::NONE));
+    app.key(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE));
+    let choices = text(&render(&mut app, 60, 19));
+    for choice in ["10s", "30s", "60s", "1h"] {
+        assert!(choices.contains(choice));
+    }
+    app.key(KeyEvent::new(KeyCode::Up, KeyModifiers::NONE));
+    app.key(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE));
+    assert_eq!(app.settings_draft.graph_interval_seconds, 30);
+    app.settings_draft.graph_base_scale_w = 300;
+    app.settings_draft.timezone = "Europe/Warsaw".into();
+    app.settings_draft.logs_page_size = 250;
+    app.settings_selected = 3;
+    let Effect::Request(Intent::SaveSettings(draft)) =
+        app.key(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE))
+    else {
+        panic!("Expected complete settings save");
+    };
+    assert_eq!(draft, app.settings_draft);
     app.update(Event::Finished(Feedback::new(
         "Could not save settings; try again",
         Severity::Error,
     )));
-    assert_eq!(app.settings.as_ref().unwrap().graph_interval_seconds, 60);
-    assert_eq!(app.startup_interval, Resolution::Hour);
-    app.key(KeyEvent::new(KeyCode::Char('s'), KeyModifiers::NONE));
-    app.update(settings(3600));
+    assert_eq!(app.settings, Some(original));
+    assert_eq!(app.settings_draft, draft);
+    app.key(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE));
+    app.update(Event::Settings(draft.clone()));
     app.update(Event::Finished(Feedback::new(
         "Settings saved",
         Severity::Success,
     )));
-    assert_eq!(app.settings.as_ref().unwrap().graph_interval_seconds, 3600);
-    assert_eq!(app.graph.resolution, Resolution::Minute);
-    assert!(!text(&render(&mut app, 94, 29)).contains("(unsaved)"));
-
+    assert_eq!(app.settings, Some(draft.clone()));
+    assert_eq!(app.graph.resolution, Resolution::ThirtySeconds);
+    assert_eq!(
+        app.graph.visualization,
+        crate::history::Visualization::Chart
+    );
+    assert_eq!(app.graph_base_scale_w, 300);
+    assert_eq!(app.logs.page_size, 250);
+    assert_eq!(app.timezone, Some(chrono_tz::Europe::Warsaw));
+    app.key(KeyEvent::new(KeyCode::Esc, KeyModifiers::NONE));
+    app.key(KeyEvent::new(KeyCode::Char('s'), KeyModifiers::NONE));
+    render(&mut app, 94, 29);
+    let target = app.settings_save;
+    for kind in [
+        MouseEventKind::Down(MouseButton::Left),
+        MouseEventKind::Up(MouseButton::Left),
+    ] {
+        let effect = app.mouse(MouseEvent {
+            kind,
+            column: target.x,
+            row: target.y,
+            modifiers: KeyModifiers::NONE,
+        });
+        if matches!(kind, MouseEventKind::Up(_)) {
+            assert!(matches!(effect, Effect::Request(Intent::SaveSettings(_))));
+        }
+    }
     let mut late = fixed_graph_app();
     late.key(KeyEvent::new(KeyCode::Char('t'), KeyModifiers::NONE));
-    late.update(settings(3600));
-    assert_eq!(late.graph.resolution, Resolution::Minute);
-    assert_eq!(late.startup_interval, Resolution::Hour);
-    late.update(Event::Settings(Settings {
-        schema_version: 2,
-        graph_interval_seconds: 10,
-    }));
-    assert_eq!(late.settings.as_ref().unwrap().graph_interval_seconds, 3600);
-    let mut unloaded = fixed_graph_app();
-    unloaded.view = View::Settings;
-    unloaded.settings_tab = SettingsTab::Charts;
-    unloaded.update(Event::SettingsUnavailable);
-    assert!(text(&render(&mut unloaded, 60, 19)).contains("Unavailable; retrying"));
+    late.key(KeyEvent::new(KeyCode::Char('g'), KeyModifiers::NONE));
+    late.update(Event::Settings(Settings::default()));
+    assert_eq!(late.graph.resolution, Resolution::ThirtySeconds);
+    assert_eq!(
+        late.graph.visualization,
+        crate::history::Visualization::Chart
+    );
+}
+
+#[test]
+fn settings_buttons_require_release_and_old_hotkeys_do_not_dispatch() {
+    let mut app = app();
+    app.view = View::Settings;
+    app.settings_tab = SettingsTab::Debug;
+    for code in ['r', 'p', 'b', 'g', 't', 'd'] {
+        assert!(matches!(
+            app.key(KeyEvent::new(KeyCode::Char(code), KeyModifiers::NONE)),
+            Effect::None
+        ));
+        assert!(app.pending.is_none());
+    }
+    for index in 0..3 {
+        render(&mut app, 60, 19);
+        let rect = app.settings_actions[index];
+        assert!(rect.height == 1 && rect.width > 0);
+        let event = |kind| MouseEvent {
+            kind,
+            column: rect.x,
+            row: rect.y,
+            modifiers: KeyModifiers::NONE,
+        };
+        assert!(matches!(
+            app.mouse(event(MouseEventKind::Down(MouseButton::Left))),
+            Effect::None
+        ));
+        let effect = app.mouse(event(MouseEventKind::Up(MouseButton::Left)));
+        assert!(matches!(
+            (index, effect),
+            (0, Effect::Request(Intent::Retry))
+                | (1, Effect::Request(Intent::Connection(false)))
+                | (2, Effect::Request(Intent::Debug(true)))
+        ));
+        app.update(Event::Finished(Feedback::new("Completed", Severity::Info)));
+    }
+    let rect = app.settings_actions[0];
+    let event = |kind| MouseEvent {
+        kind,
+        column: rect.x,
+        row: rect.y,
+        modifiers: KeyModifiers::NONE,
+    };
+    app.mouse(event(MouseEventKind::Down(MouseButton::Left)));
+    app.resize();
     assert!(matches!(
-        unloaded.key(KeyEvent::new(KeyCode::Char('s'), KeyModifiers::NONE)),
+        app.mouse(event(MouseEventKind::Up(MouseButton::Left))),
         Effect::None
     ));
-    assert!(unloaded.pending.is_none());
+}
+
+#[test]
+fn persisted_preferences_apply_on_startup_and_timezone_editor_supports_search() {
+    let mut app = app();
+    let settings = Settings {
+        graph_interval_seconds: 30,
+        graph_visualization: crate::history::Visualization::Chart,
+        graph_base_scale_w: 300,
+        timezone: "Europe/Warsaw".into(),
+        logs_page_size: 500,
+        ..Settings::default()
+    };
+    app.update(Event::Settings(settings));
+    assert_eq!(
+        app.graph.visualization,
+        crate::history::Visualization::Chart
+    );
+    assert_eq!(app.graph.resolution, Resolution::ThirtySeconds);
+    assert_eq!(app.graph_base_scale_w, 300);
+    assert_eq!(app.timezone, Some(chrono_tz::Europe::Warsaw));
+    assert_eq!(app.logs.page_size, 500);
+    assert_eq!(crate::history::power_scale_from(300, [301.0]), 600);
+    app.key(KeyEvent::new(KeyCode::Char('s'), KeyModifiers::NONE));
+    app.key(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE));
+    for character in "UTC".chars() {
+        app.key(KeyEvent::new(KeyCode::Char(character), KeyModifiers::NONE));
+    }
+    assert!(text(&render(&mut app, 60, 19)).contains("Search: UTC"));
+    let picker = app.settings_picker.as_ref().unwrap();
+    assert!(
+        picker
+            .options()
+            .iter()
+            .all(|(_, name)| name.to_lowercase().contains("utc"))
+    );
+    let rect = app.settings_choices[0].0;
+    app.mouse(MouseEvent {
+        kind: MouseEventKind::Down(MouseButton::Left),
+        column: rect.x,
+        row: rect.y,
+        modifiers: KeyModifiers::NONE,
+    });
+    assert!(app.settings_picker.is_none());
+    assert_eq!(app.settings_draft.timezone, "UTC");
+    assert_eq!(
+        app.timezone,
+        Some(chrono_tz::Europe::Warsaw),
+        "Unsaved choices must remain a draft"
+    );
+    let previous = app.logs.open().unwrap();
+    app.logs
+        .configure(Some(chrono_tz::UTC), 100, app.clock.now());
+    let next = app.logs.open().unwrap();
+    assert!(next.generation > previous.generation);
 }
 
 #[test]
@@ -1534,6 +1669,7 @@ fn time_shortcut_is_contextual_and_discards_obsolete_resolution_and_resize_respo
     let first = app.history_request().unwrap();
     let before = serde_json::to_value(app.status.as_ref().unwrap()).unwrap();
     for (label, resolution) in [
+        ("30s", Resolution::ThirtySeconds),
         ("60s", Resolution::Minute),
         ("1h", Resolution::Hour),
         ("10s", Resolution::TenSeconds),
@@ -1856,7 +1992,12 @@ fn shortcuts_are_confined_to_the_active_context() {
             app.view = View::Settings;
             app.settings_tab = SettingsTab::Debug;
             app.status.as_mut().unwrap().connection.desired = desired.into();
-            let effect = app.key(KeyEvent::new(KeyCode::Char(key), KeyModifiers::NONE));
+            assert!(matches!(
+                app.key(KeyEvent::new(KeyCode::Char(key), KeyModifiers::NONE)),
+                Effect::None
+            ));
+            app.settings_selected = if key == 'r' { 0 } else { 1 };
+            let effect = app.key(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE));
             assert!(match (key, effect) {
                 ('r', Effect::Request(Intent::Retry)) => true,
                 ('p', Effect::Request(Intent::Connection(running))) =>
@@ -1974,11 +2115,14 @@ fn help_lists_only_the_context_that_opened_it() {
             assert!(screen.contains("HELP — LOGS") && screen.contains("End"));
             assert!(!screen.contains("Request AC") && !screen.contains("F3"));
         } else if context == View::Settings {
-            assert!(screen.contains("HELP — SETTINGS") && screen.contains("Toggle runtime DEBUG"));
-            assert!(screen.contains("Retry station") && screen.contains("Pause/resume station"));
+            assert!(
+                screen.contains("HELP — SETTINGS")
+                    && screen.contains("Select Retry / Pause / Debug")
+            );
+            assert!(screen.contains("Activate selected button") && screen.contains("Click"));
             assert!(!screen.contains("Request AC") && !screen.contains("F3"));
         } else {
-            assert!(screen.contains("F3") && !screen.contains("Toggle runtime DEBUG"));
+            assert!(screen.contains("F3") && !screen.contains("Select Retry / Pause / Debug"));
             assert!(!screen.contains("Retry station") && !screen.contains("Pause/resume station"));
         }
         app.key(KeyEvent::new(KeyCode::Esc, KeyModifiers::NONE));
@@ -2244,8 +2388,9 @@ fn settings_and_help_are_bounded_modal_overlays_with_inactive_dashboard_hitboxes
     let settings = render(&mut app, 94, 29);
     assert_ne!(settings[(2, 1)].fg, station_color);
     assert!(text(&settings).contains("hci0") && text(&settings).contains("Runtime logging"));
+    app.settings_selected = 2;
     assert!(matches!(
-        app.key(KeyEvent::new(KeyCode::Char('b'), KeyModifiers::NONE)),
+        app.key(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE)),
         Effect::Request(Intent::Debug(true))
     ));
     app.key(KeyEvent::new(KeyCode::Char('?'), KeyModifiers::NONE));

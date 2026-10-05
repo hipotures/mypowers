@@ -41,7 +41,7 @@ starts each channel at 0–100 W and doubles its maximum to fit visible averages
 and current readings. Positive samples below its first quantization step receive
 one visible eighth-cell tick, while zero stays empty. This visibility floor does
 not change telemetry or historical averages.
-History uses server-computed averages in fixed UTC buckets: 10 seconds, 60 seconds
+History uses server-computed averages in fixed UTC buckets: 10 seconds, 30 seconds, 60 seconds
 or one hour per bar (`t` on the dashboard). `dashboard-live-60s.svg` and
 `dashboard-live-1h.svg` capture the additional selections. Fixtures supply fixed
 averages and sample counts directly, without SQL or HTTP. Completed bars retain
@@ -77,8 +77,10 @@ Settings uses the production Tabs widget (dashboard `s`). `settings-modal.svg`
 shows Preferences; `settings-charts.svg`, `settings-alerts.svg`,
 `settings-notify.svg` and `settings-debug.svg` cover every other tab. Additional
 60x19 Charts/Debug scenes verify the minimum size; `help-settings.svg` shows
-contextual help. Charts fixtures include a saved startup interval. The actual
-TUI persists that interval through the daemon settings API; snapshot generation
+contextual help. Charts fixtures include saved preferences. The value-list scenes
+`settings-interval-picker.svg` and `settings-visualization-picker.svg` show the
+production editors. Debug scenes include Retry, Pause/Resume and Debug buttons.
+The actual TUI persists all preference fields through the daemon settings API; snapshot generation
 uses only fake state. Battery alerts and connectors remain future features. Warning/error counts in these fixtures demonstrate the
 production status strip's rendering; they do not implement server alert tracking.
 Zero counters are never displayed.

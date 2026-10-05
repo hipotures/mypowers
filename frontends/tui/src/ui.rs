@@ -1,9 +1,9 @@
 use crate::{
     app::{App, View},
     feedback::{Feedback, Severity},
-    history::{Visualization, power_scale},
+    history::{Visualization, power_scale_from},
     model::safe,
-    settings::SettingsTab,
+    settings::{Field, SettingsTab},
 };
 use ratatui::{
     Frame,
@@ -47,6 +47,10 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
     app.title = Rect::default();
     app.quit_buttons = [Rect::default(); 2];
     app.settings_tabs = [Rect::default(); 5];
+    app.settings_fields.clear();
+    app.settings_choices.clear();
+    app.settings_actions = [Rect::default(); 3];
+    app.settings_save = Rect::default();
     app.logs.clear_hitboxes();
     if screen.width < MIN_WIDTH || screen.height < MIN_HEIGHT {
         frame.render_widget(
@@ -210,7 +214,7 @@ fn outer_footer(
     width: u16,
     interval: &str,
     visualization: Visualization,
-    tab: SettingsTab,
+    _tab: SettingsTab,
 ) -> String {
     let alternate = if visualization == Visualization::Sparkline {
         "chart"
@@ -225,20 +229,10 @@ fn outer_footer(
             format!(" a/d/l outputs F3 logs s settings t {interval} g view ? q quit ")
         }
         View::Logs => " Esc close  ? help  q quit ".into(),
-        View::Settings => match tab {
-            SettingsTab::Debug if width < 80 => " Tab tabs  r retry  p pause  b DEBUG  Esc  ?  q ",
-            SettingsTab::Debug => {
-                " Tab tabs  r retry  p pause  b DEBUG  Esc close  ? help  q quit "
-            }
-            SettingsTab::Charts if width < 80 => {
-                " Tab tabs  g view  t time  d default  s save  Esc  ?  q "
-            }
-            SettingsTab::Charts => {
-                " Tab tabs  g view  t interval  d default  s save  Esc close  ? help  q quit "
-            }
-            _ => " Tab tabs  Esc close  ? help  q quit ",
+        View::Settings if width < 80 => {
+            " Tab tabs  ↑↓ select  Enter choose  Esc close  ?  q ".into()
         }
-        .into(),
+        View::Settings => " Tab tabs  ↑↓ select  Enter choose  Esc close  ? help  q quit ".into(),
         View::Help => " Esc close  q quit ".into(),
         View::Quit => String::new(),
     }
@@ -536,7 +530,8 @@ fn dashboard(frame: &mut Frame, content: Rect, app: &mut App) {
         let columns = app
             .graph
             .columns(app.timeline_now_ms(), parts[2].width, output);
-        let maximum = power_scale(
+        let maximum = power_scale_from(
+            app.graph_base_scale_w,
             columns
                 .iter()
                 .flatten()
@@ -578,7 +573,8 @@ fn dashboard(frame: &mut Frame, content: Rect, app: &mut App) {
         let plot_width = area.width.saturating_sub(CHART_AXIS_WIDTH);
         let input = app.graph.columns(app.timeline_now_ms(), plot_width, false);
         let output = app.graph.columns(app.timeline_now_ms(), plot_width, true);
-        let maximum = power_scale(
+        let maximum = power_scale_from(
+            app.graph_base_scale_w,
             input.iter().chain(&output).flatten().copied().chain(
                 sample
                     .into_iter()
@@ -1086,50 +1082,44 @@ fn settings(frame: &mut Frame, area: Rect, app: &mut App) {
     };
     let note = |text: &'static str| Line::from(text).style(Style::default().fg(DIM));
     let lines = match app.settings_tab {
-        SettingsTab::Preferences => vec![
-            heading("Preferences"),
-            row(
-                "Timezone",
-                app.timezone
-                    .map(|zone| zone.name().to_owned())
-                    .unwrap_or_else(|| "System local".into()),
-            ),
-            row("Logs page size", app.logs.page_size.to_string()),
-            Line::default(),
-            note("These preferences are read-only for now."),
-        ],
-        SettingsTab::Charts => vec![
-            heading("Power graphs"),
-            row("Visualization", app.graph.visualization.label().into()),
-            row("Current interval", app.graph.resolution.label().into()),
-            row("Base scale", "0–100 W; automatic doubling".into()),
-            Line::default(),
-            row(
-                "Startup interval",
-                if app.settings.is_some() {
-                    format!(
-                        "{}{}",
-                        app.startup_interval.label(),
-                        if app
-                            .settings
-                            .as_ref()
-                            .and_then(|settings| settings.resolution())
-                            != Some(app.startup_interval)
-                        {
-                            "  (unsaved)"
-                        } else {
-                            ""
-                        }
-                    )
+        SettingsTab::Preferences | SettingsTab::Charts => {
+            let fields: &[Field] = if app.settings_tab == SettingsTab::Charts {
+                &Field::CHARTS
+            } else {
+                &Field::PREFERENCES
+            };
+            let mut lines = vec![heading(if app.settings_tab == SettingsTab::Charts {
+                "Power graphs"
+            } else {
+                "Preferences"
+            })];
+            for (index, field) in fields.iter().enumerate() {
+                let available = app.settings.is_some();
+                let value = if available {
+                    format!("{} ▾", app.settings_draft.value(*field))
                 } else if app.settings_error {
                     "Unavailable; retrying".into()
                 } else {
                     "Loading...".into()
-                },
-            ),
-            note("d changes the startup interval; s saves it."),
-            note("The saved interval applies on next TUI start."),
-        ],
+                };
+                let line = row(field.label(), value).style(Style::default().bg(
+                    if app.settings_selected == index {
+                        TRACK
+                    } else {
+                        BACKGROUND
+                    },
+                ));
+                app.settings_fields.push((
+                    Rect::new(rows[2].x, rows[2].y + index as u16 + 1, rows[2].width, 1),
+                    *field,
+                ));
+                lines.push(line);
+            }
+            lines.push(Line::default());
+            lines.push(note("Enter opens the list of available values."));
+            lines.push(note("Save applies choices now and on next start."));
+            lines
+        }
         SettingsTab::Alerts => vec![
             heading("Battery alerts"),
             note("Battery alerts are not available yet."),
@@ -1191,23 +1181,148 @@ fn settings(frame: &mut Frame, area: Rect, app: &mut App) {
         ],
     };
     frame.render_widget(Paragraph::new(lines), rows[2]);
+    if matches!(
+        app.settings_tab,
+        SettingsTab::Preferences | SettingsTab::Charts
+    ) {
+        let count = if app.settings_tab == SettingsTab::Charts {
+            3
+        } else {
+            2
+        };
+        app.settings_save = Rect::new(rows[2].x, rows[2].y + count + 4, 20, 1);
+        let label = if app.settings.is_none() {
+            "[ Loading... ]"
+        } else if app.pending.as_deref() == Some("settings request") {
+            "[ Saving... ]"
+        } else if app.settings.as_ref() != Some(&app.settings_draft) {
+            "[ Save changes ] *"
+        } else {
+            "[ Save changes ]"
+        };
+        frame.render_widget(
+            Paragraph::new(label).style(
+                Style::default()
+                    .fg(if app.settings.is_some() { GREEN } else { DIM })
+                    .bg(if app.settings_selected == count as usize {
+                        TRACK
+                    } else {
+                        BACKGROUND
+                    }),
+            ),
+            app.settings_save,
+        );
+    } else if app.settings_tab == SettingsTab::Debug {
+        let logging = status
+            .and_then(|s| s.logging["effective_level"].as_str())
+            .unwrap_or("Unknown");
+        let labels = [
+            "[ Retry ]".to_owned(),
+            format!(
+                "[ {} ]",
+                if status.is_some_and(|s| s.connection.desired == "paused") {
+                    "Resume"
+                } else {
+                    "Pause"
+                }
+            ),
+            format!(
+                "[ Debug {} ]",
+                if logging == "DEBUG" { "ON" } else { "OFF" }
+            ),
+        ];
+        let buttons = Layout::horizontal([Constraint::Fill(1); 3]).split(Rect::new(
+            rows[2].x,
+            rows[2].y + 9,
+            rows[2].width,
+            1,
+        ));
+        for (index, label) in labels.into_iter().enumerate() {
+            app.settings_actions[index] = buttons[index];
+            frame.render_widget(
+                Paragraph::new(label).style(
+                    Style::default()
+                        .fg(if app.connected && app.pending.is_none() {
+                            TEXT
+                        } else {
+                            DIM
+                        })
+                        .bg(if app.settings_selected == index {
+                            TRACK
+                        } else {
+                            BACKGROUND
+                        }),
+                ),
+                buttons[index],
+            );
+        }
+    }
+    if let Some(picker) = &app.settings_picker {
+        let options = picker.options();
+        let height = (options.len() as u16 + 4).min(area.height).max(4);
+        let popup = centered(area, area.width.min(48), height);
+        frame.render_widget(Clear, popup);
+        let block = Block::bordered()
+            .border_type(BorderType::Rounded)
+            .border_style(Style::default().fg(GREEN))
+            .style(Style::default().bg(BACKGROUND))
+            .title(format!(" {} ", picker.field.label()))
+            .title_bottom(" Enter select  Esc cancel ");
+        let inner = block.inner(popup);
+        frame.render_widget(block, popup);
+        frame.render_widget(
+            Paragraph::new(if picker.field == Field::Timezone {
+                format!("Search: {}", picker.query)
+            } else {
+                "Available values".into()
+            })
+            .style(Style::default().fg(MUTED)),
+            Rect::new(inner.x, inner.y, inner.width, 1),
+        );
+        if options.is_empty() {
+            frame.render_widget(
+                Paragraph::new("No matching values").style(Style::default().fg(DIM)),
+                Rect::new(inner.x, inner.y + 1, inner.width, 1),
+            );
+        }
+        let viewport = inner.height.saturating_sub(1) as usize;
+        let start = picker.selected.saturating_sub(viewport.saturating_sub(1));
+        for (offset, (index, value)) in options.iter().skip(start).take(viewport).enumerate() {
+            let rect = Rect::new(inner.x, inner.y + offset as u16 + 1, inner.width, 1);
+            app.settings_choices.push((rect, *index));
+            frame.render_widget(
+                Paragraph::new(format!(" {}", value)).style(Style::default().fg(TEXT).bg(
+                    if start + offset == picker.selected {
+                        TRACK
+                    } else {
+                        BACKGROUND
+                    },
+                )),
+                rect,
+            );
+        }
+    }
 }
 
 fn help(frame: &mut Frame, area: Rect, context: View, tab: SettingsTab) {
     let text = if context == View::Settings {
         let actions = match tab {
-            SettingsTab::Preferences => "Timezone and logs page size are read-only.",
-            SettingsTab::Charts => {
-                "g     Switch Sparkline / Chart for this session\nt     Cycle current interval: 10s / 60s / 1h\nd     Cycle the default startup interval\ns     Save startup interval on the daemon"
+            SettingsTab::Preferences | SettingsTab::Charts => {
+                "Up/Down   Select a field or Save changes
+Enter     Open values / confirm / save
+Click     Choose a field, value or Save changes
+Timezone list supports typing to search."
             }
             SettingsTab::Debug => {
-                "r     Retry station connection\np     Pause/resume station connection\nb     Toggle runtime DEBUG override"
+                "Up/Down   Select Retry / Pause / Debug
+Enter     Activate selected button
+Click     Activate a button"
             }
             SettingsTab::Alerts => "Battery alerts are not available yet.",
             SettingsTab::Notify => "Notification connectors are not available yet.",
         };
         format!(
-            "HELP — SETTINGS / {}\n\nTab / Shift-Tab or Left/Right  Switch tab\nClick a tab                   Select tab\n\n{}\n\nEsc close   q confirm quit",
+            "HELP — SETTINGS / {}\n\nTab / Shift-Tab   Switch tab\n\n{}\n\nEsc close   q confirm quit",
             tab.title(),
             actions
         )
