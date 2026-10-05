@@ -69,7 +69,8 @@ uv run mypowers tui
 
 The dashboard is centered and capped at 94x28 cells; it fits within smaller
 terminals down to 60x19 including the status strip. A single borderless status
-row sits below the dashboard, making its maximum total size 94x29. Hotkeys stay
+row sits below the dashboard with one-cell left/right margins, making its maximum
+total size 94x29. Hotkeys stay
 in the dashboard's bottom border. The logs modal stays inside that frame with two-cell
 margins on every side (90x24 when the dashboard has its full size). Opening a
 modal dims the dashboard while telemetry updates continue underneath.

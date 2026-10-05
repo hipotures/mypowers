@@ -161,9 +161,9 @@ fn status_strip_is_outside_border_fades_and_leaves_no_reassuring_noise() {
         assert_eq!(buffer[(0, 27)].symbol(), "╰");
         assert!(text(&buffer).lines().nth(27).unwrap().contains("q quit"));
         if seconds < 8 {
-            assert!(row.starts_with("AC ON confirmed"));
-            assert!(row["AC ON confirmed".len()..].trim().is_empty());
-            colors.push(buffer[(0, 28)].fg);
+            assert!(row.starts_with(" AC ON confirmed"));
+            assert!(row[" AC ON confirmed".len()..].trim().is_empty());
+            colors.push(buffer[(1, 28)].fg);
         } else {
             assert!(row.trim().is_empty());
         }
@@ -174,10 +174,10 @@ fn status_strip_is_outside_border_fades_and_leaves_no_reassuring_noise() {
     }
     assert!(colors.windows(2).all(|pair| pair[0] != pair[1]));
     app.feedback = Some(Feedback::new("New message", Severity::Info));
-    assert!(
-        text(&render(&mut app, 60, 19))
-            .ends_with("New message                                                 ")
-    );
+    let screen = text(&render(&mut app, 60, 19));
+    let row = screen.lines().last().unwrap();
+    assert!(row.starts_with(" New message"));
+    assert_eq!(row.trim(), "New message");
     render(&mut app, 60, 18);
     assert!(app.title.is_empty());
 }

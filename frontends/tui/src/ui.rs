@@ -68,7 +68,7 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
         height: surface.height - 1,
         ..surface
     };
-    let status_area = Rect::new(surface.x, area.bottom(), surface.width, 1);
+    let status_area = Rect::new(surface.x + 1, area.bottom(), surface.width - 2, 1);
     app.title = Rect::new(area.x + (area.width - 10) / 2 + 1, area.y, 8, 1);
     let outer = Block::default()
         .borders(Borders::ALL)
@@ -250,7 +250,7 @@ fn dashboard(frame: &mut Frame, content: Rect, app: &mut App) {
     let (label, color) = if !app.connected {
         ("DAEMON OFFLINE", RED)
     } else if app.live() {
-        ("LIVE", GREEN)
+        ("CONNECTED", GREEN)
     } else if app
         .status
         .as_ref()

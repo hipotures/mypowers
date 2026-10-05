@@ -124,7 +124,7 @@ def test_native_controls_logs_paste_resize_and_restoration(
     (tmp_path / ".env").write_text(f"MYPOWERS_SERVER_URL={url}\n")
     session = Session(tui_binary, tmp_path, env, "--no-color")
     try:
-        session.read(b"LIVE")
+        session.read(b"CONNECTED")
         assert "INPUT" in "\n".join(session.screen.display) and "OUTPUT" in "\n".join(
             session.screen.display
         )
@@ -189,7 +189,7 @@ def test_status_strip_confirmations_fade_and_debug_does_not_keep_it_alive(
     _, url, env = daemon_process
     session = Session(tui_binary, tmp_path, env, "--server", url)
     try:
-        session.read(b"LIVE")
+        session.read(b"CONNECTED")
         session.write(b"a")
         session.read(b"AC ON confirmed")
         border = next(index for index, row in enumerate(session.screen.display) if "q quit" in row)
@@ -207,7 +207,7 @@ def test_status_strip_confirmations_fade_and_debug_does_not_keep_it_alive(
             audit = [row for row in page["items"] if row.get("event") == "log_level_changed"]
             assert audit and audit[-1]["level"] == "INFO"
         time.sleep(8.5)
-        session.read(b"LIVE")
+        session.read(b"CONNECTED")
         assert session.screen.display[border + 1].strip() == ""
         assert session.process.poll() is None
         session.write(b"d")
@@ -250,7 +250,7 @@ def test_day_archive_refresh_lazy_pages_drag_and_live_resume(daemon_process, tui
     )
     session = Session(tui_binary, tmp_path, env, "--server", url, "--utc", "--no-color")
     try:
-        session.read(b"LIVE")
+        session.read(b"CONNECTED")
         session.write(b"\x1bOR")
         session.read(b"Archive 000")
         session.read(b"ARCHIVE")
@@ -325,7 +325,7 @@ def test_three_clients_share_state_and_do_not_stop_daemon(daemon_process, tui_bi
     sessions = [Session(tui_binary, tmp_path, env, "--server", url, "--no-mouse") for _ in range(3)]
     try:
         for session in sessions:
-            session.read(b"LIVE")
+            session.read(b"CONNECTED")
         with httpx.Client(base_url=url, trust_env=False) as client:
             before = client.get("/api/v1/status").json()
             sessions[0].write(b"a")
@@ -379,7 +379,7 @@ def test_native_authentication_and_private_relative_token_file(
     dotenv.write_text(f"MYPOWERS_SERVER_URL={url}\nMYPOWERS_API_TOKEN_FILE=./token\n")
     session = Session(tui_binary, tmp_path, env, "--env-file", str(dotenv))
     try:
-        session.read(b"LIVE")
+        session.read(b"CONNECTED")
         session.write(b"a")
         session.read(b"confirmed")
         assert token not in "\n".join(session.screen.display)
@@ -409,7 +409,7 @@ def test_closing_native_client_during_command_does_not_cancel_or_restore_outputs
     _, url, env = daemon_process
     session = Session(tui_binary, tmp_path, env, "--server", url)
     try:
-        session.read(b"LIVE")
+        session.read(b"CONNECTED")
         session.write(b"a")
         with httpx.Client(base_url=url, trust_env=False) as client:
             deadline = time.monotonic() + 5
@@ -472,7 +472,7 @@ def test_native_https_wss_and_untrusted_ca(daemon_process, tui_binary, tmp_path)
                 str(ca),
             )
             try:
-                trusted.read(b"LIVE")  # Verified WSS snapshot.
+                trusted.read(b"CONNECTED")  # Verified WSS snapshot.
                 trusted.write(b"a")
                 trusted.read(b"confirmed")  # Verified HTTPS admission and result polling.
             finally:
@@ -501,7 +501,7 @@ def test_title_double_click_copies_actual_snapshot_without_touching_desktop_clip
     env = {**env, "PATH": str(helpers) + os.pathsep + env["PATH"]}
     session = Session(tui_binary, tmp_path, env, "--server", url)
     try:
-        session.read(b"LIVE")
+        session.read(b"CONNECTED")
         row = next(index for index, text in enumerate(session.screen.display) if "MYPOWERS" in text)
         column = session.screen.display[row].index("MYPOWERS") + 3
         click = f"\x1b[<0;{column + 1};{row + 1}M\x1b[<0;{column + 1};{row + 1}m".encode()
