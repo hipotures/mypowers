@@ -11,6 +11,26 @@ from mypowers.contracts import AppError, SettingsUpdate, timestamp
 from mypowers.storage import CursorCodec, HistoryStore
 
 
+async def test_database_startup_reports_existing_history(core, tmp_path, caplog):
+    service, _, _, _ = core
+    store = HistoryStore(service, tmp_path, True, 10)
+    with caplog.at_level("INFO", logger="uvicorn.error"):
+        await store.open()
+        try:
+            assert "records=0; current device records=0" in caplog.text
+            await store.insert(service.latest)
+        finally:
+            await store.close()
+        caplog.clear()
+        reopened = HistoryStore(service, tmp_path, False, 10)
+        await reopened.open()
+        try:
+            assert str((tmp_path / "mypowers.db").resolve()) in caplog.text
+            assert "records=1; current device records=1; recording=disabled" in caplog.text
+        finally:
+            await reopened.close()
+
+
 async def test_schema_constraints_durability_and_colliding_times(core, tmp_path):
     service, _, _, _ = core
     store = HistoryStore(service, tmp_path, True, 10)

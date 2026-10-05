@@ -1,6 +1,7 @@
 """Explicit BlueZ adapter resolution and the exact-unit Bleak transport."""
 
 import asyncio
+import logging
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any, Protocol
@@ -133,6 +134,12 @@ class BleakTransport:
             raise AppError("cleanup_failed", "Previous client has not been released.", 503)
         self.adapter_id = await asyncio.wait_for(
             resolve_adapter(self.config.bluetooth.adapter_address), 5
+        )
+        logging.getLogger("uvicorn.error").info(
+            "Bluetooth controller found and ready: %s (%s). Scanning for station %s.",
+            self.config.bluetooth.adapter_address,
+            self.adapter_id,
+            self.config.device.address,
         )
         phase("scanning")
         rssi: list[int] = []

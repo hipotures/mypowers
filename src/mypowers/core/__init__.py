@@ -1,6 +1,7 @@
 """Immutable observations and serialized daemon-owned command operations."""
 
 import asyncio
+import logging
 import time
 from collections import OrderedDict
 from collections.abc import Callable
@@ -167,6 +168,16 @@ class Core:
             self.synchronized = 0
             self._notify(None)
         if previous != self.connection:
+            if previous.phase != phase or previous.reason_code != reason:
+                logging.getLogger("uvicorn.error").log(
+                    logging.WARNING if reason else logging.INFO,
+                    "Bluetooth: phase=%s; adapter=%s; controller=%s; reason=%s; %s",
+                    phase,
+                    self.connection.adapter_address,
+                    self.connection.adapter_id,
+                    reason or "none",
+                    self.connection.message,
+                )
             self.log(
                 "INFO",
                 "connection_transition",

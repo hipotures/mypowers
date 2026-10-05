@@ -26,7 +26,10 @@ def test_lazy_entrypoints_and_missing_extra(monkeypatch, capsys, name, module, e
     with pytest.raises(SystemExit) as caught:
         getattr(entrypoints, name)()
     assert caught.value.code == 2
-    assert f"mypowers[{extra}]" in capsys.readouterr().err
+    message = capsys.readouterr().err
+    assert f"mypowers[{extra}]" in message
+    command = "mypowersd" if name == "daemon" else "mypowers"
+    assert f"uv run --locked --extra {extra} {command}" in message
 
 
 def test_daemon_config_foreground_workers_and_private_token(config, tmp_path, monkeypatch, capsys):

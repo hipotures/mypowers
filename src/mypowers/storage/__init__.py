@@ -5,6 +5,7 @@ import base64
 import hashlib
 import hmac
 import json
+import logging
 import math
 import os
 import sqlite3
@@ -156,6 +157,12 @@ class HistoryStore:
                 row = await cursor.fetchone()
             assert row is not None
             self.device_id = int(row[0])
+            async with connection.execute(
+                "SELECT COUNT(*), COUNT(CASE WHEN device_id=? THEN 1 END) FROM telemetry_states",
+                (self.device_id,),
+            ) as cursor:
+                counts = await cursor.fetchone()
+            assert counts is not None
         except BaseException:
             await connection.close()
             raise
@@ -166,6 +173,14 @@ class HistoryStore:
             f"{self.path.stat().st_ino}:{self.instance}".encode()
         ).hexdigest()
         self.core.publish()
+        logging.getLogger("uvicorn.error").info(
+            "History database: %s; schema=%s; records=%s; current device records=%s; recording=%s",
+            self.path.resolve(),
+            VERSION,
+            counts[0],
+            counts[1],
+            "enabled" if self.enabled else "disabled",
+        )
 
     async def insert(self, observation: Observation) -> None:
         assert self.db is not None and self.device_id is not None
@@ -281,6 +296,9 @@ class HistoryStore:
         )
         self.core.segment = str(uuid4())
         self.core.log("ERROR", "storage_failure", self.error)
+        logging.getLogger("uvicorn.error").error(
+            "History database unavailable: %s; %s", self.path.resolve(), self.error
+        )
         self.core.publish()
 
     async def query(
