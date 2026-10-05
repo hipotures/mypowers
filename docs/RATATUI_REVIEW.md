@@ -896,6 +896,49 @@ All 15 SVGs pass `--check` and match the saved before set exactly. The Settings 
 is also byte-identical and was inspected before and after. Production code and
 the installed release binary remain unchanged.
 
+### 31. Measure and apply release optimization for renderer execution speed
+
+Completed the [release recipe](https://ratatui.rs/recipes/apps/release-your-app/),
+rechecked [backend compatibility](https://ratatui.rs/concepts/backends/), and
+verified [Cargo's profile inheritance and overrides](https://doc.rust-lang.org/cargo/reference/profiles.html).
+Both dependency graphs resolve one Crossterm 0.29, lockfiles are tracked, and
+installation uses `--locked`. The native launcher preserves the current working
+directory and forwards configuration flags to the Rust executable; both existing
+dispatch/install-hint tests passed in 0.06 seconds. Release already uses thin LTO,
+one codegen unit, and stripped symbols. Compared its size-oriented optimization
+with Rust's default speed-oriented release optimization instead of assuming the
+compiler setting was beneficial for this workload.
+
+Ran the unchanged production-renderer benchmark sequentially with `opt-level=s`
+and `opt-level=3`: five rounds of 5,000 frames per scene, with warmup and the same
+deterministic TestBackend fixtures. The speed build used an isolated target under
+`/tmp`; no daemon, hardware, real terminal, or second layout was involved.
+
+| Scene | `s`, median us/frame (min–max) | `3`, median us/frame (min–max) |
+| --- | ---: | ---: |
+| Live dashboard | 126.96 (119.59–133.24) | 66.61 (65.61–67.36) |
+| Idle dashboard | 126.50 (119.45–136.62) | 65.41 (63.43–67.03) |
+| Logs modal | 259.90 (246.01–270.52) | 139.84 (133.52–145.23) |
+
+Allocation/reallocation calls remain 90/94/294 per frame respectively. Release
+size increases from 5,689,152 to 6,403,432 bytes (approximately 5.43 to 6.11 MiB,
+12.6%). Removed `opt-level="s"` so the ordinary release profile now uses Cargo's
+default `3`, retaining its other settings. The measured render cost is roughly
+halved for this benchmark; this is not a claim of twice-as-fast network, BLE,
+terminal I/O, or overall application response time. No dependency or application
+logic change was needed.
+
+All 55 Rust tests passed under the new release profile in 35.03 seconds. All 30
+terminal-suite cases passed against an immutable copy of the measured release
+binary in 86.61 seconds, with isolated simulated services. Formatting, Clippy with
+warnings denied, and diff checks passed. A release-built xtask using matching
+optimization/LTO/codegen/strip settings verified all 15 SVG scenes, and the normal
+developer generator also passed `--check`. Regenerated SVGs and live-dashboard PNG
+bytes match the saved before set exactly; inspected that scene before and after.
+The standard release build matches the terminal-tested binary byte-for-byte.
+Updated the installed local frontend from that build without restarting existing
+application processes.
+
 ## Remaining review
 
 - Review remaining applicable application examples and tutorial integration details.
