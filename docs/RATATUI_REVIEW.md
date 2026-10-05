@@ -356,6 +356,26 @@ layout wrappers. All 37 Rust tests, formatting, Clippy with warnings denied, and
 diff checks passed. All 15 SVGs pass `--check`; regenerated SVG hashes and the
 too-small-terminal PNG bytes match the before set exactly. Inspected the after PNG.
 
+### 12. Verify history expiration and timeline identity
+
+Compared the [Sparkline example](https://ratatui.rs/examples/widgets/sparkline/)
+with production history projection. The application already passes explicit
+100 W / 300 W maxima, uses two rows, and tracks history by timestamp rather than
+event count. The idle predicate checks positive samples independently of pixel
+quantization, so small or overwritten readings still delay the idle animation.
+
+Added two fixed-clock regressions. The first checks that a sample exactly 120
+seconds old remains visible and blocks idle, then expires from both the graph
+and idle predicate one millisecond later. It also covers zero-width graph data
+and pruning. The second checks duplicate suppression, clearing the timeline on
+a backwards clock jump, daemon restarts that reuse sequence/segment identifiers,
+and an explicit gap between station segments. Both passed with existing
+production code; no graph or cache implementation change was warranted.
+
+All 39 Rust tests, formatting, Clippy with warnings denied, and diff checks
+passed. All 15 SVGs pass `--check`; regenerated SVG hashes and idle dashboard
+PNG bytes match the before set exactly. Inspected the idle PNG before and after.
+
 ## Remaining review
 
 - Review remaining applicable application examples and tutorial integration details.

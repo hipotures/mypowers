@@ -850,6 +850,113 @@ fn trends_use_timestamps_have_gap_columns_and_bounded_real_samples() {
 }
 
 #[test]
+fn trend_window_expires_at_the_same_boundary_as_the_idle_graph() {
+    use crate::clock::Clock;
+
+    let now = "2026-10-05T12:00:00Z"
+        .parse::<chrono::DateTime<chrono::Utc>>()
+        .unwrap();
+    let clock = |elapsed| Clock::Fixed {
+        now,
+        telemetry_elapsed: elapsed,
+        animation_elapsed: Duration::ZERO,
+        feedback_elapsed: Duration::ZERO,
+    };
+    let mut app = App::with_clock(false, Some(chrono_tz::UTC), clock(Duration::ZERO));
+    let mut historical = status();
+    historical.server_time = now.to_rfc3339();
+    historical.telemetry.sample.as_mut().unwrap().received_at =
+        (now - chrono::Duration::seconds(120)).to_rfc3339();
+    app.update(Event::Status(Box::new(historical)));
+    let mut current = status();
+    current.server_time = now.to_rfc3339();
+    let sample = current.telemetry.sample.as_mut().unwrap();
+    sample.received_at = now.to_rfc3339();
+    sample.sequence = 2;
+    sample.input_power_w = 0;
+    sample.output_power_w = 0;
+    app.update(Event::Status(Box::new(current)));
+
+    app.prune_trends();
+    assert_eq!(app.samples.len(), 2);
+    assert_eq!(app.graph_data(0, false), Vec::<u64>::new());
+    for output in [false, true] {
+        assert!(app.has_power_history(output));
+        assert_eq!(app.graph_data(40, output)[0], if output { 181 } else { 63 });
+    }
+    assert!(!text(&render(&mut app, 94, 29)).contains('○'));
+
+    // One millisecond past the boundary, both the graph and idle predicate expire.
+    app.clock = clock(Duration::from_millis(1));
+    for output in [false, true] {
+        assert!(!app.has_power_history(output));
+        assert!(app.graph_data(40, output).iter().all(|value| *value == 0));
+    }
+    app.prune_trends();
+    assert_eq!(app.samples.len(), 1);
+    assert_eq!(text(&render(&mut app, 94, 29)).matches('○').count(), 2);
+}
+
+#[test]
+fn trend_identity_and_clock_changes_do_not_join_unrelated_history() {
+    use crate::clock::Clock;
+
+    let now = "2026-10-05T12:00:00Z"
+        .parse::<chrono::DateTime<chrono::Utc>>()
+        .unwrap();
+    let mut app = App::with_clock(
+        false,
+        Some(chrono_tz::UTC),
+        Clock::Fixed {
+            now,
+            telemetry_elapsed: Duration::ZERO,
+            animation_elapsed: Duration::ZERO,
+            feedback_elapsed: Duration::ZERO,
+        },
+    );
+    let reading = |sequence, offset, instance: &str, segment: &str| {
+        let mut current = status();
+        current.server_time = (now + chrono::Duration::seconds(offset)).to_rfc3339();
+        current.server_instance_id = instance.into();
+        let sample = current.telemetry.sample.as_mut().unwrap();
+        sample.sequence = sequence;
+        sample.received_at = current.server_time.clone();
+        sample.segment_id = segment.into();
+        current
+    };
+    let instance = "88767477-2a2a-481f-843b-30d56a5e3f10";
+    app.update(Event::Status(Box::new(reading(1, -10, instance, "first"))));
+    app.update(Event::Status(Box::new(reading(1, -10, instance, "first"))));
+    assert_eq!(app.samples.len(), 1);
+    app.update(Event::Status(Box::new(reading(2, 0, instance, "first"))));
+    assert_eq!(app.samples.len(), 2);
+
+    // A backwards clock jump starts a new ordered timeline.
+    app.update(Event::Status(Box::new(reading(3, -5, instance, "first"))));
+    assert_eq!(app.samples.len(), 1);
+    assert_eq!(app.samples.front().unwrap().sample.sequence, 3);
+
+    // A daemon restart may reuse the previous sequence and segment identifiers.
+    let restarted = "4621ca79-497e-411c-a959-080c7527c01a";
+    app.update(Event::Status(Box::new(reading(3, 0, restarted, "first"))));
+    assert_eq!(app.samples.len(), 1);
+    assert_eq!(
+        app.samples.front().unwrap().timestamp,
+        now.timestamp() as f64
+    );
+
+    // A new station session retains time positions but breaks the connecting bar.
+    app.update(Event::Status(Box::new(reading(3, 20, restarted, "second"))));
+    assert_eq!(app.samples.len(), 2);
+    for output in [false, true] {
+        let data = app.graph_data(40, output);
+        assert_eq!(data[33], 0);
+        assert_eq!(data[39], if output { 181 } else { 63 });
+        assert_eq!(data.iter().filter(|value| **value != 0).count(), 1);
+    }
+}
+
+#[test]
 fn stream_errors_replace_transient_feedback() {
     let mut app = app();
     app.update(Event::Finished(Feedback::new(
