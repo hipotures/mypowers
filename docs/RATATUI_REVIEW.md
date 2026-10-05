@@ -587,6 +587,37 @@ before and after. No native PTY rerun or installed-binary update was needed:
 this cycle changes only tests/documentation, and cycle 18's 24 native cases and
 installed release binary still cover the current production implementation.
 
+### 20. Reject malformed startup bytes without panic or disclosure
+
+Reviewed [CLI arguments](https://ratatui.rs/recipes/apps/cli-arguments/) and
+[configuration directories](https://ratatui.rs/recipes/apps/config-directories/).
+The existing small parser needs no additional argument/configuration framework.
+The user-required current-directory `.env` contract takes precedence over the
+recipe's XDG example; configuration locations and precedence remain unchanged.
+
+Rust's [string environment iterator](https://doc.rust-lang.org/std/env/fn.vars.html)
+and [string argument iterator](https://doc.rust-lang.org/std/env/fn.args.html)
+panic on non-Unicode input. A subprocess reproduction on the installed toolchain
+proved that an unrelated byte-valued environment entry, a malformed MyPowers
+setting and a malformed argument each exited with code 101 and echoed the fake
+input in the panic. Four regression cases also cover a non-Unicode environment
+key; all failed before the fix.
+
+Configuration now iterates OS strings, ignores unrelated environment entries,
+and converts MyPowers values/CLI arguments with explicit UTF-8 validation.
+Invalid inputs return concise errors without their values, before entering raw
+mode or starting network tasks. No process-environment mutation, lossy decoding,
+new dependency, configuration fallback or token/URL-validation change was added.
+The tests use only fake markers in a minimal environment and an empty temporary
+working directory. They check exit code 2, expected error text, no panic/input
+echo, and no alternate-screen entry.
+
+All 47 Rust tests and 28 terminal-suite cases passed (35.13 and 84.46 seconds).
+Formatting, Ruff, Clippy with warnings denied, and diff checks passed. All 15 SVGs
+pass `--check`; regenerated SVGs and Settings PNG bytes match the before set
+exactly. Inspected Settings before and after. Built the release frontend and
+updated the local installed binary without restarting existing processes.
+
 ## Remaining review
 
 - Review remaining applicable application examples and tutorial integration details.

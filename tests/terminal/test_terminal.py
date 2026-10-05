@@ -529,6 +529,38 @@ def test_unreachable_unknown_values_exit_and_non_tty(tui_binary, tmp_path):
     assert result.returncode == 2 and "requires a terminal" in result.stderr
 
 
+@pytest.mark.parametrize(
+    "source,expected",
+    [
+        ("unrelated-value", b"TUI requires a terminal."),
+        ("unrelated-key", b"TUI requires a terminal."),
+        ("setting", b"MyPowers environment values must use UTF-8."),
+        ("argument", b"Arguments must use UTF-8."),
+    ],
+)
+def test_non_utf8_startup_input_never_panics_or_echoes_values(
+    tui_binary, tmp_path, source, expected
+):
+    marker = b"ReviewFakeValue"
+    raw = b"\xff" + marker
+    env = {b"PATH": os.fsencode(os.defpath)}
+    args = [os.fsencode(tui_binary)]
+    if source == "unrelated-value":
+        env[b"REVIEW_BINARY"] = raw
+    elif source == "unrelated-key":
+        env[raw] = b"ignored"
+    elif source == "setting":
+        env[b"MYPOWERS_API_TOKEN"] = raw
+    else:
+        args.extend([b"--server", raw])
+    result = subprocess.run(args, cwd=tmp_path, env=env, capture_output=True, timeout=3)
+    assert result.returncode == 2
+    assert expected in result.stderr
+    assert marker not in result.stdout + result.stderr
+    assert b"panicked at" not in result.stderr
+    assert b"\x1b[?1049h" not in result.stdout
+
+
 @pytest.mark.parametrize("daemon_process", [True], indirect=True)
 def test_native_authentication_and_private_relative_token_file(
     daemon_process, tui_binary, tmp_path

@@ -18,7 +18,15 @@ fn error(message: &str) -> io::Error {
 
 impl Config {
     pub fn load() -> io::Result<Option<Self>> {
-        Self::parse(env::args().skip(1).collect())
+        let arguments = env::args_os()
+            .skip(1)
+            .map(|value| {
+                value
+                    .into_string()
+                    .map_err(|_| error("Arguments must use UTF-8."))
+            })
+            .collect::<io::Result<Vec<_>>>()?;
+        Self::parse(arguments)
     }
 
     fn parse(args: Vec<String>) -> io::Result<Option<Self>> {
@@ -70,7 +78,14 @@ impl Config {
                 }
             }
         }
-        values.extend(env::vars().filter(|(key, _)| key.starts_with("MYPOWERS_")));
+        for (key, value) in env::vars_os() {
+            if let Some(key) = key.to_str().filter(|key| key.starts_with("MYPOWERS_")) {
+                let value = value
+                    .into_string()
+                    .map_err(|_| error("MyPowers environment values must use UTF-8."))?;
+                values.insert(key.to_owned(), value);
+            }
+        }
         let token_file = options
             .get("--token-file")
             .or(values.get("MYPOWERS_API_TOKEN_FILE"));
