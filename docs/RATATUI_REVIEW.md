@@ -1180,6 +1180,28 @@ checks passed. All 15 SVGs pass `--check` and match the saved before set exactly
 the Logs PNG is byte-identical and was inspected before and after. No production
 code or release binary changed in this cycle.
 
+### 40. Align shared CLI stream reception with valid server records
+
+The producer/API checks exposed the same boundary mismatch in the shared Python
+client used by `mypowers logs --follow`. An actual loopback WebSocket fixture
+sent a legal record below 16 KiB inside a 16,392-byte API envelope. Before the fix,
+the client closed with code 1009, both for one frame and for two fragments.
+
+Raised the shared client's `max_size` to the same bounded 32 KiB used by the TUI.
+No server-side incoming limit changed. The [websockets client reference](https://websockets.readthedocs.io/en/stable/reference/asyncio/client.html)
+describes this receive limit and the server's iterable-send API provides real
+fragmented-message coverage. Six cases verify the legal record, exactly 32 KiB,
+and rejection of one additional byte, both unfragmented and fragmented. The
+actual shared client validates the initial snapshot and receives the record with
+its full message/context. No mock transport replaces its socket/parser path.
+
+All 88 selected shared-client, CLI, and API tests passed in 47.38 seconds. Ruff
+formatting/lint, strict module typing, and diff checks passed. All 15 SVGs pass
+`--check` and match the saved before set exactly; the live dashboard PNG is
+byte-identical and was inspected before and after. The installed Rust release,
+standard build, and immutable terminal-tested copy still have identical hashes.
+No native renderer, installed binary, or existing daemon process changed.
+
 ## Remaining review
 
 - Review remaining applicable application examples and tutorial integration details.

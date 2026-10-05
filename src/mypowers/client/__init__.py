@@ -155,7 +155,7 @@ class Client:
             additional_headers=self.headers,
             ssl=self.tls if origin.startswith("wss:") else None,
             proxy=None,
-            max_size=16384,
+            max_size=32 * 1024,
             max_queue=128,
             open_timeout=self.config.timeout,
         ) as ws:

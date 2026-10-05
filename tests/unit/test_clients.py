@@ -1,3 +1,4 @@
+import asyncio
 import json
 from unittest.mock import AsyncMock
 
@@ -7,7 +8,7 @@ from mypowers_cli.main import command_exit, duration, parser, query_time, run
 
 from mypowers.client import Client
 from mypowers.config import ClientConfig
-from mypowers.contracts import AppError, Command, Output
+from mypowers.contracts import AppError, Command, Output, StreamMessage
 
 
 @pytest.mark.parametrize(
@@ -170,6 +171,72 @@ async def test_shared_client_invalid_auth_redirect_schema(method, path, status, 
                 await client.status()
             else:
                 await client.request(method, path)
+
+
+@pytest.mark.parametrize(
+    ("fragmented", "size"),
+    [(False, None), (True, None), (False, 32768), (True, 32768), (False, 32769), (True, 32769)],
+    ids=["record", "record-fragmented", "limit", "limit-fragmented", "over", "over-fragmented"],
+)
+async def test_shared_log_stream_preserves_bounded_record_envelopes(core, fragmented, size):
+    from websockets.asyncio.server import serve
+    from websockets.exceptions import ConnectionClosedError
+
+    snapshot = core[0].snapshot()
+    record = {
+        "schema_version": 1,
+        "timestamp": snapshot.server_time,
+        "server_instance_id": str(snapshot.server_instance_id),
+        "sequence": 1,
+        "level": "CRITICAL",
+        "logger": "mypowers",
+        "event": "bounded_transport",
+        "message": "x" * 4096,
+        "context": {f"key{i}": "y" * 3960 for i in range(3)},
+    }
+    initial = StreamMessage(
+        type="snapshot",
+        server_instance_id=snapshot.server_instance_id,
+        stream_sequence=1,
+        server_time=snapshot.server_time,
+        data=snapshot.model_dump(mode="json"),
+    )
+    update = initial.model_copy(update={"type": "log", "stream_sequence": 2, "data": record})
+    payload = json.dumps(update.model_dump(mode="json"), separators=(",", ":"))
+    assert len(json.dumps(record, separators=(",", ":"))) + 1 <= 16384
+    assert 16384 < len(payload) <= 32768
+    if size is not None:
+        record["context"]["padding"] = ""
+        empty = json.dumps(update.model_dump(mode="json"), separators=(",", ":"))
+        record["context"]["padding"] = "x" * (size - len(empty))
+        payload = json.dumps(update.model_dump(mode="json"), separators=(",", ":"))
+        assert len(payload) == size
+
+    async def handler(socket):
+        assert socket.request.path == "/api/v1/logs/stream?min_level=ERROR"
+        await socket.send(initial.model_dump_json())
+        if fragmented:
+            middle = len(payload) // 2
+            await socket.send([payload[:middle], payload[middle:]])
+        else:
+            await socket.send(payload)
+        await socket.wait_closed()
+
+    async with serve(handler, "127.0.0.1", 0, compression=None) as server:
+        port = server.sockets[0].getsockname()[1]
+        async with Client(ClientConfig(server=f"http://127.0.0.1:{port}")) as client:
+            stream = client.stream(logs=True, min_level="ERROR")
+            try:
+                assert (await asyncio.wait_for(anext(stream), 2)).type == "snapshot"
+                if size == 32769:
+                    with pytest.raises(ConnectionClosedError) as caught:
+                        await asyncio.wait_for(anext(stream), 2)
+                    assert caught.value.sent.code == 1009
+                else:
+                    received = await asyncio.wait_for(anext(stream), 2)
+                    assert received.type == "log" and received.data == record
+            finally:
+                await stream.aclose()
 
 
 async def test_client_uncertain_admission_never_replays(core):
