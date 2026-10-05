@@ -22,10 +22,11 @@ GATT/name/subscription setup 25s, first valid sample 5s, stale/write cutoff 3s, 
 3s. Retry delays are 2/5/10/20/30s plus at most 10% jitter; infrastructure checks use a slower wait.
 These are application decisions, not measured firmware guarantees.
 
-History records the first fresh observation in each UTC interval selected by
-`history.interval_seconds`, rather than starting the next interval after a delayed
-write. Observation timestamps remain unchanged. Reconnection segments are recorded
+History records full telemetry only when values change. Unchanged values extend
+their confirmed coverage once per UTC interval selected by `history.interval_seconds`.
+Observation timestamps remain unchanged. Reconnection segments are recorded
 immediately; unavailable telemetry leaves genuine gaps instead of repeating cached values.
+See [history migration](history-migration.md) for the explicit version-1 conversion.
 
 | Variable | Meaning |
 |---|---|
@@ -78,7 +79,8 @@ graph interval (10/30/60/3600 seconds), visualization (Sparkline/Chart), base sc
 (100/300 W with automatic doubling), timezone (`system` or IANA), and log page size
 (50/100/250/500/1000). These values are loaded by each TUI and survive daemon restarts.
 Graph aggregation intervals are independent of `history.interval_seconds`, which
-controls recording. Preference storage works when recording is disabled.
+controls coverage checkpoints for unchanged telemetry. Preference storage works
+when recording is disabled.
 
 Read and update preferences through `GET` / `PUT /api/v1/settings`. Updates change
 only supplied, validated fields. New preferences require a typed contract field

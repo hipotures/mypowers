@@ -16,22 +16,23 @@ async def test_schema_constraints_durability_and_colliding_times(core, tmp_path)
     store = HistoryStore(service, tmp_path, True, 10)
     await store.open()
     try:
-        for _ in range(3):
-            await store.insert(service.latest)
+        for watts in range(3):
+            sample = service.latest.sample.model_copy(update={"input_power_w": watts})
+            await store.insert(replace(service.latest, sample=sample))
         page = await store.query(
             timestamp(service.clock.time() - 1), timestamp(service.clock.time() + 1)
         )
         assert len(page.items) == 3
         assert len({r["id"] for r in page.items}) == 3
-        assert all(r["input_power_w"] == 0 for r in page.items)
-        async with store.db.execute("PRAGMA table_info(telemetry)") as query:
+        assert [r["input_power_w"] for r in page.items] == [0, 1, 2]
+        async with store.db.execute("PRAGMA table_info(telemetry_states)") as query:
             columns = [r[1] for r in await query.fetchall()]
         assert not {"frame", "raw", "log"} & set(columns)
         with pytest.raises(sqlite3.IntegrityError):
-            await store.db.execute("UPDATE telemetry SET battery_percent=101")
+            await store.db.execute("UPDATE telemetry_states SET battery_percent=101")
         await store.db.rollback()
         with pytest.raises(sqlite3.IntegrityError):
-            await store.db.execute("UPDATE telemetry SET ac_enabled=1")
+            await store.db.execute("UPDATE telemetry_states SET ac_enabled=1")
         await store.db.rollback()
         async with store.db.execute("PRAGMA integrity_check") as query:
             assert (await query.fetchone())[0] == "ok"
@@ -64,6 +65,53 @@ async def test_periodic_new_samples_segments_and_no_restamping(core, tmp_path):
         service.receive(frame(), session)
         store.schedule()
         assert store.queue.qsize() == 1
+    finally:
+        await store.close()
+
+
+async def test_changes_are_immediate_and_unchanged_states_only_extend_coverage(core, tmp_path):
+    service, clock, _, session = core
+    store = HistoryStore(service, tmp_path, True, 10)
+    await store.open()
+
+    async def flush():
+        store.schedule()
+        while not store.queue.empty():
+            await store.insert(store.queue.get_nowait())
+            store.queue.task_done()
+
+    try:
+        service.receive(frame(), session)
+        await flush()
+        start = service.latest.epoch
+        for _ in range(25):
+            clock.advance(1)
+            service.receive(frame(), session)
+            await flush()
+        page = await store.query(timestamp(start - 1), timestamp(clock.time() + 1))
+        assert len(page.items) == 1
+        assert page.items[0]["end_at_ms"] > page.items[0]["received_at_ms"] + 19000
+        # All payload fields matter, not just watts. Each change within the same
+        # recording interval creates a state immediately, without waiting 10 s.
+        for values in ({"battery": 70}, {"minutes": 99}, {"flags": 14}, {"input_w": 1}):
+            clock.advance(0.1)
+            service.receive(frame(**values), session)
+            store.schedule()
+            assert store.queue.qsize() == 1
+            await store.insert(store.queue.get_nowait())
+            store.queue.task_done()
+        page = await store.query(timestamp(start - 1), timestamp(clock.time() + 1))
+        assert len(page.items) == 5
+        old_end = page.items[-1]["end_at_ms"]
+        # Resuming the same payload after silence must not extend the previous run.
+        clock.advance(10)
+        store.schedule()
+        assert store.queue.empty()
+        service.receive(frame(input_w=1), session)
+        await flush()
+        page = await store.query(timestamp(start - 1), timestamp(clock.time() + 1))
+        assert len(page.items) == 6 and page.items[-2]["end_at_ms"] == old_end
+        assert page.items[-1]["segment_id"] != page.items[-2]["segment_id"]
     finally:
         await store.close()
 
@@ -115,8 +163,9 @@ async def test_stable_high_water_pagination_under_backwards_insertion(core, tmp_
     await store.open()
     try:
         now = service.latest.epoch
-        for delta in (0, 0, 1, 2):
-            await store.insert(replace(service.latest, epoch=now + delta))
+        for watts, delta in enumerate((0, 0, 1, 2)):
+            sample = service.latest.sample.model_copy(update={"input_power_w": watts})
+            await store.insert(replace(service.latest, epoch=now + delta, sample=sample))
         start, end = timestamp(now - 1), timestamp(now + 10)
         first = await store.query(start, end, 2)
         assert len(first.items) == 2 and first.next_cursor
@@ -141,7 +190,7 @@ async def test_stable_high_water_pagination_under_backwards_insertion(core, tmp_
         await store.close()
 
 
-@pytest.mark.parametrize("kind", ["future", "unversioned", "corrupt"])
+@pytest.mark.parametrize("kind", ["legacy", "future", "unversioned", "corrupt"])
 async def test_unknown_database_never_overwritten(core, tmp_path, kind):
     store = HistoryStore(core[0], tmp_path, True, 10)
     if kind == "corrupt":
@@ -151,6 +200,8 @@ async def test_unknown_database_never_overwritten(core, tmp_path, kind):
             connection.execute("CREATE TABLE preserved(value)")
             if kind == "future":
                 connection.execute("PRAGMA user_version=99")
+            elif kind == "legacy":
+                connection.execute("PRAGMA user_version=1")
     before = store.path.read_bytes()
     with pytest.raises((RuntimeError, sqlite3.DatabaseError)):
         await store.open()
@@ -229,8 +280,8 @@ async def test_read_only_storage_preserves_live_service(core, tmp_path):
         await store.close()
 
 
-@pytest.mark.parametrize("seconds", [10, 60, 3600])
-async def test_power_aggregates_include_zeros_skip_gaps_and_preserve_fractional_means(
+@pytest.mark.parametrize("seconds", [10, 30, 60, 3600])
+async def test_power_aggregates_weight_duration_include_zeros_and_skip_gaps(
     core, tmp_path, seconds
 ):
     service = core[0]
@@ -238,13 +289,22 @@ async def test_power_aggregates_include_zeros_skip_gaps_and_preserve_fractional_
     await store.open()
     try:
         start = (int(service.latest.epoch) // seconds - 4) * seconds
-        for offset, input_w, output_w in [(0, 0, 0), (1, 1, 3), (2 * seconds, 60, 180)]:
+        # 100/300 W for one second, then a measured zero for the rest of the bucket.
+        for offset, input_w, output_w, segment in [
+            (0, 100, 300, "first"),
+            (1, 0, 0, "first"),
+            (seconds - 0.001, 0, 0, "first"),
+            (2 * seconds, 60, 180, "second"),
+            (3 * seconds, 0, 0, "second"),
+        ]:
             sample = service.latest.sample.model_copy(
-                update={"input_power_w": input_w, "output_power_w": output_w}
+                update={
+                    "input_power_w": input_w,
+                    "output_power_w": output_w,
+                    "segment_id": segment,
+                }
             )
             await store.insert(replace(service.latest, epoch=start + offset, sample=sample))
-        # A reading exactly at until belongs to the next request, not this one.
-        await store.insert(replace(service.latest, epoch=start + 3 * seconds))
         page = await store.aggregates(timestamp(start), timestamp(start + 3 * seconds), seconds, 3)
         assert page.bucket_seconds == seconds
         assert page.since_ms == start * 1000 and page.until_ms == (start + 3 * seconds) * 1000
@@ -253,23 +313,38 @@ async def test_power_aggregates_include_zeros_skip_gaps_and_preserve_fractional_
             (start + 2 * seconds) * 1000,
         ]
         assert page.items[0].sample_count == 2
-        assert page.items[0].input_power_w == 0.5 and page.items[0].output_power_w == 1.5
+        assert page.items[0].input_power_w == pytest.approx(100 / seconds)
+        assert page.items[0].output_power_w == pytest.approx(300 / seconds)
         assert page.items[1].sample_count == 1 and page.items[1].input_power_w == 60
         empty = await store.aggregates(
-            timestamp(start + seconds), timestamp(start + 2 * seconds), seconds, 1
+            timestamp(start + seconds),
+            timestamp(start + 2 * seconds),
+            seconds,
+            1,
         )
         assert empty.items == []
         zero = await store.aggregates(
-            timestamp(start + 3 * seconds), timestamp(start + 4 * seconds), seconds, 1
+            timestamp(start + 3 * seconds),
+            timestamp(start + 4 * seconds),
+            seconds,
+            1,
         )
         assert len(zero.items) == 1 and zero.items[0].input_power_w == 0
         assert zero.items[0].sample_count == 1
+        # A long state beginning before the request still contributes to each clipped bucket.
+        clipped = await store.aggregates(
+            timestamp(start + 2 * seconds + 1),
+            timestamp(start + 3 * seconds - 1),
+            seconds,
+            1,
+        )
+        assert len(clipped.items) == 1 and clipped.items[0].output_power_w == 180
         async with store.db.execute(
-            "EXPLAIN QUERY PLAN SELECT * FROM telemetry WHERE device_id=? "
-            "AND received_at_ms>=? AND received_at_ms<?",
+            "EXPLAIN QUERY PLAN SELECT * FROM telemetry_states WHERE device_id=? "
+            "AND end_at_ms>? AND received_at_ms<?",
             (store.device_id, start * 1000, (start + seconds) * 1000),
         ) as query:
-            assert "telemetry_device_time_id" in str(await query.fetchall())
+            assert "states_device_" in str(await query.fetchall())
         async with store.db.execute("PRAGMA integrity_check") as query:
             assert (await query.fetchone())[0] == "ok"
     finally:
@@ -334,6 +409,8 @@ async def test_hourly_aggregates_return_bars_instead_of_thousands_of_raw_rows(co
             (
                 store.device_id,
                 (start + index * 10) * 1000,
+                (start + (index + 1) * 10) * 1000,
+                (start + index * 10) * 1000,
                 sample.segment_id,
                 71,
                 100 if index % 2 else 0,
@@ -347,9 +424,10 @@ async def test_hourly_aggregates_return_bars_instead_of_thousands_of_raw_rows(co
             for index in range(43 * 360)
         ]
         await store.db.executemany(
-            "INSERT INTO telemetry(device_id,received_at_ms,segment_id,battery_percent,"
+            "INSERT INTO telemetry_states(device_id,received_at_ms,end_at_ms,last_observed_at_ms,"
+            "segment_id,battery_percent,"
             "input_power_w,output_power_w,remaining_minutes,ac_enabled,dc_enabled,"
-            "light_enabled,status_flags) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+            "light_enabled,status_flags) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
             rows,
         )
         await store.db.commit()

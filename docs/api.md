@@ -13,8 +13,8 @@ the checked-in [OpenAPI artifact](openapi.json) describes typed requests and res
 | GET `/api/v1/capabilities` | Only qualified reads and AC/DC/common-lamp outputs |
 | GET `/api/v1/settings` | Persisted application settings and defaults |
 | PUT `/api/v1/settings` | Validate and persist supplied settings fields; omitted fields stay unchanged |
-| GET `/api/v1/history` | UTC `[since,until)` raw sample page, limit/cursor |
-| GET `/api/v1/history/aggregates` | UTC power averages and sample counts per 10s / 30s / 60s / 1h bucket |
+| GET `/api/v1/history` | UTC `[since,until)` state change page, limit/cursor |
+| GET `/api/v1/history/aggregates` | UTC duration-weighted power averages per 10s / 30s / 60s / 1h bucket |
 | PUT `/api/v1/outputs/{ac,dc,light}` | One explicit boolean intention with idempotency UUID |
 | GET `/api/v1/commands/{uuid}` | Retained asynchronous result |
 | PUT `/api/v1/connection` | `{"desired":"paused"}` or `{"desired":"running"}` |
@@ -63,23 +63,28 @@ History default range is last hour ending at server time; limit defaults 1,000, 
 Pages order by `(received_at_ms,id)` and keep a signed high-water ID to exclude subsequent inserts,
 including backward clock insertions. Pass the cursor with unchanged or omitted range filters.
 Disabled/degraded history is a 503, distinct from a successful empty page.
+Rows contain full state payloads and `received_at_ms`, exclusive `end_at_ms`,
+and `last_observed_at_ms`. Range filters select changes starting within the range;
+aggregate queries also include overlapping states that started before it.
+Coverage endpoints can advance while a state remains unchanged; high-water
+pagination excludes newly inserted changes, not updates to coverage endpoints.
 
 `GET /api/v1/history/aggregates` requires aware `since` and `until` timestamps.
-`bucket_seconds` is 10 (default), 60 or 3600; `limit` is the maximum number of
+`bucket_seconds` is 10 (default), 30, 60 or 3600; `limit` is the maximum number of
 potential buckets in the requested range, 1–256 (default 256). Oversized ranges
 return 422, even when little or no data exists; aggregate results are not paged
-or silently truncated. The current device's indexed receive-time range is
-aggregated in SQLite, without schema changes or additional database files.
+or silently truncated. The current device's indexed state spans are aggregated
+in SQLite, without additional database files or permanent aggregate tables.
 
 Buckets align to UTC epoch multiples of `bucket_seconds`. Filtering is exactly
 `[since,until)`, so an unaligned range can include partial first/last buckets.
 The response echoes `bucket_seconds`, `since_ms`, `until_ms` and `source=database`.
 Ordered `items` contain `bucket_start_ms`, fractional `input_power_w` and
-`output_power_w` averages, and `sample_count`. AVG includes recorded zeros;
-missing buckets are omitted and must remain gaps in a graph. COUNT distinguishes
-an observed zero from no data and describes the current bucket's sample population.
-This is the arithmetic mean of available persisted observations, not an energy
-integral or a time-weighted estimate across recording gaps. The same availability,
+`output_power_w` averages, and `sample_count` (the number of contributing state
+spans). Averages are `SUM(power * covered_duration) / SUM(covered_duration)`;
+recorded zeros contribute. Missing buckets are omitted and must remain gaps in
+a graph. Unavailable periods do not contribute and are never filled from cached
+telemetry. The same availability,
 authentication, four-query admission limit and six-second deadline apply to raw
 and aggregate history reads.
 

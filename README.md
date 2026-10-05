@@ -1,7 +1,7 @@
 # MyPowers
 
 MyPowers monitors one qualified ALLPOWERS S300 and explicitly controls its AC group, DC group
-and common lamps. A foreground daemon owns BLE, records periodic SQLite history and serves an
+and common lamps. A foreground daemon owns BLE, records change-only SQLite history and serves an
 HTTP/WebSocket API. The Rich CLI and Rust/Ratatui TUI use that same API locally or remotely.
 Closing a frontend never stops collection or changes station outputs.
 
@@ -98,6 +98,7 @@ for locked exports, installation, supervisors and Caddy. No process creates a ve
 
 - [API and streams](docs/api.md), [generated OpenAPI](docs/openapi.json)
 - [Configuration](docs/configuration.md), [operations](docs/operations.md)
+- [Change-only history and explicit SQLite conversion](docs/history-migration.md)
 - [Implementation validation and acceptance results](docs/validation/IMPLEMENTATION_VALIDATION.md)
 - [Preserved exact-unit research](docs/research/s300/README.md)
 

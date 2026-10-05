@@ -150,26 +150,26 @@ def test_startup_backfills_the_live_graph_window_from_server_history(
         # Seed only the fresh simulated fixture database, never a user database.
         with sqlite3.connect(tmp_path / "data" / "mypowers.db") as database:
             device_id = database.execute("SELECT id FROM devices LIMIT 1").fetchone()[0]
-            database.executemany(
-                "INSERT INTO telemetry(device_id,received_at_ms,segment_id,battery_percent,"
-                "input_power_w,output_power_w,remaining_minutes,ac_enabled,dc_enabled,"
-                "light_enabled,status_flags) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
-                [
-                    (
-                        device_id,
-                        now_ms - offset * 1000,
-                        sample["segment_id"],
-                        71,
-                        35,
-                        3,
-                        2880,
-                        int(sample["ac_enabled"]),
-                        int(sample["dc_enabled"]),
-                        int(sample["light_enabled"]),
-                        sample["status_flags"],
-                    )
-                    for offset in range(425, 4, -10)
-                ],
+            database.execute(
+                "INSERT INTO telemetry_states(device_id,received_at_ms,end_at_ms,"
+                "last_observed_at_ms,segment_id,battery_percent,input_power_w,output_power_w,"
+                "remaining_minutes,ac_enabled,dc_enabled,light_enabled,status_flags) "
+                "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                (
+                    device_id,
+                    now_ms - 425000,
+                    now_ms - 5000,
+                    now_ms - 5001,
+                    "seeded-history",
+                    71,
+                    35,
+                    3,
+                    2880,
+                    int(sample["ac_enabled"]),
+                    int(sample["dc_enabled"]),
+                    int(sample["light_enabled"]),
+                    sample["status_flags"],
+                ),
             )
         page = client.get(
             "/api/v1/history",
@@ -179,7 +179,7 @@ def test_startup_backfills_the_live_graph_window_from_server_history(
                 "limit": 1000,
             },
         ).json()
-        assert len(page["items"]) >= 43
+        assert any(row["segment_id"] == "seeded-history" for row in page["items"])
     session = Session(tui_binary, tmp_path, env, "--server", url)
     try:
         session.read(b"CONNECTED")
@@ -205,7 +205,12 @@ def test_startup_backfills_the_live_graph_window_from_server_history(
         assert "INPUT 35 W" not in rows[label_row]
         assert "OUTPUT 3 W" not in rows[label_row]
         # The actual client rotates per-bar aggregates without replacing live numbers.
-        for label, minimum, maximum in [("60s", 1, 10), ("1h", 1, 3), ("10s", 30, 43)]:
+        for label, minimum, maximum in [
+            ("30s", 1, 20),
+            ("60s", 1, 10),
+            ("1h", 1, 3),
+            ("10s", 30, 43),
+        ]:
             session.write(b"t")
             session.read(f"t {label}".encode())
             deadline = time.monotonic() + 5

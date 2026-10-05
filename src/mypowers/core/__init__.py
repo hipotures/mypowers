@@ -211,6 +211,10 @@ class Core:
             return
         mono, epoch = self.clock.monotonic(), self.clock.time()
         previous = self.latest
+        if previous and mono - previous.monotonic >= self.stale_after:
+            # A fresh frame after silence starts a new history segment even when
+            # no API read or periodic tick observed the stale interval.
+            self.segment = str(uuid4())
         if previous and abs((epoch - previous.epoch) - (mono - previous.monotonic)) > 2:
             self.segment = str(uuid4())
             self.log("WARNING", "clock_discontinuity", "Wall clock discontinuity observed.")

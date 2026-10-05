@@ -10,7 +10,7 @@ import os
 import sqlite3
 import time
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal, cast
 from uuid import uuid4
 
 import aiosqlite
@@ -25,37 +25,12 @@ from mypowers.contracts import (
     aware_ms,
 )
 from mypowers.core import Core, Observation
+from mypowers.storage.schema import AGGREGATES, INSERT_STATE, SCHEMA, STATE_FIELDS, VERSION
 
 SETTINGS_SCHEMA = """
 CREATE TABLE IF NOT EXISTS settings (
  key TEXT PRIMARY KEY, value_json TEXT NOT NULL
 ) STRICT;
-"""
-
-SCHEMA = """
-BEGIN IMMEDIATE;
-CREATE TABLE devices (
- id INTEGER PRIMARY KEY, address TEXT NOT NULL UNIQUE, name TEXT NOT NULL,
- model TEXT NOT NULL, created_at_ms INTEGER NOT NULL
-) STRICT;
-CREATE TABLE telemetry (
- id INTEGER PRIMARY KEY, device_id INTEGER NOT NULL REFERENCES devices(id),
- received_at_ms INTEGER NOT NULL, segment_id TEXT NOT NULL,
- battery_percent INTEGER NOT NULL CHECK (battery_percent BETWEEN 0 AND 100),
- input_power_w INTEGER NOT NULL CHECK (input_power_w BETWEEN 0 AND 65535),
- output_power_w INTEGER NOT NULL CHECK (output_power_w BETWEEN 0 AND 65535),
- remaining_minutes INTEGER NOT NULL CHECK (remaining_minutes BETWEEN 0 AND 65535),
- ac_enabled INTEGER NOT NULL CHECK (ac_enabled IN (0,1)),
- dc_enabled INTEGER NOT NULL CHECK (dc_enabled IN (0,1)),
- light_enabled INTEGER NOT NULL CHECK (light_enabled IN (0,1)),
- status_flags INTEGER NOT NULL CHECK (status_flags BETWEEN 0 AND 127),
- CHECK (ac_enabled = ((status_flags & 2) != 0)),
- CHECK (dc_enabled = ((status_flags & 1) != 0)),
- CHECK (light_enabled = ((status_flags & 16) != 0))
-) STRICT;
-CREATE INDEX telemetry_device_time_id ON telemetry(device_id, received_at_ms, id);
-PRAGMA user_version=1;
-COMMIT;
 """
 
 
@@ -102,6 +77,7 @@ class HistoryStore:
         self.saved_sequence = 0
         self.last_segment: str | None = None
         self.last_bucket: int | None = None
+        self.saved_values: tuple[Any, ...] | None = None
         self.queue: asyncio.Queue[Observation] = asyncio.Queue(256)
         self.lock = asyncio.Lock()
         self.queries = 0
@@ -140,8 +116,10 @@ class HistoryStore:
                         raise RuntimeError(
                             "Unversioned nonempty database requires operator action."
                         )
-            elif version != 1:
-                raise RuntimeError("Unsupported database schema; operator action required.")
+            elif version != VERSION:
+                raise RuntimeError(
+                    "Unsupported database schema; run scripts/migrate-history.py on a backup."
+                )
             for name, value in (
                 ("journal_mode", "DELETE"),
                 ("synchronous", "FULL"),
@@ -192,27 +170,48 @@ class HistoryStore:
     async def insert(self, observation: Observation) -> None:
         assert self.db is not None and self.device_id is not None
         sample = observation.sample
+        received = int(observation.epoch * 1000)
+        values = tuple(getattr(sample, field) for field in STATE_FIELDS)
         async with self.lock:
-            await self.db.execute(
-                "INSERT INTO telemetry(device_id,received_at_ms,segment_id,battery_percent,"
-                "input_power_w,output_power_w,remaining_minutes,ac_enabled,"
-                "dc_enabled,light_enabled,status_flags) "
-                "VALUES (?,?,?,?,?,?,?,?,?,?,?)",
-                (
-                    self.device_id,
-                    int(observation.epoch * 1000),
-                    sample.segment_id,
-                    sample.battery_percent,
-                    sample.input_power_w,
-                    sample.output_power_w,
-                    sample.remaining_minutes,
-                    int(sample.ac_enabled),
-                    int(sample.dc_enabled),
-                    int(sample.light_enabled),
-                    sample.status_flags,
-                ),
-            )
-            await self.db.commit()
+            try:
+                async with self.db.execute(
+                    "SELECT id,last_observed_at_ms,segment_id,"
+                    + ",".join(STATE_FIELDS)
+                    + " FROM telemetry_states WHERE device_id=? ORDER BY id DESC LIMIT 1",
+                    (self.device_id,),
+                ) as cursor:
+                    previous = await cursor.fetchone()
+                continuous = (
+                    previous is not None
+                    and previous[2] == sample.segment_id
+                    and received >= previous[1]
+                )
+                if previous is not None and continuous and tuple(previous[3:]) == values:
+                    await self.db.execute(
+                        "UPDATE telemetry_states SET end_at_ms=?,last_observed_at_ms=? WHERE id=?",
+                        (received + 1, received, previous[0]),
+                    )
+                else:
+                    if previous is not None and continuous:
+                        await self.db.execute(
+                            "UPDATE telemetry_states SET end_at_ms=? WHERE id=?",
+                            (received, previous[0]),
+                        )
+                    await self.db.execute(
+                        INSERT_STATE,
+                        (
+                            self.device_id,
+                            received,
+                            received + 1,
+                            received,
+                            sample.segment_id,
+                            *values,
+                        ),
+                    )
+                await self.db.commit()
+            except BaseException:
+                await self.db.rollback()
+                raise
         self.last_write = sample.received_at
 
     def schedule(self) -> None:
@@ -225,10 +224,15 @@ class HistoryStore:
             or latest.sample.sequence <= self.saved_sequence
         ):
             return
-        # Persist the first fresh observation in each UTC interval. Relative deadlines
-        # accumulate polling delays and leave artificial holes in 10-second aggregates.
+        # Record changes immediately; unchanged observations checkpoint coverage once
+        # per UTC interval. Cached or stale values never extend the recorded span.
         bucket = math.floor(latest.epoch / self.interval)
-        if latest.sample.segment_id == self.last_segment and bucket == self.last_bucket:
+        values = tuple(getattr(latest.sample, field) for field in STATE_FIELDS)
+        if (
+            latest.sample.segment_id == self.last_segment
+            and values == self.saved_values
+            and bucket == self.last_bucket
+        ):
             return
         try:
             self.queue.put_nowait(latest)
@@ -237,7 +241,7 @@ class HistoryStore:
             self.core.segment = str(uuid4())
             return
         self.saved_sequence, self.last_segment = latest.sample.sequence, latest.sample.segment_id
-        self.last_bucket = bucket
+        self.last_bucket, self.saved_values = bucket, values
 
     async def run(self) -> None:
         retry = 0.0
@@ -323,7 +327,8 @@ class HistoryStore:
             after_time, after_id = data["time"], data["id"]
         else:
             async with self.db.execute(
-                "SELECT coalesce(max(id),0) FROM telemetry WHERE device_id=?", (self.device_id,)
+                "SELECT coalesce(max(id),0) FROM telemetry_states WHERE device_id=?",
+                (self.device_id,),
             ) as query:
                 row = await query.fetchone()
             high = row[0] if row else 0
@@ -331,7 +336,7 @@ class HistoryStore:
             raise AppError("invalid_range", "since must be before until.", 422)
         self.db.row_factory = aiosqlite.Row
         async with self.db.execute(
-            "SELECT * FROM telemetry WHERE device_id=? AND received_at_ms>=? "
+            "SELECT * FROM telemetry_states WHERE device_id=? AND received_at_ms>=? "
             "AND received_at_ms<? AND id<=? AND (received_at_ms>? OR (received_at_ms=? AND id>?)) "
             "ORDER BY received_at_ms,id LIMIT ?",
             (self.device_id, start, end, high, after_time, after_time, after_id, limit + 1),
@@ -375,18 +380,25 @@ class HistoryStore:
         try:
             async with asyncio.timeout(6):
                 async with self.lock:
-                    # UTC epoch buckets, including correct floor division before 1970.
-                    # AVG includes measured zeros; absent buckets have no returned record.
                     async with self.db.execute(
-                        "SELECT received_at_ms - ((received_at_ms % ? + ?) % ?) "
-                        "AS bucket_start_ms, AVG(input_power_w), AVG(output_power_w), COUNT(*) "
-                        "FROM telemetry WHERE device_id=? AND received_at_ms>=? "
-                        "AND received_at_ms<? GROUP BY bucket_start_ms ORDER BY bucket_start_ms",
-                        (span, span, span, self.device_id, start, end),
+                        AGGREGATES,
+                        (
+                            start // span * span,
+                            span,
+                            span,
+                            end,
+                            self.device_id,
+                            start,
+                            end,
+                            span,
+                            end,
+                            start,
+                            span,
+                        ),
                     ) as query:
                         rows = await query.fetchall()
                     return HistoryAggregates(
-                        bucket_seconds=bucket_seconds,
+                        bucket_seconds=cast(Literal[10, 30, 60, 3600], bucket_seconds),
                         since_ms=start,
                         until_ms=end,
                         items=[
