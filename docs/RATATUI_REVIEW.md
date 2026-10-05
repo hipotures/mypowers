@@ -861,6 +861,41 @@ All six selected keyboard/modal/paste/resize/restoration cases passed in
 28.55 seconds. All 15 SVGs pass `--check` and match the saved before set exactly;
 the Logs Help PNG is also byte-identical and was inspected before and after.
 
+### 30. Verify modal transitions and complete rendered frame state
+
+Completed the [Popup example](https://ratatui.rs/examples/apps/popup/) and
+[Flex example](https://ratatui.rs/examples/layout/flex/). Production already uses
+Clear before modal contents, Block's inner area, and explicit centered Layout
+constraints. Its fixed dashboard/modal bounds do not warrant a layout rewrite.
+The Flex demo enlarges its layout cache for its many configurable constraint
+combinations; MyPowers has fixed layouts and already enables caching. No cache
+size expansion is justified by the existing measurements.
+
+Added a deterministic transition regression using the actual production renderer.
+It visits all 25 ordered pairs among Dashboard, Logs, Help, Settings, and Quit,
+at 60x19, 80x24, 94x29, and 120x40, with both color modes and ASCII/Unicode data.
+Across 800 reused-terminal frames, every complete pre-flush buffer matches a fresh
+render exactly, including all symbols, backgrounds, foregrounds, and modifiers.
+Fixtures alternate long/short text, filled/empty log lists, battery values,
+connected/offline state, help context, and status feedback/counters. ASCII cases
+also compare the complete post-flush TestBackend buffers.
+
+The initial naive post-flush comparison exposed a TestBackend representation
+limit rather than a production frame difference. Its draw method copies emitted
+cells only; it does not emulate a terminal erasing the trailing half of a wide
+glyph. Reused backing arrays can therefore retain hidden text/attributes, which
+may later appear in that array although a physical terminal has erased them.
+The installed Ratatui core 0.1.2 implementation confirms this behavior. Unicode
+cases assert the full pre-flush frame without normalizing away any renderer data.
+The canonical image generator already starts each scene with a fresh TestBackend,
+so it does not accumulate this limitation. No renderer/backend workaround was added.
+
+The new regression passed in 3.71 seconds; the full 55-test Rust suite passed in
+35.07 seconds. Formatting, Clippy with warnings denied, and diff checks passed.
+All 15 SVGs pass `--check` and match the saved before set exactly. The Settings PNG
+is also byte-identical and was inspected before and after. Production code and
+the installed release binary remain unchanged.
+
 ## Remaining review
 
 - Review remaining applicable application examples and tutorial integration details.

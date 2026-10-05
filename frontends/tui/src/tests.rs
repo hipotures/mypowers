@@ -252,6 +252,119 @@ fn repeated_resize_matches_fresh_frames_and_keeps_hitboxes_in_bounds() {
 }
 
 #[test]
+fn view_transitions_clear_old_symbols_and_styles_in_a_reused_terminal() {
+    use crate::clock::Clock;
+    fn draw_frame(terminal: &mut Terminal<TestBackend>, app: &mut App) -> Buffer {
+        let mut rendered = None;
+        terminal
+            .draw(|frame| {
+                ui::draw(frame, app);
+                rendered = Some(frame.buffer_mut().clone());
+            })
+            .unwrap();
+        rendered.unwrap()
+    }
+    let now = "2026-10-05T12:00:00Z".parse().unwrap();
+    let views = [
+        View::Dashboard,
+        View::Logs,
+        View::Help,
+        View::Settings,
+        View::Quit,
+    ];
+    for (no_color, unicode) in [(false, false), (false, true), (true, false), (true, true)] {
+        for (width, height) in [(60, 19), (80, 24), (94, 29), (120, 40)] {
+            let mut app = App::with_clock(
+                no_color,
+                Some(chrono_tz::UTC),
+                Clock::Fixed {
+                    now,
+                    telemetry_elapsed: Duration::ZERO,
+                    animation_elapsed: Duration::from_secs(8),
+                    feedback_elapsed: Duration::from_secs(1),
+                },
+            );
+            let mut terminal = Terminal::new(TestBackend::new(width, height)).unwrap();
+            let mut step = 0;
+            for from in views {
+                for to in views {
+                    for view in [from, to] {
+                        let long_text = step % 2 == 0;
+                        let fragment = if unicode {
+                            "界 e\u{0301} 👨‍👩‍👧‍👦"
+                        } else {
+                            "Long station text "
+                        };
+                        let mut current = status();
+                        current.server_time = "2026-10-05T12:00:00Z".into();
+                        current.device["name"] = json!(if long_text {
+                            fragment.repeat(12)
+                        } else {
+                            "AP S300".to_owned()
+                        });
+                        let sample = current.telemetry.sample.as_mut().unwrap();
+                        sample.received_at = current.server_time.clone();
+                        sample.sequence = step;
+                        sample.battery_percent = [78, 3, 100][step as usize % 3];
+                        app.update(Event::Status(Box::new(current)));
+                        if step % 3 == 0 {
+                            app.update(Event::Disconnected("Connection lost".into()));
+                        }
+                        app.view = view;
+                        app.help_context =
+                            [View::Dashboard, View::Logs, View::Settings][step as usize % 3];
+                        app.resize();
+                        app.logs.records.clear();
+                        if long_text {
+                            for sequence in 0..40 {
+                                app.logs.records.push_back(json!({
+                                    "timestamp": "2026-10-05T12:00:00Z", "level": "ERROR",
+                                    "sequence": sequence,
+                                    "server_instance_id": "88767477-2a2a-481f-843b-30d56a5e3f10",
+                                    "message": fragment.repeat(12)
+                                }));
+                            }
+                        }
+                        app.warning_count = u32::from(long_text);
+                        app.error_count = u32::from(!long_text);
+                        app.feedback = Some(Feedback::new(
+                            if long_text {
+                                fragment.repeat(20)
+                            } else {
+                                "Saved".into()
+                            },
+                            if long_text {
+                                Severity::Error
+                            } else {
+                                Severity::Success
+                            },
+                        ));
+                        let actual_frame = draw_frame(&mut terminal, &mut app);
+                        let mut fresh = Terminal::new(TestBackend::new(width, height)).unwrap();
+                        let fresh_frame = draw_frame(&mut fresh, &mut app);
+                        assert_eq!(
+                            actual_frame, fresh_frame,
+                            "Full frame at {width}x{height}, no_color={no_color}, unicode={unicode}, step={step}"
+                        );
+                        // TestBackend does not emulate erasing a wide glyph's trailing cell.
+                        // Unicode is checked in the complete pre-flush frame above.
+                        if !unicode {
+                            assert_eq!(
+                                terminal.backend().buffer(),
+                                fresh.backend().buffer(),
+                                "{width}x{height}, no_color={no_color}, transition step={step}"
+                            );
+                        }
+                        step += 1;
+                    }
+                }
+            }
+            assert_eq!(step, 50);
+        }
+    }
+}
+
+#[test]
 fn status_strip_is_outside_border_fades_and_leaves_no_reassuring_noise() {
     let mut app = app();
     let mut colors = Vec::new();
