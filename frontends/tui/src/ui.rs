@@ -552,13 +552,7 @@ fn dashboard(frame: &mut Frame, content: Rect, app: &mut App) {
                     .flat_map(|s| [s.input_power_w as f64, s.output_power_w as f64]),
             ),
         );
-        frame.render_widget(
-            Paragraph::new(format!("0–{maximum} W"))
-                .alignment(Alignment::Right)
-                .style(Style::default().fg(DIM)),
-            Rect::new(rows[6].x, rows[6].y + 1, rows[6].width, 1),
-        );
-        let time_labels = chart_time_labels(
+        let time_ticks = chart_time_ticks(
             app.timeline_now_ms(),
             app.graph.resolution,
             plot_width,
@@ -571,7 +565,7 @@ fn dashboard(frame: &mut Frame, content: Rect, app: &mut App) {
             if idle { &[] } else { &output },
             maximum,
             live,
-            time_labels,
+            time_ticks,
         );
         if idle {
             idle_graph(
@@ -647,7 +641,7 @@ fn power_chart(
     output: &[Option<f64>],
     maximum: u64,
     live: bool,
-    time_labels: [String; 3],
+    time_ticks: Vec<(u16, String)>,
 ) {
     let input_runs = chart_runs(input);
     let output_runs = chart_runs(output);
@@ -680,21 +674,23 @@ fn power_chart(
                         0.0,
                         f64::from(area.width.saturating_sub(CHART_AXIS_WIDTH + 1).max(1)),
                     ])
-                    .labels(
-                        time_labels
-                            .iter()
-                            .cloned()
-                            .map(|label| Line::from(label).style(Style::default().fg(MUTED))),
-                    )
-                    .labels_alignment(Alignment::Center)
+                    // Reserve a label row; time ticks have actual timestamp positions.
+                    .labels([Line::from("")])
                     .style(Style::default().fg(BORDER)),
             )
             .y_axis(
                 Axis::default()
                     .bounds([0.0, maximum as f64])
-                    .labels([0, maximum / 2, maximum].map(|value| {
-                        Line::from(format!("{value:>6}")).style(Style::default().fg(MUTED))
-                    }))
+                    .labels(
+                        [
+                            // Chart puts the lowest label above the horizontal axis.
+                            // Keep its reserved width, and label the origin below instead.
+                            Line::from("      "),
+                            Line::from(format!("{:>6}", maximum / 2)),
+                            Line::from(format!("{maximum:>6}")),
+                        ]
+                        .map(|label| label.style(Style::default().fg(MUTED))),
+                    )
                     .labels_alignment(Alignment::Right)
                     .style(Style::default().fg(BORDER)),
             )
@@ -718,6 +714,27 @@ fn power_chart(
             *target = cell.clone();
         }
     }
+    frame.render_widget(
+        Paragraph::new("0")
+            .alignment(Alignment::Right)
+            .style(Style::default().fg(MUTED)),
+        Rect::new(area.x, area.bottom() - 2, CHART_AXIS_WIDTH - 1, 1),
+    );
+    let plot_x = area.x + CHART_AXIS_WIDTH;
+    let plot_width = area.width.saturating_sub(CHART_AXIS_WIDTH);
+    for (column, label) in time_ticks {
+        frame.buffer_mut()[(plot_x + column, area.bottom() - 2)]
+            .set_symbol("┬")
+            .set_fg(BORDER);
+        let label_width = label.len() as u16;
+        let label_x = column
+            .saturating_sub(label_width / 2)
+            .min(plot_width.saturating_sub(label_width));
+        frame.render_widget(
+            Paragraph::new(label).style(Style::default().fg(MUTED)),
+            Rect::new(plot_x + label_x, area.bottom() - 1, label_width, 1),
+        );
+    }
 }
 
 fn braille_pattern(symbol: &str) -> Option<u32> {
@@ -728,33 +745,48 @@ fn braille_pattern(symbol: &str) -> Option<u32> {
         .map(|c| c as u32 - 0x2800)
 }
 
-pub(crate) fn chart_time_labels(
+pub(crate) fn chart_time_ticks(
     now_ms: i64,
     resolution: crate::history::Resolution,
     width: u16,
     timezone: Option<chrono_tz::Tz>,
-) -> [String; 3] {
+) -> Vec<(u16, String)> {
     let span = resolution.seconds() * 1000;
     let latest = now_ms.div_euclid(span) * span;
     let duration = i64::from(width.saturating_sub(1)) * span;
-    let format = match resolution {
-        crate::history::Resolution::TenSeconds => "%H:%M:%S",
-        crate::history::Resolution::Minute => "%H:%M",
-        crate::history::Resolution::Hour => "%m-%d %Hh",
+    let first = latest - duration;
+    let unit = if resolution == crate::history::Resolution::Hour {
+        3_600_000
+    } else {
+        60_000
     };
-    [latest - duration, latest - duration / 2, latest].map(|time| {
-        chrono::DateTime::from_timestamp_millis(time)
-            .map(|time| {
-                if let Some(zone) = timezone {
-                    time.with_timezone(&zone).format(format).to_string()
-                } else {
-                    time.with_timezone(&chrono::Local)
-                        .format(format)
-                        .to_string()
-                }
-            })
-            .unwrap_or_else(|| "--".into())
-    })
+    // Anchor equal intervals to UTC, so ticks move with the data instead of relabeling endpoints.
+    let step = (duration / 2 / unit).max(1) * unit;
+    let format = if resolution == crate::history::Resolution::Hour {
+        "%m-%d %Hh"
+    } else {
+        "%H:%M"
+    };
+    let mut ticks = Vec::new();
+    let mut time = first.div_euclid(step) * step;
+    if time < first {
+        time += step;
+    }
+    while time <= latest {
+        if let Some(timestamp) = chrono::DateTime::from_timestamp_millis(time) {
+            let label = if let Some(zone) = timezone {
+                timestamp.with_timezone(&zone).format(format).to_string()
+            } else {
+                timestamp
+                    .with_timezone(&chrono::Local)
+                    .format(format)
+                    .to_string()
+            };
+            ticks.push((((time - first) / span) as u16, label));
+        }
+        time += step;
+    }
+    ticks
 }
 
 fn idle_graph(frame: &mut Frame, area: Rect, elapsed: std::time::Duration) {

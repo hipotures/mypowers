@@ -2175,7 +2175,7 @@ fn graph_switch_is_contextual_session_local_and_preserves_loaded_averages() {
     assert_eq!(app.graph.points[0].bucket_start_ms, point.bucket_start_ms);
     assert_eq!(app.graph.points[0].input_power_w, point.input_power_w);
     let screen = text(&render(&mut app, 94, 29));
-    assert!(screen.contains("g spark") && screen.contains("0–200 W"));
+    assert!(screen.contains("g spark") && screen.contains("   200│"));
     assert_eq!(
         app.graph.width, 83,
         "The shared chart excludes the reserved Y-axis columns"
@@ -2255,7 +2255,10 @@ fn shared_chart_uses_four_rows_two_colors_common_scale_and_safe_minimum_layout()
         let buffer = render(&mut app, width, height);
         let screen = text(&buffer);
         assert!(screen.contains("INPUT 63 W") && screen.contains("OUTPUT 181 W"));
-        assert_eq!(screen.matches("0–400 W").count(), 1, "One common scale");
+        assert!(
+            !screen.contains("0–400 W"),
+            "The Y axis already identifies the scale"
+        );
         let row = screen
             .lines()
             .position(|line| line.contains("INPUT"))
@@ -2283,21 +2286,22 @@ fn shared_chart_uses_four_rows_two_colors_common_scale_and_safe_minimum_layout()
         );
         assert!(screen.contains("q quit"));
         assert!(
-            screen.contains("   400│") && screen.contains("   200│") && screen.contains("     0│")
+            screen.contains("   400│") && screen.contains("   200│") && screen.contains("     0└")
         );
         assert!(
             screen
                 .lines()
                 .nth(usize::from(row + 6))
                 .unwrap()
-                .contains("└──")
+                .contains("     0└")
         );
+        assert!(!screen.contains("     0│"));
         assert!(
             screen
                 .lines()
                 .nth(usize::from(row + 7))
                 .unwrap()
-                .contains("12:00:00")
+                .contains("12:00")
         );
         assert_eq!(app.graph.width, width.min(94) - 11);
     }
@@ -2349,32 +2353,60 @@ fn shared_chart_idle_waits_for_both_histories_and_returns_on_fractional_power() 
 }
 
 #[test]
-fn chart_time_axis_tracks_visible_utc_buckets_and_selected_timezone() {
+fn chart_time_ticks_align_to_full_minutes_and_move_with_history() {
     let now = "2026-10-05T12:00:00Z"
         .parse::<chrono::DateTime<chrono::Utc>>()
         .unwrap()
         .timestamp_millis();
     for (resolution, expected) in [
-        (Resolution::TenSeconds, ["11:46:20", "11:53:10", "12:00:00"]),
-        (Resolution::Minute, ["10:38", "11:19", "12:00"]),
-        (Resolution::Hour, ["10-02 02h", "10-03 19h", "10-05 12h"]),
+        (
+            Resolution::TenSeconds,
+            vec![(10, "11:48"), (46, "11:54"), (82, "12:00")],
+        ),
+        (Resolution::Minute, vec![(11, "10:49"), (52, "11:30")]),
+        (Resolution::Hour, vec![(20, "10-02 22h"), (61, "10-04 15h")]),
     ] {
+        let actual = ui::chart_time_ticks(now + 750, resolution, 83, Some(chrono_tz::UTC));
         assert_eq!(
-            ui::chart_time_labels(now + 750, resolution, 83, Some(chrono_tz::UTC)),
+            actual,
             expected
+                .into_iter()
+                .map(|(column, label)| (column, label.into()))
+                .collect::<Vec<_>>()
+        );
+        let moved = ui::chart_time_ticks(
+            now + resolution.seconds() * 1000,
+            resolution,
+            83,
+            Some(chrono_tz::UTC),
+        );
+        assert_eq!(
+            moved,
+            actual
+                .into_iter()
+                .map(|(column, label)| (column - 1, label))
+                .collect::<Vec<_>>()
         );
     }
     assert_eq!(
-        ui::chart_time_labels(now, Resolution::Minute, 3, Some(chrono_tz::Europe::Warsaw)),
-        ["13:58", "13:59", "14:00"]
+        ui::chart_time_ticks(now, Resolution::Minute, 3, Some(chrono_tz::Europe::Warsaw)),
+        vec![
+            (0, "13:58".into()),
+            (1, "13:59".into()),
+            (2, "14:00".into())
+        ]
     );
     let dst = "2026-10-25T01:00:00Z"
         .parse::<chrono::DateTime<chrono::Utc>>()
         .unwrap()
         .timestamp_millis();
     assert_eq!(
-        ui::chart_time_labels(dst, Resolution::Minute, 3, Some(chrono_tz::Europe::Warsaw)),
-        ["02:58", "02:59", "02:00"]
+        ui::chart_time_ticks(dst, Resolution::Minute, 3, Some(chrono_tz::Europe::Warsaw)),
+        vec![
+            (0, "02:58".into()),
+            (1, "02:59".into()),
+            (2, "02:00".into())
+        ]
     );
 }
 

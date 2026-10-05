@@ -1261,12 +1261,6 @@
 <svg x="500" y="120" width="10" height="20" overflow="hidden"><text x="0" y="16" fill="#779099" transform="scale(0.9 1)">W</text></svg>
 <svg x="590" y="120" width="10" height="20" overflow="hidden"><text x="0" y="16" fill="#445e69" transform="scale(0.833333 1)" font-size="20">│</text></svg>
 <svg x="0" y="140" width="10" height="20" overflow="hidden"><text x="0" y="16" fill="#445e69" transform="scale(0.833333 1)" font-size="20">│</text></svg>
-<svg x="510" y="140" width="10" height="20" overflow="hidden"><text x="0" y="16" fill="#4f5d66" transform="scale(0.9 1)">0</text></svg>
-<svg x="520" y="140" width="10" height="20" overflow="hidden"><text x="0" y="16" fill="#4f5d66" transform="scale(0.9 1)">–</text></svg>
-<svg x="530" y="140" width="10" height="20" overflow="hidden"><text x="0" y="16" fill="#4f5d66" transform="scale(0.9 1)">4</text></svg>
-<svg x="540" y="140" width="10" height="20" overflow="hidden"><text x="0" y="16" fill="#4f5d66" transform="scale(0.9 1)">0</text></svg>
-<svg x="550" y="140" width="10" height="20" overflow="hidden"><text x="0" y="16" fill="#4f5d66" transform="scale(0.9 1)">0</text></svg>
-<svg x="570" y="140" width="10" height="20" overflow="hidden"><text x="0" y="16" fill="#4f5d66" transform="scale(0.9 1)">W</text></svg>
 <svg x="590" y="140" width="10" height="20" overflow="hidden"><text x="0" y="16" fill="#445e69" transform="scale(0.833333 1)" font-size="20">│</text></svg>
 <svg x="0" y="160" width="10" height="20" overflow="hidden"><text x="0" y="16" fill="#445e69" transform="scale(0.833333 1)" font-size="20">│</text></svg>
 <svg x="50" y="160" width="10" height="20" overflow="hidden"><text x="0" y="16" fill="#779099" transform="scale(0.9 1)">4</text></svg>
@@ -1321,7 +1315,6 @@
 <svg x="570" y="200" width="10" height="20" overflow="hidden"><text x="0" y="16" fill="#5cb5cc" transform="scale(0.9 1)">⠊</text></svg>
 <svg x="590" y="200" width="10" height="20" overflow="hidden"><text x="0" y="16" fill="#445e69" transform="scale(0.833333 1)" font-size="20">│</text></svg>
 <svg x="0" y="220" width="10" height="20" overflow="hidden"><text x="0" y="16" fill="#445e69" transform="scale(0.833333 1)" font-size="20">│</text></svg>
-<svg x="70" y="220" width="10" height="20" overflow="hidden"><text x="0" y="16" fill="#779099" transform="scale(0.9 1)">0</text></svg>
 <svg x="80" y="220" width="10" height="20" overflow="hidden"><text x="0" y="16" fill="#445e69" transform="scale(0.833333 1)" font-size="20">│</text></svg>
 <svg x="90" y="220" width="10" height="20" overflow="hidden"><text x="0" y="16" fill="#76cb89" transform="scale(0.9 1)">⠉</text></svg>
 <svg x="100" y="220" width="10" height="20" overflow="hidden"><text x="0" y="16" fill="#76cb89" transform="scale(0.9 1)">⠉</text></svg>
@@ -1374,8 +1367,9 @@
 <svg x="570" y="220" width="10" height="20" overflow="hidden"><text x="0" y="16" fill="#76cb89" transform="scale(0.9 1)">⠑</text></svg>
 <svg x="590" y="220" width="10" height="20" overflow="hidden"><text x="0" y="16" fill="#445e69" transform="scale(0.833333 1)" font-size="20">│</text></svg>
 <svg x="0" y="240" width="10" height="20" overflow="hidden"><text x="0" y="16" fill="#445e69" transform="scale(0.833333 1)" font-size="20">│</text></svg>
+<svg x="70" y="240" width="10" height="20" overflow="hidden"><text x="0" y="16" fill="#779099" transform="scale(0.9 1)">0</text></svg>
 <svg x="80" y="240" width="10" height="20" overflow="hidden"><text x="0" y="16" fill="#445e69" transform="scale(0.833333 1)" font-size="20">└</text></svg>
-<svg x="90" y="240" width="10" height="20" overflow="hidden"><text x="0" y="16" fill="#445e69" transform="scale(0.833333 1)" font-size="20">─</text></svg>
+<svg x="90" y="240" width="10" height="20" overflow="hidden"><text x="0" y="16" fill="#445e69" transform="scale(0.833333 1)" font-size="20">┬</text></svg>
 <svg x="100" y="240" width="10" height="20" overflow="hidden"><text x="0" y="16" fill="#445e69" transform="scale(0.833333 1)" font-size="20">─</text></svg>
 <svg x="110" y="240" width="10" height="20" overflow="hidden"><text x="0" y="16" fill="#445e69" transform="scale(0.833333 1)" font-size="20">─</text></svg>
 <svg x="120" y="240" width="10" height="20" overflow="hidden"><text x="0" y="16" fill="#445e69" transform="scale(0.833333 1)" font-size="20">─</text></svg>
@@ -1399,7 +1393,7 @@
 <svg x="300" y="240" width="10" height="20" overflow="hidden"><text x="0" y="16" fill="#445e69" transform="scale(0.833333 1)" font-size="20">─</text></svg>
 <svg x="310" y="240" width="10" height="20" overflow="hidden"><text x="0" y="16" fill="#445e69" transform="scale(0.833333 1)" font-size="20">─</text></svg>
 <svg x="320" y="240" width="10" height="20" overflow="hidden"><text x="0" y="16" fill="#445e69" transform="scale(0.833333 1)" font-size="20">─</text></svg>
-<svg x="330" y="240" width="10" height="20" overflow="hidden"><text x="0" y="16" fill="#445e69" transform="scale(0.833333 1)" font-size="20">─</text></svg>
+<svg x="330" y="240" width="10" height="20" overflow="hidden"><text x="0" y="16" fill="#445e69" transform="scale(0.833333 1)" font-size="20">┬</text></svg>
 <svg x="340" y="240" width="10" height="20" overflow="hidden"><text x="0" y="16" fill="#445e69" transform="scale(0.833333 1)" font-size="20">─</text></svg>
 <svg x="350" y="240" width="10" height="20" overflow="hidden"><text x="0" y="16" fill="#445e69" transform="scale(0.833333 1)" font-size="20">─</text></svg>
 <svg x="360" y="240" width="10" height="20" overflow="hidden"><text x="0" y="16" fill="#445e69" transform="scale(0.833333 1)" font-size="20">─</text></svg>
@@ -1423,30 +1417,21 @@
 <svg x="540" y="240" width="10" height="20" overflow="hidden"><text x="0" y="16" fill="#445e69" transform="scale(0.833333 1)" font-size="20">─</text></svg>
 <svg x="550" y="240" width="10" height="20" overflow="hidden"><text x="0" y="16" fill="#445e69" transform="scale(0.833333 1)" font-size="20">─</text></svg>
 <svg x="560" y="240" width="10" height="20" overflow="hidden"><text x="0" y="16" fill="#445e69" transform="scale(0.833333 1)" font-size="20">─</text></svg>
-<svg x="570" y="240" width="10" height="20" overflow="hidden"><text x="0" y="16" fill="#445e69" transform="scale(0.833333 1)" font-size="20">─</text></svg>
+<svg x="570" y="240" width="10" height="20" overflow="hidden"><text x="0" y="16" fill="#445e69" transform="scale(0.833333 1)" font-size="20">┬</text></svg>
 <svg x="590" y="240" width="10" height="20" overflow="hidden"><text x="0" y="16" fill="#445e69" transform="scale(0.833333 1)" font-size="20">│</text></svg>
 <svg x="0" y="260" width="10" height="20" overflow="hidden"><text x="0" y="16" fill="#445e69" transform="scale(0.833333 1)" font-size="20">│</text></svg>
-<svg x="50" y="260" width="10" height="20" overflow="hidden"><text x="0" y="16" fill="#779099" transform="scale(0.9 1)">1</text></svg>
-<svg x="60" y="260" width="10" height="20" overflow="hidden"><text x="0" y="16" fill="#779099" transform="scale(0.9 1)">1</text></svg>
-<svg x="70" y="260" width="10" height="20" overflow="hidden"><text x="0" y="16" fill="#779099" transform="scale(0.9 1)">:</text></svg>
-<svg x="80" y="260" width="10" height="20" overflow="hidden"><text x="0" y="16" fill="#779099" transform="scale(0.9 1)">5</text></svg>
-<svg x="90" y="260" width="10" height="20" overflow="hidden"><text x="0" y="16" fill="#779099" transform="scale(0.9 1)">2</text></svg>
-<svg x="100" y="260" width="10" height="20" overflow="hidden"><text x="0" y="16" fill="#779099" transform="scale(0.9 1)">:</text></svg>
-<svg x="110" y="260" width="10" height="20" overflow="hidden"><text x="0" y="16" fill="#779099" transform="scale(0.9 1)">0</text></svg>
-<svg x="120" y="260" width="10" height="20" overflow="hidden"><text x="0" y="16" fill="#779099" transform="scale(0.9 1)">0</text></svg>
-<svg x="290" y="260" width="10" height="20" overflow="hidden"><text x="0" y="16" fill="#779099" transform="scale(0.9 1)">1</text></svg>
-<svg x="300" y="260" width="10" height="20" overflow="hidden"><text x="0" y="16" fill="#779099" transform="scale(0.9 1)">1</text></svg>
-<svg x="310" y="260" width="10" height="20" overflow="hidden"><text x="0" y="16" fill="#779099" transform="scale(0.9 1)">:</text></svg>
-<svg x="320" y="260" width="10" height="20" overflow="hidden"><text x="0" y="16" fill="#779099" transform="scale(0.9 1)">5</text></svg>
-<svg x="330" y="260" width="10" height="20" overflow="hidden"><text x="0" y="16" fill="#779099" transform="scale(0.9 1)">6</text></svg>
-<svg x="340" y="260" width="10" height="20" overflow="hidden"><text x="0" y="16" fill="#779099" transform="scale(0.9 1)">:</text></svg>
-<svg x="350" y="260" width="10" height="20" overflow="hidden"><text x="0" y="16" fill="#779099" transform="scale(0.9 1)">0</text></svg>
-<svg x="360" y="260" width="10" height="20" overflow="hidden"><text x="0" y="16" fill="#779099" transform="scale(0.9 1)">0</text></svg>
-<svg x="500" y="260" width="10" height="20" overflow="hidden"><text x="0" y="16" fill="#779099" transform="scale(0.9 1)">1</text></svg>
-<svg x="510" y="260" width="10" height="20" overflow="hidden"><text x="0" y="16" fill="#779099" transform="scale(0.9 1)">2</text></svg>
-<svg x="520" y="260" width="10" height="20" overflow="hidden"><text x="0" y="16" fill="#779099" transform="scale(0.9 1)">:</text></svg>
-<svg x="530" y="260" width="10" height="20" overflow="hidden"><text x="0" y="16" fill="#779099" transform="scale(0.9 1)">0</text></svg>
-<svg x="540" y="260" width="10" height="20" overflow="hidden"><text x="0" y="16" fill="#779099" transform="scale(0.9 1)">0</text></svg>
+<svg x="90" y="260" width="10" height="20" overflow="hidden"><text x="0" y="16" fill="#779099" transform="scale(0.9 1)">1</text></svg>
+<svg x="100" y="260" width="10" height="20" overflow="hidden"><text x="0" y="16" fill="#779099" transform="scale(0.9 1)">1</text></svg>
+<svg x="110" y="260" width="10" height="20" overflow="hidden"><text x="0" y="16" fill="#779099" transform="scale(0.9 1)">:</text></svg>
+<svg x="120" y="260" width="10" height="20" overflow="hidden"><text x="0" y="16" fill="#779099" transform="scale(0.9 1)">5</text></svg>
+<svg x="130" y="260" width="10" height="20" overflow="hidden"><text x="0" y="16" fill="#779099" transform="scale(0.9 1)">2</text></svg>
+<svg x="310" y="260" width="10" height="20" overflow="hidden"><text x="0" y="16" fill="#779099" transform="scale(0.9 1)">1</text></svg>
+<svg x="320" y="260" width="10" height="20" overflow="hidden"><text x="0" y="16" fill="#779099" transform="scale(0.9 1)">1</text></svg>
+<svg x="330" y="260" width="10" height="20" overflow="hidden"><text x="0" y="16" fill="#779099" transform="scale(0.9 1)">:</text></svg>
+<svg x="340" y="260" width="10" height="20" overflow="hidden"><text x="0" y="16" fill="#779099" transform="scale(0.9 1)">5</text></svg>
+<svg x="350" y="260" width="10" height="20" overflow="hidden"><text x="0" y="16" fill="#779099" transform="scale(0.9 1)">6</text></svg>
+<svg x="530" y="260" width="10" height="20" overflow="hidden"><text x="0" y="16" fill="#779099" transform="scale(0.9 1)">1</text></svg>
+<svg x="540" y="260" width="10" height="20" overflow="hidden"><text x="0" y="16" fill="#779099" transform="scale(0.9 1)">2</text></svg>
 <svg x="550" y="260" width="10" height="20" overflow="hidden"><text x="0" y="16" fill="#779099" transform="scale(0.9 1)">:</text></svg>
 <svg x="560" y="260" width="10" height="20" overflow="hidden"><text x="0" y="16" fill="#779099" transform="scale(0.9 1)">0</text></svg>
 <svg x="570" y="260" width="10" height="20" overflow="hidden"><text x="0" y="16" fill="#779099" transform="scale(0.9 1)">0</text></svg>

@@ -119,11 +119,14 @@ small Buffer compositor unions their Braille patterns, so neither line erases
 the other. Cells shared by both series use a neutral foreground. Recording gaps break each line; measured zeros remain points on the baseline. The chart uses
 the full content width, with seven columns reserved for the power axis; each
 remaining plot column requests one aggregate bucket. The vertical axis shows
-zero, half-scale and maximum, in W. Four plot rows remain above two additional
-rows for the horizontal axis and time labels. Time labels follow the selected
-timezone: HH:MM:SS for 10s buckets, HH:MM for 60s, and month-day/hour for 1h.
-The endpoint labels identify the oldest and latest bucket starts, not the time
-of the last observation. Axes remain visible during idle. When both channels are idle it shows one shared idle marker.
+zero at the axes’ intersection, half-scale and maximum, in W. The chart does
+not repeat this range above the plot. Four plot rows remain above two additional
+rows for the horizontal axis and time labels. Equally spaced ticks are anchored
+to UTC intervals at full minutes (10s/60s buckets) or hours (1h buckets). Labels
+use the selected timezone: HH:MM or month-day/hour. Ticks move with the history
+window and remain at their actual timestamps, rather than relabeling fixed
+endpoints. Axes remain visible during idle. When both channels are idle it shows
+one shared idle marker.
 Visualization selection is local to the current process; no settings API,
 database persistence or config-file writes are introduced.
 
