@@ -697,6 +697,31 @@ and daemon-offline PNG bytes match the before set exactly. Inspected that scene
 before and after. Cycle 22's full Rust/native suite and installed release binary
 remain current because this cycle only adds a test and documentation.
 
+### 24. Verify the complete HTTP body-size boundary
+
+Reviewed archive/stream ordering against the existing Logs documentation. The
+footer reports new stream arrivals while the archive stays stationary; End
+fetches today's latest range and enables follow. That is different from an
+unread counter tied to the visible viewport. No new acknowledgement model or
+counter state was introduced during this internal review.
+
+Checked the installed Reqwest 0.12.28 `Response::chunk` implementation in
+`src/async_impl/response.rs`: it yields successive data frames, not one complete
+response. The existing MyPowers reader accumulates bytes and checks the combined
+size before extending its buffer. Added a loopback-server regression for the
+16-MiB boundary with both Content-Length and HTTP chunked framing. Each response
+contains valid JSON plus whitespace, sent in 64-KiB writes. Exactly 16 MiB must
+return the JSON object; one byte more must return the client-limit error in both
+framing modes. This verifies an aggregate limit rather than a per-chunk check.
+The exact-boundary server must finish normally; an oversized response may be
+interrupted by the client's rejection. Production code already behaves correctly.
+
+The four boundary cases passed in 0.70 seconds; all 51 Rust tests passed in
+35.10 seconds. Formatting, Clippy with warnings denied, and diff checks passed.
+All 15 SVGs pass `--check`; regenerated SVGs and Logs PNG bytes match the before
+set exactly. Inspected Logs before and after. Production is unchanged, so the
+installed release binary and previous terminal verification remain applicable.
+
 ## Remaining review
 
 - Review remaining applicable application examples and tutorial integration details.

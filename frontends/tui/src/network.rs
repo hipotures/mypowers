@@ -540,6 +540,68 @@ mod tests {
         .unwrap()
     }
 
+    #[tokio::test]
+    async fn http_body_limit_applies_to_the_complete_response_for_both_framing_modes() {
+        const LIMIT: usize = 16 * 1024 * 1024;
+        for chunked in [false, true] {
+            for extra in [0, 1] {
+                let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+                let api = api_for(&listener);
+                let server = tokio::spawn(async move {
+                    let (mut socket, request) = accept_http_request(&listener).await;
+                    assert!(request.starts_with("GET /api/v1/logs HTTP/1.1"));
+                    let length = LIMIT + extra;
+                    let framing = if chunked {
+                        "Transfer-Encoding: chunked".to_owned()
+                    } else {
+                        format!("Content-Length: {length}")
+                    };
+                    socket
+                        .write_all(
+                            format!("HTTP/1.1 200 OK\r\n{framing}\r\nConnection: close\r\n\r\n")
+                                .as_bytes(),
+                        )
+                        .await?;
+                    // Valid JSON on both sides of the boundary, divided into small writes.
+                    let mut body = vec![b' '; length];
+                    body[..2].copy_from_slice(b"{}");
+                    for chunk in body.chunks(64 * 1024) {
+                        if chunked {
+                            socket
+                                .write_all(format!("{:x}\r\n", chunk.len()).as_bytes())
+                                .await?;
+                        }
+                        socket.write_all(chunk).await?;
+                        if chunked {
+                            socket.write_all(b"\r\n").await?;
+                        }
+                    }
+                    if chunked {
+                        socket.write_all(b"0\r\n\r\n").await?;
+                    }
+                    Ok::<_, std::io::Error>(())
+                });
+                let result = api.request(reqwest::Method::GET, "/logs", None, None).await;
+                if extra == 0 {
+                    assert_eq!(result.unwrap(), json!({}), "chunked={chunked}");
+                } else {
+                    assert_eq!(
+                        result.unwrap_err(),
+                        "API response exceeds client limit.",
+                        "chunked={chunked}"
+                    );
+                }
+                let sent = timeout(Duration::from_secs(3), server)
+                    .await
+                    .unwrap()
+                    .unwrap();
+                if extra == 0 {
+                    sent.unwrap();
+                }
+            }
+        }
+    }
+
     async fn receive_stream_record(record: Value) -> (Result<(), String>, Option<Value>) {
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
         let api = api_for(&listener);
