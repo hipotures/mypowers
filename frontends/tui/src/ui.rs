@@ -344,6 +344,7 @@ fn dim_background(frame: &mut Frame) {
 }
 
 fn dashboard(frame: &mut Frame, content: Rect, app: &mut App) {
+    let live = app.live();
     let rows = Layout::vertical([
         Constraint::Length(1),
         Constraint::Fill(1),
@@ -370,7 +371,7 @@ fn dashboard(frame: &mut Frame, content: Rect, app: &mut App) {
     );
     let (label, color) = if !app.connected {
         ("DAEMON OFFLINE", RED)
-    } else if app.live() {
+    } else if live {
         ("CONNECTED", GREEN)
     } else if app
         .status
@@ -466,8 +467,7 @@ fn dashboard(frame: &mut Frame, content: Rect, app: &mut App) {
             .alignment(Alignment::Center),
             parts[0],
         );
-        let data = app.graph_data(parts[2].width, output);
-        if app.live() && value == Some(0) && !app.has_power_history(output) {
+        if live && value == Some(0) && !app.has_power_history(output) {
             idle_graph(
                 frame,
                 parts[2],
@@ -475,16 +475,16 @@ fn dashboard(frame: &mut Frame, content: Rect, app: &mut App) {
             );
             continue;
         }
-        let data: Vec<_> = data
+        let data = app
+            .graph_data(parts[2].width, output)
             .into_iter()
             .map(|value| {
-                SparklineBar::from(value).style(Style::default().fg(if app.live() {
+                SparklineBar::from(value).style(Style::default().fg(if live {
                     load_color(value, maximum)
                 } else {
                     DIM
                 }))
-            })
-            .collect();
+            });
         frame.render_widget(Sparkline::default().data(data).max(maximum), parts[2]);
     }
     let controls = Layout::horizontal([Constraint::Ratio(1, 3); 3]).split(rows[8]);
@@ -501,7 +501,7 @@ fn dashboard(frame: &mut Frame, content: Rect, app: &mut App) {
         let state = enabled
             .map(|on| if on { "ON" } else { "OFF" })
             .unwrap_or("--");
-        let color = if enabled == Some(true) && app.live() {
+        let color = if enabled == Some(true) && live {
             GREEN
         } else {
             DIM

@@ -52,6 +52,49 @@ checks passed. The check command verified all 15 scenes. Regenerated SVG SHA-256
 sums match the before set exactly; rasterized live dashboard and Logs PNGs also
 match byte-for-byte. Inspected the dashboard before and Logs after. No UI change.
 
+### 2. Remove repeated work in dashboard rendering
+
+Reviewed the [Sparkline example](https://ratatui.rs/examples/widgets/sparkline/)
+and the locally installed 0.30.2 widget implementation. Its `data` method accepts
+an iterator, so the application need not materialize styled bars first. Freshness
+is now evaluated once per dashboard frame, preventing its label, bars, and output
+states from using different decisions as telemetry reaches its freshness boundary.
+Idle rendering no longer allocates or populates a graph vector that it immediately
+discards. Fixed graph scales and the existing idle-history rule are unchanged.
+
+Added a dependency-free offline benchmark using the production renderer and
+TestBackend, a fixed clock, 40 history samples, and a 2,000-record log archive:
+
+```sh
+cargo bench --locked --manifest-path frontends/tui/Cargo.toml --bench render
+```
+
+Five rounds of 5,000 frames at 120x30 produced these median timings on the review
+machine (microseconds per frame; TestBackend includes buffer diff/flush work):
+
+| Scene | Before | After |
+| --- | ---: | ---: |
+| Live dashboard | 897.75 | 873.76 |
+| Idle dashboard | 886.01 | 877.36 |
+| Logs modal | 1223.41 | 1223.30 |
+
+These are small improvements, with system-load variation especially visible in
+the Logs measurements. They do not establish a broad terminal performance gain.
+The simplification removes repeated freshness decisions and unused idle work.
+
+Validation: all 30 TUI tests passed, including the local HTTP test rerun with
+loopback access after the sandbox denied socket creation. Clippy with warnings
+denied passed. All 15 saved SVGs passed `--check`; regenerated SHA-256 sums match
+the before set exactly. Live dashboard PNGs match byte-for-byte and the after
+image was inspected. No UI change.
+
+The [Hello tutorial](https://ratatui.rs/tutorials/hello-ratatui/),
+[Counter update/render/testing sections](https://ratatui.rs/tutorials/counter-app/basic-app/),
+[JSON Editor main loop](https://ratatui.rs/tutorials/json-editor/main/), and
+[Elm architecture overview](https://ratatui.rs/concepts/application-patterns/the-elm-architecture/)
+have also been reviewed. Existing App/effect/renderer separation and contextual
+input routing already fit these principles; no replacement framework is needed.
+
 ## Remaining review
 
 - Detailed tutorial review: Counter App and JSON Editor, including update/render separation.

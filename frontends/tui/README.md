@@ -179,12 +179,24 @@ without a daemon or terminal:
 
 ```sh
 cargo xtask ui-snapshots
+cargo xtask ui-snapshots --check
 ```
 
 See [the snapshot developer note](../../artifacts/ui/README.md) for scenes, fixed
 time/data, exporter limitations, and optional PNG inspection. The shared library
 contains the production renderer; `xtask` contains only fixture data, cell-to-SVG
 export, and file generation.
+
+For a dependency-free offline render benchmark with fixed application state:
+
+```sh
+cargo bench --locked --manifest-path frontends/tui/Cargo.toml --bench render
+```
+
+It measures the production renderer through TestBackend at 120x30, using live,
+idle, and Logs scenes. The output reports per-frame median/min/max across five
+rounds. Measurements include Ratatui buffer diffing, exclude real terminal I/O,
+and vary with system load; compare before/after runs on the same machine.
 
 ```sh
 cargo fmt --check --manifest-path frontends/tui/Cargo.toml
