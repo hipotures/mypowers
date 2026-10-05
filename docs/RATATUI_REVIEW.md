@@ -834,6 +834,33 @@ All 29 terminal-suite cases passed in 84.55 seconds against isolated services.
 Built the release frontend and updated the installed local binary without
 restarting existing application processes.
 
+### 29. Verify terminal event kinds through the actual input parser
+
+Completed the [User Input example](https://ratatui.rs/examples/apps/user_input/)
+and checked the [keyboard protocol's event types and functional keys](https://sw.kovidgoyal.net/kitty/keyboard-protocol/).
+The example routes input by application mode and accepts press events. MyPowers
+already filters event kinds before contextual dispatch; no input editor or
+additional framework is needed for its current read-only settings and shortcuts.
+Extended coverage at the production process boundary rather than calling App's
+key method directly and bypassing that filter.
+
+The new PTY test sends press/repeat/release encodings through Crossterm, exercises
+Alt/Control modifiers and F3, and uses ordinary help presses as ordered barriers.
+It verifies that ignored input does not change outputs/revision, connection
+session/desired state, logging level, or the active help context. Valid presses
+still open Logs, confirm AC ON against the isolated simulated backend, and quit
+immediately with Ctrl-Q while restoring the original terminal attributes.
+The F3 encoding uses the protocol's tilde form; CSI R is reserved for cursor
+position reports. MyPowers does not negotiate additional keyboard reporting
+modes: this test covers supported events when received, not universal terminal
+support or suppression of legacy auto-repeat that arrives as ordinary presses.
+
+The new regression passed in 3.97 seconds. Python linting, formatting, and diff
+checks passed. Production code and the installed release binary remain unchanged.
+All six selected keyboard/modal/paste/resize/restoration cases passed in
+28.55 seconds. All 15 SVGs pass `--check` and match the saved before set exactly;
+the Logs Help PNG is also byte-identical and was inspected before and after.
+
 ## Remaining review
 
 - Review remaining applicable application examples and tutorial integration details.

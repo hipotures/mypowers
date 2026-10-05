@@ -187,6 +187,64 @@ def test_native_controls_logs_paste_resize_and_restoration(
         session.close()
 
 
+def test_keyboard_event_types_and_modifiers_do_not_dispatch_shortcuts(
+    daemon_process, tui_binary, tmp_path
+):
+    _, url, env = daemon_process
+    session = Session(tui_binary, tmp_path, env, "--server", url, "--utc")
+
+    def key(codepoint, modifiers=1, kind=1):
+        return f"\x1b[{codepoint};{modifiers}:{kind}u".encode()
+
+    def ignored_keys(characters):
+        return (
+            b"".join(
+                key(ord(char), modifiers, kind)
+                for char in characters
+                for modifiers, kind in [(1, 2), (1, 3), (3, 1), (5, 1)]
+                if not (char == "q" and modifiers == 5 and kind == 1)
+            )
+            + key(ord("q"), 5, 2)
+            + key(ord("q"), 5, 3)
+        )
+
+    try:
+        session.read(b"CONNECTED")
+        with httpx.Client(base_url=url, trust_env=False) as client:
+            before = client.get("/api/v1/status").json()
+            session.write(ignored_keys("adlprsq?") + b"\x1b[13;1:2~\x1b[13;1:3~")
+            # A real press is an ordered barrier after all ignored events.
+            session.write(key(ord("?")))
+            session.read("HELP — DASHBOARD".encode())
+            session.write(key(27))
+            session.read(b"F3 logs")
+            session.write(b"\x1b[13;1:1~")  # F3 press.
+            session.read(b"ARCHIVE")
+            session.read(b"Log: INFO")
+            session.write(ignored_keys("fb+-q?"))
+            session.write(key(ord("?")))
+            session.read("HELP — LOGS".encode())
+            assert session.process.poll() is None
+            after = client.get("/api/v1/status").json()
+            assert after["connection"]["session_id"] == before["connection"]["session_id"]
+            assert after["connection"]["desired"] == before["connection"]["desired"]
+            assert after["controls"]["outputs_revision"] == before["controls"]["outputs_revision"]
+            assert after["logging"]["effective_level"] == "INFO"
+            for output in ["ac_enabled", "dc_enabled", "light_enabled"]:
+                assert after["telemetry"]["sample"][output] == before["telemetry"]["sample"][output]
+            session.write(key(27))
+            session.read(b"F3 logs")
+            session.write(key(ord("a")))
+            session.read(b"AC ON confirmed")
+            wait_state(client, "ac", True)
+        session.write(key(ord("q"), 5))  # Ctrl-Q press still quits immediately.
+        session.read(b"\x1b[?1049l")
+        assert session.process.wait(timeout=3) == 0
+        assert termios.tcgetattr(session.slave) == session.original
+    finally:
+        session.close()
+
+
 def test_keyboard_burst_does_not_starve_immediate_quit(daemon_process, tui_binary, tmp_path):
     _, url, env = daemon_process
     session = Session(tui_binary, tmp_path, env, "--server", url)
