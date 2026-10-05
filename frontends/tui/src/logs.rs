@@ -136,6 +136,12 @@ impl Logs {
     }
 
     fn load(&mut self, kind: Load) -> Option<Request> {
+        self.generation += 1;
+        self.loading = false;
+        self.drag = None;
+        if matches!(kind, Load::Latest | Load::Oldest) {
+            self.unseen = 0;
+        }
         let (since, until) = match day_bounds(self.day, self.timezone) {
             Ok(bounds) => bounds,
             Err(error) => {
@@ -148,13 +154,8 @@ impl Logs {
             Load::Newer => self.next_cursor.clone(),
             _ => None,
         };
-        self.generation += 1;
         self.loading = true;
         self.message = "Loading logs...".into();
-        self.drag = None;
-        if matches!(kind, Load::Latest | Load::Oldest) {
-            self.unseen = 0;
-        }
         Some(Request {
             started: Instant::now(),
             generation: self.generation,

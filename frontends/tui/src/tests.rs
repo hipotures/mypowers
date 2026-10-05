@@ -1096,6 +1096,82 @@ fn live_and_archived_log_filters_preserve_critical_records() {
 }
 
 #[test]
+fn invalid_log_day_bounds_discard_pending_responses_and_allow_navigation_to_recover() {
+    use crate::clock::Clock;
+    let now = "2011-12-30T12:00:00Z".parse().unwrap();
+    for (succeeds, days_back) in [(false, 1), (true, 1), (false, 2), (true, 2)] {
+        let mut app = App::with_clock(
+            false,
+            Some(chrono_tz::Pacific::Apia),
+            Clock::Fixed {
+                now,
+                telemetry_elapsed: Duration::ZERO,
+                animation_elapsed: Duration::ZERO,
+                feedback_elapsed: Duration::ZERO,
+            },
+        );
+        app.view = View::Logs;
+        let pending = app.logs.open().unwrap();
+        for _ in 0..days_back {
+            assert!(app.logs.navigate(false).is_none());
+        }
+        assert_eq!(
+            app.logs.day.to_string(),
+            if days_back == 1 {
+                "2011-12-30"
+            } else {
+                "2011-12-29"
+            }
+        );
+        let error = app.logs.message.clone();
+        assert!(error.contains(if days_back == 1 {
+            "valid local midnight"
+        } else {
+            "next day boundary"
+        }));
+        assert!(!app.logs.loading);
+        assert_ne!(app.logs.generation(), pending.generation);
+        app.feedback = None;
+        let page = |sequence| {
+            serde_json::from_value(json!({
+                "schema_version": 1, "items": [{
+                    "sequence": sequence, "timestamp": "2011-12-30T12:00:00Z",
+                    "server_instance_id": "88767477-2a2a-481f-843b-30d56a5e3f10",
+                    "level": "INFO", "message": format!("Record {sequence}")
+                }], "previous_cursor": null, "next_cursor": null,
+                "has_more_before": false, "has_more_after": false,
+                "source": "files", "gap": false, "skipped_lines": 0
+            }))
+            .unwrap()
+        };
+        app.update(Event::LogPage(
+            pending,
+            if succeeds {
+                Ok(page(1))
+            } else {
+                Err("Old request failed".into())
+            },
+        ));
+        assert!(app.logs.records.is_empty());
+        assert_eq!(app.logs.message, error);
+        assert!(!app.logs.loading);
+        assert!(
+            app.feedback.is_none(),
+            "An obsolete response must not replace status feedback"
+        );
+        for _ in 1..days_back {
+            assert!(app.logs.navigate(true).is_none());
+        }
+        let recovered = app.logs.navigate(true).unwrap();
+        app.update(Event::LogPage(recovered, Ok(page(2))));
+        assert_eq!(app.logs.day.to_string(), "2011-12-31");
+        assert_eq!(app.logs.records.len(), 1);
+        assert_eq!(app.logs.records[0]["sequence"], 2);
+        assert!(!app.logs.loading);
+    }
+}
+
+#[test]
 fn log_day_bounds_use_iana_dst_transitions_and_midnight_offsets() {
     let zone = Some(chrono_tz::Europe::Warsaw);
     for (date, hours) in [("2026-03-29", 23), ("2026-10-25", 25), ("2026-10-05", 24)] {
@@ -1113,6 +1189,48 @@ fn log_day_bounds_use_iana_dst_transitions_and_midnight_offsets() {
     }
     let (start, _) = crate::logs::day_bounds("2026-10-05".parse().unwrap(), zone).unwrap();
     assert!(start.starts_with("2026-10-04T22:00:00"));
+    for (zone, date, first_time, expected_start, expected_end) in [
+        (
+            chrono_tz::America::Havana,
+            "2026-11-01",
+            "00:00",
+            "2026-11-01T04:00:00Z",
+            "2026-11-02T05:00:00Z",
+        ),
+        (
+            chrono_tz::America::Sao_Paulo,
+            "2018-11-04",
+            "01:00",
+            "2018-11-04T03:00:00Z",
+            "2018-11-05T02:00:00Z",
+        ),
+        (
+            chrono_tz::Asia::Kathmandu,
+            "1986-01-01",
+            "00:15",
+            "1985-12-31T18:30:00Z",
+            "1986-01-01T18:15:00Z",
+        ),
+    ] {
+        let (start, end) = crate::logs::day_bounds(date.parse().unwrap(), Some(zone)).unwrap();
+        let start = chrono::DateTime::parse_from_rfc3339(&start).unwrap();
+        let end = chrono::DateTime::parse_from_rfc3339(&end).unwrap();
+        assert_eq!(
+            start,
+            chrono::DateTime::parse_from_rfc3339(expected_start).unwrap()
+        );
+        assert_eq!(
+            end,
+            chrono::DateTime::parse_from_rfc3339(expected_end).unwrap()
+        );
+        assert_eq!(
+            start
+                .with_timezone(&zone)
+                .format("%Y-%m-%d %H:%M")
+                .to_string(),
+            format!("{date} {first_time}")
+        );
+    }
 }
 
 #[test]

@@ -1024,6 +1024,37 @@ Formatting, Clippy with warnings denied, and diff checks passed. All 15 SVGs pas
 and was inspected before and after. Updated the installed local frontend without
 restarting existing application processes.
 
+### 35. Invalidate pending log responses even when day bounds cannot be built
+
+Reviewed Chrono's [local-time gaps and folds](https://docs.rs/chrono/latest/chrono/offset/enum.LocalResult.html)
+and the installed chrono-tz transition tests. Existing day-boundary handling uses
+the earliest valid instant and already handles ordinary skipped/repeated midnight.
+Added explicit UTC endpoint checks for Havana's repeated midnight, Sao Paulo's
+skipped hour, and Kathmandu's fifteen-minute midnight gap. Independently checked
+the fixture instants against Python's installed IANA timezone database.
+
+Found an error-path ordering bug: log request generation advanced only after
+successful date-boundary calculation. Navigating while a request was pending to
+a date whose bounds cannot be determined left that old request current and the
+loading flag active. Its delayed result could populate the newly selected range,
+replace the boundary error, or produce obsolete status feedback.
+
+Moved request invalidation and local load-state reset before boundary calculation.
+A four-case regression uses Apia's skipped 2011-12-30 and the preceding day's
+unavailable next boundary, delivering both successful and failed old responses
+through the production App. It first reproduced the error-message overwrite.
+It verifies unchanged empty records/error feedback, obsolete generation rejection,
+cleared loading state, and recovery by navigation to a valid date. The first
+fixture was corrected after checking its UTC-to-local date; the reported
+production failure was reproduced with the corrected fixture before the fix.
+No new date-navigation policy or UI layout was introduced.
+
+All 59 Rust tests passed in 35.06 seconds. Formatting, Clippy with warnings denied,
+and diff checks passed. All 15 SVGs pass `--check` and match the saved before set
+exactly; the Logs PNG is byte-identical and was inspected before and after.
+The updated release build also passed the native day/archive/live-navigation
+case. Updated the installed local frontend without restarting existing processes.
+
 ## Remaining review
 
 - Review remaining applicable application examples and tutorial integration details.
