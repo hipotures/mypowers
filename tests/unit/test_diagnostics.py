@@ -242,6 +242,55 @@ async def test_bounded_record_rate_limit_and_non_debug_no_raw(tmp_path):
         await logs.close()
 
 
+@pytest.mark.parametrize(
+    ("message", "event", "context", "truncated"),
+    [
+        ("Station connected", "application", {"attempt": 1}, False),
+        ("x" * 4096, "application", {}, False),
+        ("🔋" * 4096, "application", {}, True),
+        ("電" * 4096, "application", {}, True),
+        ('\\"' * 2048, "application", {"payload": "🔋" * 4096}, True),
+        ("Station connected", "🔋" * 4096, {}, True),
+        ("🔋" * 4096, "🔋" * 4096, {}, True),
+    ],
+    ids=["normal", "ascii", "emoji", "cjk", "escaped-context", "large-event", "both-large"],
+)
+async def test_bounded_encoded_records_remain_available_in_files_ring_and_stream(
+    tmp_path, message, event, context, truncated
+):
+    logs = Diagnostics("11111111-1111-4111-8111-111111111111", tmp_path)
+    logs.start()
+    subscriber = logs.subscribe()
+    try:
+        logs.accept("CRITICAL", event, message, context)
+        await flush(logs)
+        record = logs.records[-1]
+        raw = (tmp_path / "mypowers.jsonl").read_bytes()
+        assert len(raw) <= 16384
+        assert raw.endswith(b"\n") and json.loads(raw) == record
+        assert bool(record["context"].get("truncated")) == truncated
+        if not truncated:
+            assert record["message"] == message and record["event"] == event
+            assert record["context"] == context
+        else:
+            assert message.startswith(record["message"])
+            assert event.startswith(record["event"])
+            if event == "application":
+                assert record["event"] == event and record["message"]
+        page = await logs.query(tail=10)
+        assert page.source == "files" and page.skipped_lines == 0 and page.items == [record]
+        logs.state = "degraded"
+        page = await logs.query(tail=10)
+        assert page.source == "ring" and page.items == [record]
+        streamed = await asyncio.wait_for(subscriber.get(), 1)
+        assert streamed == record
+        envelope = {"type": "log", "data": streamed}
+        assert len(json.dumps(envelope, ensure_ascii=False).encode("utf-8")) < 32768
+    finally:
+        logs.subscribers.clear()
+        await logs.close()
+
+
 def test_supervisor_redaction_including_exception_and_query_token():
     from mypowers.diagnostics.redaction import RedactionFilter
 

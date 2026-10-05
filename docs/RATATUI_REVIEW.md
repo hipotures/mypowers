@@ -1117,6 +1117,38 @@ All 15 SVGs pass `--check` and match the saved before set exactly. The Logs PNG 
 byte-identical and was inspected before and after. Updated the installed local
 frontend without restarting existing application processes.
 
+### 38. Keep produced records readable by their own archive scanner
+
+The [Python JSON reference](https://docs.python.org/3/library/json.html#json.dump)
+explains ASCII escaping and compact separators. Diagnostics checked a different
+serialization than its writer and only discarded context when oversized. A
+4,096-symbol Unicode message still produced a JSONL line exceeding the scanner's
+16 KiB limit, so the archive discarded a record available in the ring/stream.
+Four new producer regressions reproduced this mismatch before the fix.
+
+Use one compact ASCII encoder for size checks and file writes and one shared
+16 KiB record constant for production and scanning. The byte budget includes the
+newline. Oversized records first replace context with the existing truncation
+marker, then shorten oversized message/event text on code-point boundaries using
+bounded binary search. Event text now uses the existing redaction/character cap
+as well. Ordinary messages and context remain unchanged; the marker makes
+size-driven truncation explicit. Existing oversized archive lines still follow
+the scanner's documented malformed-line handling; no archive rewrite or migration
+was introduced.
+
+Seven producer cases cover ordinary/maximum ASCII text, emoji, CJK, escaped text,
+large context, and large event identifiers. They verify the actual file size and
+JSON decode, prefix preservation, the truncation marker, no skipped archived
+record, ring/stream equality, and a bounded serialized stream record. All 19
+Diagnostics tests passed in 0.28 seconds. The full unit/integration suite passed
+281 cases with one existing skip in 71.83 seconds; Ruff formatting/lint and strict
+module typing passed. Native release archive navigation and status-line fading
+also passed against the updated isolated producer (5.65 and 12.28 seconds).
+
+All 15 SVGs pass `--check` and match the saved before set exactly. The Logs PNG
+is byte-identical and was inspected before and after. The Rust release is unchanged
+from cycle 37. No existing daemon or hardware process was restarted.
+
 ## Remaining review
 
 - Review remaining applicable application examples and tutorial integration details.

@@ -62,3 +62,5 @@ to one server UUID, not durable exactly-once storage. Streams cap 16 clients, 12
 client-to-server WS messages cap 16 KiB. The TUI caps received WS frames and complete messages
 at 32 KiB, allowing space for a log record's stream envelope. History pages cap 10,000,
 log pages/tails 1,000, and query admission caps four per subsystem.
+Produced JSONL log records also cap 16 KiB, including their newline. Oversized records
+mark context as truncated and shorten text as needed to remain readable by the archive API.

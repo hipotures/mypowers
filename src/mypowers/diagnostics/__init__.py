@@ -20,10 +20,15 @@ from mypowers.storage import CursorCodec
 
 SECRET_KEYS = re.compile(r"token|authorization|cookie|password|credential|secret|dotenv", re.I)
 CONTROLS = re.compile(r"[\x00-\x08\x0b-\x1f\x7f-\x9f]")
+MAX_RECORD_BYTES = 16 * 1024
 
 
 def plain(value: str) -> str:
     return CONTROLS.sub("", value)
+
+
+def encode_record(record: dict[str, Any]) -> str:
+    return json.dumps(record, ensure_ascii=True, separators=(",", ":"))
 
 
 class StructuredHandler(logging.Handler):
@@ -123,13 +128,31 @@ class Diagnostics:
                 "sequence": self.sequence,
                 "level": level,
                 "logger": "mypowers",
-                "event": event,
+                "event": self.redact(event),
                 "message": self.redact(message),
                 "context": self.redact(context),
             }
-            encoded = json.dumps(record, ensure_ascii=True)
-            if len(encoded.encode()) > 16384:
+            if len(encode_record(record)) + 1 > MAX_RECORD_BYTES:
                 record["context"] = {"truncated": True}
+                # Count the same escaped bytes and newline that the writer emits.
+                fields = sorted(
+                    ("message", "event"),
+                    key=lambda field: len(json.dumps(record[field], ensure_ascii=True)),
+                    reverse=True,
+                )
+                for field in fields:
+                    if len(encode_record(record)) + 1 <= MAX_RECORD_BYTES:
+                        break
+                    original = record[field]
+                    low, high = 0, len(original)
+                    while low < high:
+                        middle = (low + high + 1) // 2
+                        record[field] = original[:middle]
+                        if len(encode_record(record)) + 1 <= MAX_RECORD_BYTES:
+                            low = middle
+                        else:
+                            high = middle - 1
+                    record[field] = original[:low]
             self.records.append(record)
         try:
             self.queue.put_nowait(record)
@@ -191,7 +214,7 @@ class Diagnostics:
                         self.state = "ok"
                     except OSError:
                         self.state = "degraded"
-                encoded = json.dumps(item, ensure_ascii=True, separators=(",", ":"))
+                encoded = encode_record(item)
                 if sink:
                     try:
                         record = logging.LogRecord(
@@ -370,7 +393,7 @@ class Diagnostics:
                 file.seek(start)
                 while file.tell() < end:
                     offset = file.tell()
-                    raw = file.readline(min(16385, end - offset))
+                    raw = file.readline(min(MAX_RECORD_BYTES + 1, end - offset))
                     charge(len(raw))
                     yield offset, file.tell(), raw
                 return
@@ -433,7 +456,7 @@ class Diagnostics:
                     start = offset if offset is not None and not backward else 0
                     end = offset if offset is not None and backward else size
                     for before, after, raw in lines(file, start, end):
-                        if len(raw) > 16384 or not raw.endswith(b"\n"):
+                        if len(raw) > MAX_RECORD_BYTES or not raw.endswith(b"\n"):
                             skipped += 1
                             continue
                         try:
