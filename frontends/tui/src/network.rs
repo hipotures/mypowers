@@ -418,6 +418,7 @@ impl Api {
             if message.schema_version != 1
                 || message.stream_sequence <= sequence
                 || uuid::Uuid::parse_str(&message.server_instance_id).is_err()
+                || chrono::DateTime::parse_from_rfc3339(&message.server_time).is_err()
             {
                 return Err("Invalid API stream sequence or schema.".into());
             }
@@ -554,6 +555,7 @@ mod tests {
                     .send(Message::Text(
                         json!({
                             "schema_version": 1, "server_instance_id": status.server_instance_id,
+                            "server_time": status.server_time,
                             "stream_sequence": sequence, "type": kind, "data": data
                         })
                         .to_string()
@@ -576,6 +578,58 @@ mod tests {
         };
         assert!(incoming.try_recv().is_err());
         (result, received)
+    }
+
+    #[tokio::test]
+    async fn heartbeats_require_valid_server_timestamps_before_the_next_state() {
+        for (timestamp, valid) in [
+            (Some(json!("2026-10-05T12:00:00Z")), true),
+            (Some(json!("invalid")), false),
+            (Some(Value::Null), false),
+            (None, false),
+        ] {
+            let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+            let api = api_for(&listener);
+            let server = tokio::spawn(async move {
+                let (socket, _) = listener.accept().await.unwrap();
+                let mut socket = tokio_tungstenite::accept_async(socket).await.unwrap();
+                let status = crate::tests::status();
+                for (sequence, kind) in [(1, "snapshot"), (2, "heartbeat"), (3, "state")] {
+                    let mut message = json!({
+                        "schema_version": 1, "server_instance_id": status.server_instance_id,
+                        "server_time": status.server_time, "stream_sequence": sequence,
+                        "type": kind, "data": if kind == "heartbeat" { Value::Null } else { serde_json::to_value(&status).unwrap() }
+                    });
+                    if kind == "heartbeat" {
+                        if let Some(timestamp) = &timestamp {
+                            message["server_time"] = timestamp.clone();
+                        } else {
+                            message.as_object_mut().unwrap().remove("server_time");
+                        }
+                    }
+                    socket
+                        .send(Message::Text(message.to_string().into()))
+                        .await
+                        .unwrap();
+                }
+                let _ = socket.close(None).await;
+            });
+            let (events, mut incoming) = mpsc::channel(4);
+            let result = timeout(Duration::from_secs(3), api.stream_once(false, &events))
+                .await
+                .unwrap();
+            server.await.unwrap();
+            let error = result.unwrap_err();
+            assert_eq!(error.starts_with("Invalid API stream"), !valid);
+            assert!(matches!(incoming.try_recv(), Ok(Event::Status(_))));
+            if valid {
+                assert!(matches!(incoming.try_recv(), Ok(Event::Status(_))));
+            }
+            assert!(
+                incoming.try_recv().is_err(),
+                "Unexpected state reached the UI"
+            );
+        }
     }
 
     #[tokio::test]

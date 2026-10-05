@@ -440,6 +440,33 @@ SVG hashes and Logs PNG bytes match the before set exactly. Inspected Logs
 before and after. Built the release binary and updated the local installed
 frontend; existing processes were not restarted.
 
+### 15. Validate timestamps in every WebSocket envelope
+
+Reviewed the [Elm architecture guidance](https://ratatui.rs/concepts/application-patterns/the-elm-architecture/)
+and compared frontend stream handling with the [API contract](api.md#stream-schema)
+and daemon emitter. Separating network effects from state updates remains
+appropriate; mutable rendering is limited to viewport/hitbox state that depends
+on the actual Frame area. No component framework or additional event layer is
+needed.
+
+Found that the Rust stream envelope omitted the required `server_time` field.
+Consequently, a heartbeat with missing or invalid time was considered a valid
+message and refreshed the connection's receive deadline. A local WebSocket
+regression failed with the existing decoder, proving the missing validation.
+
+Added the required String field and RFC3339 validation before processing any
+message or refreshing the deadline. Invalid, null and absent heartbeat times
+now close the stream before the following state can reach the UI. The regression
+also checks that a valid heartbeat permits that state. Existing mock envelopes
+now include the required timestamp; the production daemon already emitted it.
+No compatibility path, wall-clock skew rule, or visual change was added.
+
+All 41 Rust tests and 24 native PTY cases passed. Formatting, Ruff, Clippy with
+warnings denied, and diff checks passed. All 15 SVGs pass `--check`; regenerated
+SVG hashes and daemon-offline PNG bytes match the before set exactly. Inspected
+the offline PNG before and after. The release build and local installed frontend
+were updated without restarting existing processes.
+
 ## Remaining review
 
 - Review remaining applicable application examples and tutorial integration details.

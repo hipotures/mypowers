@@ -226,6 +226,7 @@ def test_stream_bursts_do_not_starve_modal_resize_or_quit(
                     {
                         "schema_version": 1,
                         "server_instance_id": snapshot["server_instance_id"],
+                        "server_time": current["server_time"],
                         "stream_sequence": sequence,
                         "type": "snapshot",
                         "data": current,
@@ -253,6 +254,7 @@ def test_stream_bursts_do_not_starve_modal_resize_or_quit(
                         {
                             "schema_version": 1,
                             "server_instance_id": snapshot["server_instance_id"],
+                            "server_time": stamp,
                             "stream_sequence": sequence,
                             "type": "log" if logs else "state",
                             "data": data,

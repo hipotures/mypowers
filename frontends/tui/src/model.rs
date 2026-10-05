@@ -121,6 +121,7 @@ pub struct StreamMessage {
     pub kind: String,
     pub server_instance_id: String,
     pub stream_sequence: u64,
+    pub server_time: String,
     pub data: Option<Value>,
 }
 
