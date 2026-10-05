@@ -56,8 +56,10 @@ uv run mypowers debug off
 ```
 
 Use `a`/`d`/`l` for AC/DC/lamps, Tab/Shift-Tab and Enter/Space, mouse clicks for controls,
-F2/F3 for dashboard/logs, `r` for retry, `p` for pause/resume, `b` for runtime DEBUG,
-`f` to filter logs, `?` for help, and `q`/Ctrl+C/Ctrl+Z to exit cleanly. Ctrl+Z is mapped to exit
+F2/F3 for dashboard/logs modal, `r` for retry on the dashboard or refresh in logs,
+`p` for pause/resume, `b` for runtime DEBUG,
+`f` to filter logs, Left/Right for log days, End for today/live, and `?` for help.
+Esc closes a modal, `q` confirms exit, and Ctrl+Q/Ctrl+C/Ctrl+Z exit immediately. Ctrl+Z is mapped to exit
 in this release. `--no-mouse`, `--no-color`, `NO_COLOR`, `--timezone Europe/Warsaw`, and `--utc`
 are supported. Paste cannot trigger controls. Stale/pending states disable output intentions.
 Unknown/unconfirmed outcomes show a command ID and are never automatically replayed.

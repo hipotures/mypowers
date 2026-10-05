@@ -145,6 +145,12 @@ class Page(DTO):
     skipped_lines: int = 0
 
 
+class LogPage(Page):
+    previous_cursor: str | None = None
+    has_more_before: bool = False
+    has_more_after: bool = False
+
+
 class StreamMessage(DTO):
     schema_version: Literal[1] = 1
     type: StreamKind

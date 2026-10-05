@@ -23,7 +23,7 @@ cleanup() {
   # These are direct children of this shell; never terminate another terminal.
   if [[ -n "$terminal_pid" ]] && kill -0 "$terminal_pid" 2>/dev/null; then
     if [[ -n "$win" && -n "$app_pid" ]] && kill -0 "$app_pid" 2>/dev/null; then
-      DISPLAY=:99 xdotool key --window "$win" q >/dev/null 2>&1 || true
+      DISPLAY=:99 xdotool key --window "$win" ctrl+q >/dev/null 2>&1 || true
       for ((i = 0; i < 20; i++)); do
         kill -0 "$app_pid" 2>/dev/null || break
         sleep 0.05
@@ -66,7 +66,7 @@ fi
 
 env -u NO_COLOR -u WAYLAND_DISPLAY WINIT_UNIX_BACKEND=x11 DISPLAY=:99 \
   alacritty --class codex-terminal-screenshot --title codex-terminal-screenshot --hold \
-  -o 'window.dynamic_title=false' 'window.dimensions.columns=94' 'window.dimensions.lines=24' 'font.size=14' \
+  -o 'window.dynamic_title=false' 'window.dimensions.columns=102' 'window.dimensions.lines=32' 'font.size=14' \
   --working-directory "$repo_dir" -e cargo run --locked --manifest-path "$project_dir/Cargo.toml" >/tmp/terminal-screenshot-alacritty.log 2>&1 &
 terminal_pid=$!
 printf '%s\n' "$terminal_pid" >/tmp/terminal-screenshot-alacritty.pid

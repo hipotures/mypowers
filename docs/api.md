@@ -16,7 +16,7 @@ the checked-in [OpenAPI artifact](openapi.json) describes typed requests and res
 | GET `/api/v1/commands/{uuid}` | Retained asynchronous result |
 | PUT `/api/v1/connection` | `{"desired":"paused"}` or `{"desired":"running"}` |
 | POST `/api/v1/connection/retry` | Empty JSON object; coalesced wakeup |
-| GET `/api/v1/logs` | Tail or UTC range, min_level/limit/cursor |
+| GET `/api/v1/logs` | Tail or UTC range, min_level/limit/cursor/direction |
 | PUT `/api/v1/runtime/log-level` | DEBUG/INFO/WARNING/ERROR, optional duration_seconds ≤86400 |
 | DELETE `/api/v1/runtime/log-level` | Remove override and restore startup baseline |
 | WS `/api/v1/events` | Initial snapshot, state/command/heartbeat observations |
@@ -66,6 +66,21 @@ Queries read only active/retained application files off-loop with a 3-second/64-
 Signed cursors reference file identities/offsets; removed sources return 410 log_cursor_expired.
 Malformed/final partial lines are skipped with a count. Ring fallback explicitly sets source=ring,
 gap=true. Logs include raw frame_hex only at DEBUG, never in SQLite or normal status/command DTOs.
+
+Range queries accept `direction=forward` (oldest first, default) or `backward`
+(newest page first); the records within every page are chronological. Responses
+include `previous_cursor`, `next_cursor`, `has_more_before`, and `has_more_after`.
+Fetch an older page with its `previous_cursor` and `direction=backward`, or a
+newer page with its `next_cursor` and `direction=forward`. Keep the same time and
+minimum-level filters. Cursors identify byte boundaries or ring sequences and
+survive file renaming during retained rotation. Expired/truncated sources return
+410; a client must explicitly refresh rather than silently omit history.
+
+The TUI translates the selected local calendar day into UTC `[since,until)`
+boundaries and loads bounded pages. DST days can be 23 or 25 hours. Archive
+scrolling does not insert live records into the displayed window; today/live
+is an explicit follow state. Log-level changes are INFO audit events, including
+when normal INFO logging has been disabled.
 
 ## Stream schema
 

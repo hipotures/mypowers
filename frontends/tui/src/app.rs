@@ -1,10 +1,9 @@
 use crate::{
     model::{Command, Status, safe},
-    network::{Event, Intent},
+    network::{ClipboardTarget, Event, Intent},
 };
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
 use ratatui::layout::{Position, Rect};
-use serde_json::Value;
 use std::{
     collections::VecDeque,
     time::{Duration, Instant},
@@ -15,6 +14,7 @@ pub enum View {
     Dashboard,
     Logs,
     Help,
+    Quit,
 }
 
 pub struct Trend {
@@ -31,27 +31,29 @@ pub struct App {
     pub hovered: Option<usize>,
     pub selected: Option<usize>,
     pub title: Rect,
-    pub clipboard_notice: Option<(bool, Instant)>,
+    pub clipboard_notice: Option<(bool, Instant, ClipboardTarget)>,
     pub notice: String,
     pub connection_notice: String,
     pub log_notice: String,
     pub pending: Option<String>,
     pub view: View,
-    pub logs: VecDeque<Value>,
-    pub log_level: usize,
-    pub scroll: usize,
+    pub logs: crate::logs::Logs,
     pub no_color: bool,
     pub timezone: Option<chrono_tz::Tz>,
     title_click: Option<(Instant, Position)>,
     press: Option<(usize, u64, String, u64)>,
     generation: u64,
+    pub quit_yes: bool,
+    pub quit_buttons: [Rect; 2],
 }
 
 pub enum Effect {
     None,
     Quit,
     Copy,
+    CopyLogs,
     Request(Intent),
+    Logs(crate::logs::Request),
 }
 
 impl App {
@@ -71,14 +73,14 @@ impl App {
             log_notice: String::new(),
             pending: None,
             view: View::Dashboard,
-            logs: VecDeque::new(),
-            log_level: 0,
-            scroll: 0,
+            logs: crate::logs::Logs::new(timezone),
             no_color,
             timezone,
             title_click: None,
             press: None,
             generation: 0,
+            quit_yes: true,
+            quit_buttons: [Rect::default(); 2],
         }
     }
 
@@ -151,23 +153,16 @@ impl App {
             Event::Notice(message) => self.log_notice = message,
             Event::Finished(message) => {
                 self.pending = None;
+                if self.view == View::Logs {
+                    self.logs.action = Some((message.clone(), Instant::now()));
+                }
                 self.notice = message;
             }
-            Event::Log(record) => {
-                if record.get("sequence").is_some()
-                    && self.logs.iter().any(|old| {
-                        old["sequence"] == record["sequence"]
-                            && old["server_instance_id"] == record["server_instance_id"]
-                    })
-                {
-                    return;
-                }
-                self.logs.push_back(record);
-                while self.logs.len() > 1000 {
-                    self.logs.pop_front();
-                }
+            Event::Log(record) => self.logs.record(record),
+            Event::LogPage(request, page) => self.logs.accept(&request, page),
+            Event::Copied(success, target) => {
+                self.clipboard_notice = Some((success, Instant::now(), target));
             }
-            Event::Copied(success) => self.clipboard_notice = Some((success, Instant::now())),
             Event::Exit => {}
         }
     }
@@ -263,12 +258,55 @@ impl App {
 
     pub fn key(&mut self, key: KeyEvent) -> Effect {
         if key.modifiers.contains(KeyModifiers::CONTROL)
-            && matches!(key.code, KeyCode::Char('c' | 'z'))
+            && matches!(key.code, KeyCode::Char('q' | 'c' | 'z'))
         {
             return Effect::Quit;
         }
+        if key.code == KeyCode::Esc {
+            self.view = View::Dashboard;
+            self.resize();
+            return Effect::None;
+        }
+        if self.view == View::Quit {
+            match key.code {
+                KeyCode::Enter | KeyCode::Char('y')
+                    if self.quit_yes || key.code == KeyCode::Char('y') =>
+                {
+                    return Effect::Quit;
+                }
+                KeyCode::Enter | KeyCode::Char('n') => {
+                    self.view = View::Dashboard;
+                    self.resize();
+                }
+                KeyCode::Tab | KeyCode::BackTab | KeyCode::Left | KeyCode::Right => {
+                    self.quit_yes = !self.quit_yes
+                }
+                _ => {}
+            }
+            return Effect::None;
+        }
+        if self.view == View::Logs {
+            if matches!(key.code, KeyCode::Esc | KeyCode::F(2) | KeyCode::F(3)) {
+                self.view = View::Dashboard;
+                self.resize();
+                return Effect::None;
+            }
+            if let Some(request) = self.logs.key(key.code) {
+                return Effect::Logs(request);
+            }
+            if !matches!(
+                key.code,
+                KeyCode::Char('q' | 'b') | KeyCode::F(1) | KeyCode::Char('?')
+            ) {
+                return Effect::None;
+            }
+        }
         match key.code {
-            KeyCode::Esc | KeyCode::Char('q') => return Effect::Quit,
+            KeyCode::Char('q') => {
+                self.view = View::Quit;
+                self.quit_yes = true;
+                self.resize();
+            }
             KeyCode::F(1) | KeyCode::Char('?') => {
                 self.view = View::Help;
                 self.resize();
@@ -280,6 +318,9 @@ impl App {
             KeyCode::F(3) => {
                 self.view = View::Logs;
                 self.resize();
+                if let Some(request) = self.logs.open() {
+                    return Effect::Logs(request);
+                }
             }
             KeyCode::Char('a' | 'd' | 'l') if self.view == View::Dashboard => {
                 return self.toggle(match key.code {
@@ -296,19 +337,6 @@ impl App {
                 return self.toggle(self.selected.unwrap_or(0));
             }
             KeyCode::Char(key @ ('r' | 'p' | 'b')) => return self.operation(key),
-            KeyCode::Char('f') if self.view == View::Logs => {
-                self.log_level = (self.log_level + 1) % 4;
-                self.scroll = 0;
-            }
-            KeyCode::Up | KeyCode::PageUp if self.view == View::Logs => {
-                self.scroll = (self.scroll + if key.code == KeyCode::Up { 1 } else { 10 }).min(1000)
-            }
-            KeyCode::Down | KeyCode::PageDown if self.view == View::Logs => {
-                self.scroll =
-                    self.scroll
-                        .saturating_sub(if key.code == KeyCode::Down { 1 } else { 10 })
-            }
-            KeyCode::End if self.view == View::Logs => self.scroll = 0,
             _ => {}
         }
         Effect::None
@@ -318,12 +346,37 @@ impl App {
         self.hovered = None;
         self.controls = [Rect::default(); 3];
         self.title = Rect::default();
+        self.quit_buttons = [Rect::default(); 2];
         self.title_click = None;
         self.press = None;
+        self.logs.resize();
         self.generation += 1;
     }
 
     pub fn mouse(&mut self, mouse: MouseEvent) -> Effect {
+        if self.view == View::Quit {
+            if mouse.kind == MouseEventKind::Down(MouseButton::Left) {
+                let position = Position::new(mouse.column, mouse.row);
+                if self.quit_buttons[0].contains(position) {
+                    return Effect::Quit;
+                }
+                if self.quit_buttons[1].contains(position) {
+                    self.view = View::Dashboard;
+                    self.resize();
+                }
+            }
+            return Effect::None;
+        }
+        if self.view == View::Logs {
+            if self.logs.copy_click(mouse) {
+                return Effect::CopyLogs;
+            }
+            return self
+                .logs
+                .mouse(mouse)
+                .map(Effect::Logs)
+                .unwrap_or(Effect::None);
+        }
         let position = Position::new(mouse.column, mouse.row);
         let hit = self
             .controls
@@ -369,12 +422,6 @@ impl App {
             MouseEventKind::Down(_) => {
                 self.press = None;
                 self.title_click = None;
-            }
-            MouseEventKind::ScrollUp if self.view == View::Logs => {
-                self.scroll = (self.scroll + 3).min(1000)
-            }
-            MouseEventKind::ScrollDown if self.view == View::Logs => {
-                self.scroll = self.scroll.saturating_sub(3)
             }
             _ => {}
         }

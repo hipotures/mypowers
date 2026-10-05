@@ -1,5 +1,6 @@
 mod app;
 mod config;
+mod logs;
 mod model;
 mod network;
 mod terminal;
@@ -9,7 +10,7 @@ mod ui;
 
 use app::{App, Effect};
 use crossterm::event::{self, Event as TerminalEvent, KeyEventKind};
-use network::{Api, Event};
+use network::{Api, ClipboardTarget, Event};
 use ratatui::{Terminal, backend::CrosstermBackend};
 use std::{
     io::{self, IsTerminal},
@@ -42,8 +43,10 @@ fn run() -> Result<(), String> {
         .map_err(|_| "Cannot start network runtime.")?;
     let (events, mut incoming) = mpsc::channel(256);
     let (requests, operations) = mpsc::channel(8);
+    let (log_requests, log_operations) = tokio::sync::watch::channel(None);
     runtime.spawn(api.clone().stream(false, events.clone()));
     runtime.spawn(api.clone().stream(true, events.clone()));
+    runtime.spawn(api.clone().log_pages(log_operations, events.clone()));
     runtime.spawn(api.operations(operations, events.clone()));
     let signal_events = events.clone();
     runtime.spawn(async move {
@@ -71,6 +74,9 @@ fn run() -> Result<(), String> {
                     Err(_) => break,
                 }
             }
+            if let Some(request) = app.logs.maintenance() {
+                let _ = log_requests.send(Some(request));
+            }
             if std::time::Instant::now() >= next_frame {
                 app.prune_trends();
                 terminal.draw(|frame| ui::draw(frame, &mut app))?;
@@ -90,6 +96,9 @@ fn run() -> Result<(), String> {
                 match effect {
                     Effect::Quit => break,
                     Effect::None => {}
+                    Effect::Logs(request) => {
+                        let _ = log_requests.send(Some(request));
+                    }
                     Effect::Request(intent) => {
                         if requests.try_send(intent).is_err() {
                             app.pending = None;
@@ -102,11 +111,25 @@ fn run() -> Result<(), String> {
                                 serde_json::to_string_pretty(status).map_err(io::Error::other)?;
                             let events = events.clone();
                             runtime.spawn(async move {
-                                let _ = events.send(Event::Copied(copy_json(json).await)).await;
+                                let _ = events
+                                    .send(Event::Copied(
+                                        copy_text(json).await,
+                                        ClipboardTarget::Snapshot,
+                                    ))
+                                    .await;
                             });
                         } else {
-                            app.clipboard_notice = Some((false, std::time::Instant::now()));
+                            app.update(Event::Copied(false, ClipboardTarget::Snapshot));
                         }
+                    }
+                    Effect::CopyLogs => {
+                        let text = app.logs.clipboard_text();
+                        let events = events.clone();
+                        runtime.spawn(async move {
+                            let _ = events
+                                .send(Event::Copied(copy_text(text).await, ClipboardTarget::Logs))
+                                .await;
+                        });
                     }
                 }
             }
@@ -118,7 +141,7 @@ fn run() -> Result<(), String> {
     result.map_err(|_| "TUI stopped after an I/O error; terminal settings restored.".into())
 }
 
-async fn copy_json(json: String) -> bool {
+async fn copy_text(text: String) -> bool {
     use tokio::io::AsyncWriteExt;
     let copy = async {
         let mut child = tokio::process::Command::new("wl-copy")
@@ -129,7 +152,7 @@ async fn copy_json(json: String) -> bool {
             .kill_on_drop(true)
             .spawn()?;
         let mut stdin = child.stdin.take().unwrap();
-        stdin.write_all(json.as_bytes()).await?;
+        stdin.write_all(text.as_bytes()).await?;
         drop(stdin);
         child.wait().await
     };

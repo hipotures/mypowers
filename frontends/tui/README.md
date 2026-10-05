@@ -49,18 +49,29 @@ uv run mypowers tui
 | Enter / Space | Activate the focused output |
 | Left click, released over the same control | Activate that output |
 | F2 | Dashboard |
-| F3 | Logs |
+| F3 | Open/close the logs modal |
 | F1 / ? | Help |
 | f | Cycle minimum log level |
-| Arrows / PageUp / PageDown / mouse wheel | Scroll logs |
-| End | Follow latest logs |
-| r | Request connection retry |
+| Up/Down / PageUp/PageDown / mouse wheel / scrollbar drag | Scroll logs; lazily load adjacent pages |
+| Left/Right or [ / ] | Previous/next log day |
+| r / F5 in logs | Refresh the selected day's archive |
+| + / - in logs | Change records per request: 50, 100, 250, 500, 1,000 |
+| Home in logs | Load the beginning of the selected day |
+| End in logs | Return to today and follow its live bottom |
+| r on dashboard | Request connection retry |
 | p | Pause/resume daemon BLE acquisition |
 | b | Toggle runtime DEBUG override |
 | Double-click MYPOWERS | Copy current rendered API snapshot through Wayland `wl-copy` |
-| q / Esc / Ctrl-C / Ctrl-Z | Quit cleanly |
+| Double-click LOGS title | Copy every currently loaded log record, including rows outside the viewport |
+| Esc | Close a modal/help and return to the dashboard |
+| q | Open quit confirmation; Enter confirms, Esc cancels |
+| Ctrl-Q / Ctrl-C / Ctrl-Z | Quit immediately and restore the terminal |
 
-The terminal must be at least 60x18. Resize invalidates old mouse presses and
+The dashboard is centered and capped at 94x28 cells; it fits within smaller
+terminals down to 60x18. The logs modal stays inside that frame with two-cell
+margins on every side (90x24 when the dashboard has its full size). Opening a
+modal dims the dashboard while telemetry updates continue underneath.
+Resize invalidates old mouse presses and
 hitboxes. Bracketed paste never activates controls. Drawing is limited to 4 FPS;
 HTTP and the independent event/log streams run outside the input/render loop.
 
@@ -81,13 +92,37 @@ Trends retain at most 120 seconds and 512 actual notifications. Time buckets
 represent the last sample in each display column, with empty columns across
 missing intervals/segments. No synthetic history is generated. Scales remain
 0–100 W input and 0–300 W output; larger readings are displayed numerically while
-the graph saturates. Logs retain at most 1,000 records and show history gaps,
+the graph saturates. Logs show history gaps,
 effective level, and DEBUG override expiry. Clipboard support is optional and
 requires `wl-copy` and an accessible Wayland session.
+Log copies are plain text with timestamps in the selected timezone, levels, and
+complete messages, without terminal width clipping. Pages not yet loaded are not
+included. The modal border briefly shows `Logs copied` or `Copy failed`.
 
-The log view shows a vertical scrollbar when filtered records exceed the visible
-rows. The thumb tracks the displayed position and viewport size. Use the mouse
-wheel, arrows, or PageUp/PageDown to scroll; End follows the newest records.
+The logs modal opens as a stationary archive for today. Days use the selected
+IANA timezone (or the local system timezone), including daylight-saving transitions;
+API timestamps and the server's records remain UTC. Every HTTP request filters
+`since`/`until` and `min_level` on the daemon and returns at most the selected page
+size. The client never reads server log files. It caches at most five archive
+pages and a separate bounded recent-stream buffer; discarded pages can be fetched
+again through opaque cursors. Page size is local to this session until server-side
+mutable settings are implemented.
+
+A vertical scrollbar appears when the cached records exceed the visible rows.
+Click its track or drag the thumb; Up/Down, PageUp/PageDown and the mouse wheel
+also scroll. At the first/last cached row, another scroll loads the adjacent page;
+at a completed day's boundary, another scroll enters the previous/next day.
+Empty days are navigable. Future days are blocked.
+
+`r`/F5 refreshes the selected day from its beginning without live insertion. New
+stream records cannot move a stationary archive or a dragged thumb. Reaching the
+bottom of today's completed range or pressing End enables live follow. Scrolling
+up disables follow immediately. The header labels ARCHIVE/LIVE explicitly.
+
+Restart both the daemon and TUI after updating this version: the log API now
+returns bidirectional pagination metadata. Updating a binary does not update an
+already running process. Runtime log-level changes are INFO audit records even
+when the selected level suppresses ordinary INFO messages.
 
 ## Verify
 

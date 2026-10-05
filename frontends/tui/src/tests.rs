@@ -1,7 +1,7 @@
 use crate::{
     app::{App, Effect, View},
     model::Status,
-    network::{Event, Intent},
+    network::{ClipboardTarget, Event, Intent},
     ui,
 };
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
@@ -109,7 +109,7 @@ fn freshness_is_monotonic_and_busy_unknown_and_stale_states_disable_controls() {
 
 #[test]
 fn layouts_preserve_inline_values_two_row_graphs_and_unknown_values() {
-    for (width, height) in [(60, 18), (80, 24), (94, 24), (120, 40)] {
+    for (width, height) in [(60, 18), (80, 24), (94, 24), (94, 28), (120, 40)] {
         let mut app = app();
         let buffer = render(&mut app, width, height);
         let screen = text(&buffer);
@@ -145,12 +145,61 @@ fn layouts_preserve_inline_values_two_row_graphs_and_unknown_values() {
 }
 
 #[test]
+fn dashboard_and_log_modal_stop_growing_at_their_defined_sizes() {
+    let mut app = app();
+    let dashboard = render(&mut app, 120, 40);
+    let x = (120 - ui::DASHBOARD_WIDTH) / 2;
+    let y = (40 - ui::DASHBOARD_HEIGHT) / 2;
+    assert_eq!(dashboard[(x, y)].symbol(), "╭");
+    assert_eq!(
+        dashboard[(x + ui::DASHBOARD_WIDTH - 1, y + ui::DASHBOARD_HEIGHT - 1)].symbol(),
+        "╯"
+    );
+    app.view = View::Logs;
+    let overlay = render(&mut app, 120, 40);
+    assert_eq!(overlay[(x + 2, y + 2)].symbol(), "╭");
+    assert_eq!(
+        overlay[(x + ui::DASHBOARD_WIDTH - 3, y + ui::DASHBOARD_HEIGHT - 3)].symbol(),
+        "╯"
+    );
+    let larger = render(&mut app, 160, 60);
+    assert_eq!(larger[(33, 16)].symbol(), "╭");
+    assert_eq!(larger[(35, 18)].symbol(), "╭");
+}
+
+#[test]
+fn log_modal_dims_dashboard_without_stopping_status_updates() {
+    let mut app = app();
+    let normal = render(&mut app, 94, 24);
+    let title = app.title;
+    app.view = View::Logs;
+    let overlay = render(&mut app, 94, 24);
+    assert_eq!(
+        normal[(title.x, title.y)].symbol(),
+        overlay[(title.x, title.y)].symbol()
+    );
+    assert_ne!(
+        normal[(title.x, title.y)].fg,
+        overlay[(title.x, title.y)].fg
+    );
+    assert!(app.controls.iter().all(|rect| rect.is_empty()));
+    let mut status = status();
+    status.telemetry.sample.as_mut().unwrap().battery_percent = 81;
+    app.update(Event::Status(Box::new(status)));
+    app.key(KeyEvent::new(KeyCode::Esc, KeyModifiers::NONE));
+    assert!(text(&render(&mut app, 94, 24)).contains("81%"));
+}
+
+#[test]
 fn log_scrollbar_tracks_overflow_scroll_filter_and_resize() {
     let mut app = app();
     app.view = View::Logs;
+    app.logs.follow = true;
     for sequence in 0..80 {
         app.update(Event::Log(json!({
             "sequence": sequence,
+            "timestamp": chrono::Utc::now().to_rfc3339(),
+            "server_instance_id": "88767477-2a2a-481f-843b-30d56a5e3f10",
             "level": "INFO",
             "message": format!("Record {sequence:03}"),
         })));
@@ -170,25 +219,250 @@ fn log_scrollbar_tracks_overflow_scroll_filter_and_resize() {
         modifiers: KeyModifiers::NONE,
     });
     assert!(!text(&render(&mut app, 60, 18)).contains("Record 079"));
-    for _ in 0..100 {
-        app.key(KeyEvent::new(KeyCode::PageUp, KeyModifiers::NONE));
-    }
+    app.logs.offset = 0;
     let top = render(&mut app, 60, 18);
     assert!(text(&top).contains("Record 000"));
     assert!(!text(&top).contains("Record 079"));
     assert!(thumb_rows(&top)[0] < thumb_rows(&bottom)[0]);
-    app.key(KeyEvent::new(KeyCode::End, KeyModifiers::NONE));
+    app.logs.follow = true;
     assert!(text(&render(&mut app, 60, 18)).contains("Record 079"));
-    app.scroll = 1000;
+    app.logs.follow = false;
+    app.logs.offset = 1000;
     render(&mut app, 120, 40);
-    assert_eq!(app.scroll, 80 - 35);
-    app.log_level = 3;
-    let filtered = render(&mut app, 60, 18);
-    assert!(thumb_rows(&filtered).is_empty());
-    assert_eq!(app.scroll, 0);
-    app.log_level = 0;
-    app.logs.truncate(4);
+    assert_eq!(app.logs.offset, 80 - app.logs.viewport);
+    app.logs.records.truncate(4);
     assert!(thumb_rows(&render(&mut app, 60, 18)).is_empty());
+}
+
+#[test]
+fn escape_closes_help_and_logs_instead_of_quitting() {
+    let mut app = app();
+    app.key(KeyEvent::new(KeyCode::Char('?'), KeyModifiers::NONE));
+    assert!(app.view == View::Help);
+    assert!(matches!(
+        app.key(KeyEvent::new(KeyCode::Esc, KeyModifiers::NONE)),
+        Effect::None
+    ));
+    assert!(app.view == View::Dashboard);
+    assert!(matches!(
+        app.key(KeyEvent::new(KeyCode::F(3), KeyModifiers::NONE)),
+        Effect::Logs(_)
+    ));
+    app.key(KeyEvent::new(KeyCode::F(1), KeyModifiers::NONE));
+    app.key(KeyEvent::new(KeyCode::Esc, KeyModifiers::NONE));
+    assert!(app.view == View::Dashboard);
+    app.key(KeyEvent::new(KeyCode::Esc, KeyModifiers::NONE));
+    assert!(app.view == View::Dashboard);
+    assert!(matches!(
+        app.key(KeyEvent::new(KeyCode::Esc, KeyModifiers::NONE)),
+        Effect::None
+    ));
+    assert!(matches!(
+        app.key(KeyEvent::new(KeyCode::Char('q'), KeyModifiers::NONE)),
+        Effect::None
+    ));
+    assert!(app.view == View::Quit);
+    let screen = text(&render(&mut app, 80, 24));
+    assert!(screen.contains("Quit MyPowers?"));
+    assert!(app.controls.iter().all(|rect| rect.is_empty()));
+    app.key(KeyEvent::new(KeyCode::Esc, KeyModifiers::NONE));
+    assert!(app.view == View::Dashboard);
+    app.key(KeyEvent::new(KeyCode::Char('q'), KeyModifiers::NONE));
+    assert!(matches!(
+        app.key(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE)),
+        Effect::Quit
+    ));
+    app.key(KeyEvent::new(KeyCode::F(3), KeyModifiers::NONE));
+    assert!(matches!(
+        app.key(KeyEvent::new(KeyCode::Char('q'), KeyModifiers::CONTROL)),
+        Effect::Quit
+    ));
+}
+
+#[test]
+fn logs_title_double_click_copies_loaded_rows_without_viewport_or_message_clipping() {
+    let mut app = app();
+    app.view = View::Logs;
+    app.logs = crate::logs::Logs::new(Some(chrono_tz::Europe::Warsaw));
+    let long_message = format!("{} END", "x".repeat(3500));
+    for sequence in 0..80 {
+        app.logs.records.push_back(json!({
+            "timestamp":"2026-10-05T10:00:00Z", "level":"INFO",
+            "message":if sequence == 79 { long_message.clone() } else { format!("Record {sequence:03}") },
+        }));
+    }
+    app.logs.offset = 20;
+    let screen = text(&render(&mut app, 94, 28));
+    assert!(!screen.contains("Record 000") && !screen.contains(" END"));
+    let title = app.logs.title;
+    assert_eq!(
+        screen
+            .lines()
+            .nth(title.y as usize)
+            .unwrap()
+            .chars()
+            .skip(title.x as usize)
+            .take(4)
+            .collect::<String>(),
+        "LOGS"
+    );
+    let click = MouseEvent {
+        kind: MouseEventKind::Down(MouseButton::Left),
+        column: title.x + 1,
+        row: title.y,
+        modifiers: KeyModifiers::NONE,
+    };
+    assert!(matches!(app.mouse(click), Effect::None));
+    render(&mut app, 94, 28);
+    assert!(matches!(app.mouse(click), Effect::CopyLogs));
+    let copied = app.logs.clipboard_text();
+    assert_eq!(copied.lines().count(), 80);
+    assert!(copied.starts_with("2026-10-05T12:00:00+02:00 INFO Record 000\n"));
+    assert!(copied.ends_with(&format!("{long_message}\n")));
+    assert_eq!(app.logs.offset, 20);
+    app.update(Event::Copied(true, ClipboardTarget::Logs));
+    let screen = text(&render(&mut app, 94, 28));
+    assert!(screen.contains("Logs copied") && !screen.contains("JSON copied"));
+    assert!(matches!(app.mouse(click), Effect::None));
+    app.resize();
+    render(&mut app, 94, 28);
+    assert!(matches!(app.mouse(click), Effect::None));
+    render(&mut app, 50, 15);
+    assert!(app.logs.title.is_empty());
+    assert!(matches!(app.mouse(click), Effect::None));
+}
+
+#[test]
+fn archived_logs_stay_still_during_live_arrivals_and_scrollbar_drag() {
+    let mut app = app();
+    app.view = View::Logs;
+    app.logs.follow = true;
+    let stamp = chrono::Utc::now();
+    let record = |sequence| {
+        json!({
+            "sequence": sequence, "timestamp": (stamp + chrono::Duration::milliseconds(sequence)).to_rfc3339(),
+            "server_instance_id": "88767477-2a2a-481f-843b-30d56a5e3f10", "level":"INFO",
+            "message":format!("Record {sequence:03}"),
+        })
+    };
+    for sequence in 0..80 {
+        app.update(Event::Log(record(sequence)));
+    }
+    render(&mut app, 94, 24);
+    let thumb = app.logs.thumb;
+    assert!(!thumb.is_empty());
+    let mouse = |kind, row| MouseEvent {
+        kind,
+        column: thumb.x,
+        row,
+        modifiers: KeyModifiers::NONE,
+    };
+    app.mouse(mouse(MouseEventKind::Down(MouseButton::Left), thumb.y));
+    app.mouse(mouse(
+        MouseEventKind::Drag(MouseButton::Left),
+        app.logs.scrollbar.y + 3,
+    ));
+    let offset = app.logs.offset;
+    assert!(offset > 0 && offset < app.logs.max_offset());
+    let before = text(&render(&mut app, 94, 24));
+    for sequence in 80..100 {
+        app.update(Event::Log(record(sequence)));
+    }
+    let after = text(&render(&mut app, 94, 24));
+    assert_eq!(app.logs.offset, offset);
+    assert_eq!(app.logs.records.len(), 80);
+    assert_eq!(app.logs.unseen, 20);
+    let content = |screen: &str| {
+        screen
+            .lines()
+            .filter(|line| line.contains("Record"))
+            .map(str::to_owned)
+            .collect::<Vec<_>>()
+    };
+    assert_eq!(content(&before), content(&after));
+    app.mouse(mouse(
+        MouseEventKind::Up(MouseButton::Left),
+        app.logs.scrollbar.y + 3,
+    ));
+    assert!(!app.logs.follow);
+    app.resize();
+    let held = app.logs.offset;
+    app.mouse(mouse(MouseEventKind::Drag(MouseButton::Left), 0));
+    assert_eq!(app.logs.offset, held);
+    let Effect::Logs(request) = app.key(KeyEvent::new(KeyCode::End, KeyModifiers::NONE)) else {
+        panic!("Expected day query");
+    };
+    let page: crate::logs::Page = serde_json::from_value(json!({
+        "schema_version":1, "items":[record(95),record(96),record(97),record(98),record(99)],
+        "previous_cursor":"before", "next_cursor":"after", "has_more_before":true,
+        "has_more_after":false, "source":"files", "gap":false,"skipped_lines":0,
+    }))
+    .unwrap();
+    app.update(Event::LogPage(request, Ok(page)));
+    let screen = text(&render(&mut app, 94, 24));
+    assert!(screen.contains("Record 099") && app.logs.follow);
+}
+
+#[test]
+fn log_pages_ignore_old_responses_and_keep_cursor_edges_when_cache_is_bounded() {
+    let mut logs = crate::logs::Logs::new(Some(chrono_tz::UTC));
+    logs.page_size = 50;
+    logs.layout(10);
+    let first = logs.open().unwrap();
+    let current = logs.navigate(false).unwrap();
+    let page = |start: usize| {
+        serde_json::from_value::<crate::logs::Page>(json!({
+        "schema_version":1, "items": (start..start+50).map(|sequence| json!({
+            "sequence":sequence,"message":format!("Record {sequence}"),"level":"INFO",
+            "timestamp":"2020-01-01T12:00:00Z", "server_instance_id":"88767477-2a2a-481f-843b-30d56a5e3f10"
+        })).collect::<Vec<_>>(),
+        "previous_cursor":format!("before-{start}"), "next_cursor":format!("after-{}",start+49),
+        "has_more_before":true, "has_more_after":false, "source":"files", "gap":false,"skipped_lines":0,
+    })).unwrap()
+    };
+    logs.accept(&first, Ok(page(400)));
+    assert!(logs.records.is_empty() && logs.loading);
+    logs.accept(&current, Ok(page(350)));
+    for start in (0..350).step_by(50).rev() {
+        logs.offset = 0;
+        let request = logs.scroll(false, 1).unwrap();
+        assert_eq!(request.kind, crate::logs::Load::Older);
+        assert_eq!(request.limit, 50);
+        logs.accept(&request, Ok(page(start)));
+        assert!(logs.records.len() <= 250);
+    }
+    assert_eq!(logs.records.front().unwrap()["sequence"], 0);
+    assert_eq!(logs.records.back().unwrap()["sequence"], 249);
+    logs.offset = logs.max_offset();
+    let newer = logs.scroll(true, 1).unwrap();
+    assert_eq!(newer.kind, crate::logs::Load::Newer);
+    assert_eq!(newer.cursor.as_deref(), Some("after-249"));
+    logs.accept(&newer, Ok(page(250)));
+    assert_eq!(logs.records.len(), 250);
+    assert_eq!(logs.records.front().unwrap()["sequence"], 50);
+    logs.offset = 0;
+    let older = logs.scroll(false, 1).unwrap();
+    assert_eq!(older.cursor.as_deref(), Some("before-50"));
+}
+
+#[test]
+fn log_day_bounds_use_iana_dst_transitions_and_midnight_offsets() {
+    let zone = Some(chrono_tz::Europe::Warsaw);
+    for (date, hours) in [("2026-03-29", 23), ("2026-10-25", 25), ("2026-10-05", 24)] {
+        let (start, end) = crate::logs::day_bounds(date.parse().unwrap(), zone).unwrap();
+        let start = chrono::DateTime::parse_from_rfc3339(&start).unwrap();
+        let end = chrono::DateTime::parse_from_rfc3339(&end).unwrap();
+        assert_eq!((end - start).num_hours(), hours);
+        assert_eq!(
+            start
+                .with_timezone(&chrono_tz::Europe::Warsaw)
+                .format("%Y-%m-%d %H:%M")
+                .to_string(),
+            format!("{date} 00:00")
+        );
+    }
+    let (start, _) = crate::logs::day_bounds("2026-10-05".parse().unwrap(), zone).unwrap();
+    assert!(start.starts_with("2026-10-04T22:00:00"));
 }
 
 #[test]
@@ -232,7 +506,7 @@ fn click_activates_once_on_release_and_resize_or_revision_discards_old_press() {
     ));
     assert!(matches!(
         app.key(KeyEvent::new(KeyCode::Esc, KeyModifiers::NONE)),
-        Effect::Quit
+        Effect::None
     ));
 }
 
@@ -273,4 +547,21 @@ fn stream_errors_do_not_erase_user_command_feedback() {
     app.update(Event::Notice("Logs unavailable".into()));
     assert!(app.display_notice().contains("Outcome uncertain"));
     assert!(!app.connected);
+}
+
+#[test]
+fn concurrent_log_page_does_not_erase_runtime_action_feedback() {
+    let mut app = app();
+    let Effect::Logs(request) = app.key(KeyEvent::new(KeyCode::F(3), KeyModifiers::NONE)) else {
+        panic!("Expected log request");
+    };
+    app.update(Event::Finished("Runtime log level updated.".into()));
+    let page = serde_json::from_value(json!({
+        "schema_version":1,"items":[],"previous_cursor":null,"next_cursor":null,
+        "has_more_before":false,"has_more_after":false,"source":"files","gap":false,"skipped_lines":0,
+    })).unwrap();
+    app.update(Event::LogPage(request, Ok(page)));
+    assert!(text(&render(&mut app, 60, 18)).contains("Runtime log level updated."));
+    app.key(KeyEvent::new(KeyCode::Char('r'), KeyModifiers::NONE));
+    assert!(app.logs.action.is_none());
 }

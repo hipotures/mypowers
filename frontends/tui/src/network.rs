@@ -14,14 +14,21 @@ use tokio_tungstenite::{
     tungstenite::{Message, client::IntoClientRequest, protocol::WebSocketConfig},
 };
 
+#[derive(Clone, Copy, PartialEq)]
+pub enum ClipboardTarget {
+    Snapshot,
+    Logs,
+}
+
 pub enum Event {
     Status(Box<Status>),
     Disconnected(String),
     Command(Command),
     Log(Value),
+    LogPage(crate::logs::Request, Result<crate::logs::Page, String>),
     Notice(String),
     Finished(String),
-    Copied(bool),
+    Copied(bool, ClipboardTarget),
     Exit,
 }
 
@@ -265,6 +272,84 @@ impl Api {
             let result = self.perform(intent, &events).await;
             if events.send(Event::Finished(result)).await.is_err() {
                 return;
+            }
+        }
+    }
+
+    async fn log_page(&self, request: &crate::logs::Request) -> Result<crate::logs::Page, String> {
+        let mut url = self.origin.join("/logs").map_err(|_| "Invalid logs URL.")?;
+        url.query_pairs_mut()
+            .append_pair("since", &request.since)
+            .append_pair("until", &request.until)
+            .append_pair("min_level", request.level)
+            .append_pair("limit", &request.limit.to_string())
+            .append_pair(
+                "direction",
+                if matches!(
+                    request.kind,
+                    crate::logs::Load::Latest | crate::logs::Load::Older
+                ) {
+                    "backward"
+                } else {
+                    "forward"
+                },
+            );
+        if let Some(cursor) = &request.cursor {
+            url.query_pairs_mut().append_pair("cursor", cursor);
+        }
+        let value = self
+            .request(
+                reqwest::Method::GET,
+                &format!("/logs?{}", url.query().unwrap()),
+                None,
+                None,
+            )
+            .await?;
+        let page: crate::logs::Page =
+            serde_json::from_value(value).map_err(|_| "Invalid log page response.")?;
+        if page.schema_version != 1
+            || page.items.len() > request.limit
+            || (page.has_more_before && page.previous_cursor.is_none())
+            || (page.has_more_after && page.next_cursor.is_none())
+            || page.items.iter().any(|record| {
+                record["timestamp"]
+                    .as_str()
+                    .is_none_or(|stamp| chrono::DateTime::parse_from_rfc3339(stamp).is_err())
+                    || record["sequence"].as_u64().is_none()
+                    || record["server_instance_id"]
+                        .as_str()
+                        .is_none_or(|id| uuid::Uuid::parse_str(id).is_err())
+                    || record["message"].as_str().is_none()
+            })
+        {
+            return Err("Invalid log page schema or pagination.".into());
+        }
+        Ok(page)
+    }
+
+    pub async fn log_pages(
+        self: Arc<Self>,
+        mut requests: tokio::sync::watch::Receiver<Option<crate::logs::Request>>,
+        events: mpsc::Sender<Event>,
+    ) {
+        loop {
+            if requests.changed().await.is_err() {
+                return;
+            }
+            let Some(mut request) = requests.borrow_and_update().clone() else {
+                continue;
+            };
+            loop {
+                tokio::select! {
+                    changed = requests.changed() => {
+                        if changed.is_err() { return; }
+                        if let Some(next) = requests.borrow_and_update().clone() { request = next; }
+                    }
+                    page = self.log_page(&request) => {
+                        if events.send(Event::LogPage(request, page)).await.is_err() { return; }
+                        break;
+                    }
+                }
             }
         }
     }

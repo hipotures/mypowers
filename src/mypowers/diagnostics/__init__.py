@@ -10,10 +10,12 @@ import sys
 import threading
 import time
 from collections import deque
+from collections.abc import Iterator
+from contextlib import ExitStack
 from pathlib import Path
-from typing import Any
+from typing import Any, BinaryIO, Literal
 
-from mypowers.contracts import AppError, Level, Page, aware_ms, timestamp, utc_now
+from mypowers.contracts import AppError, Level, LogPage, aware_ms, timestamp, utc_now
 from mypowers.storage import CursorCodec
 
 SECRET_KEYS = re.compile(r"token|authorization|cookie|password|credential|secret|dotenv", re.I)
@@ -235,8 +237,9 @@ class Diagnostics:
         self.expires = time.monotonic() + duration if duration is not None else None
         self.expiry_epoch = time.time() + duration if duration is not None else None
         self.logger.setLevel(getattr(logging, self.effective))
-        self.log(
-            "ERROR", "log_level_changed", "Runtime log level changed.", effective=self.effective
+        # Record the setting change even when the new level suppresses ordinary INFO messages.
+        self.accept(
+            "INFO", "log_level_changed", "Runtime log level changed.", {"effective": self.effective}
         )
         return self.health()
 
@@ -249,7 +252,8 @@ class Diagnostics:
         min_level: Level = Level.DEBUG,
         limit: int = 100,
         cursor: str | None = None,
-    ) -> Page:
+        direction: Literal["forward", "backward"] = "forward",
+    ) -> LogPage:
         if tail is not None and (since or until or cursor):
             raise AppError("invalid_log_query", "tail and range/cursor modes are exclusive.", 422)
         if not 1 <= limit <= 1000 or tail is not None and not 1 <= tail <= 1000:
@@ -273,7 +277,7 @@ class Diagnostics:
             filters = retained_filters
         self.queries += 1
         try:
-            return await asyncio.to_thread(self.scan, tail, filters, limit, decoded)
+            return await asyncio.to_thread(self.scan, tail, filters, limit, decoded, direction)
         finally:
             self.queries -= 1
 
@@ -289,8 +293,15 @@ class Diagnostics:
             return False
 
     def scan(
-        self, tail: int | None, filters: dict[str, Any], limit: int, decoded: dict[str, Any] | None
-    ) -> Page:
+        self,
+        tail: int | None,
+        filters: dict[str, Any],
+        limit: int,
+        decoded: dict[str, Any] | None,
+        direction: Literal["forward", "backward"],
+    ) -> LogPage:
+        backward = tail is not None or direction == "backward"
+        count = tail or limit
         if self.state != "ok":
             with self.mutex:
                 retained = list(self.records)
@@ -304,9 +315,16 @@ class Diagnostics:
                 r
                 for r in retained
                 if self.matches(r, filters)
-                and (not decoded or r["sequence"] > decoded.get("sequence", 0))
+                and (
+                    not decoded
+                    or (
+                        r["sequence"] <= decoded["sequence"]
+                        if backward
+                        else r["sequence"] > decoded["sequence"]
+                    )
+                )
             ]
-            ring_items = selected[-tail:] if tail else selected[:limit]
+            ring_items = selected[-count:] if backward else selected[:count]
             next_cursor = (
                 self.codec.encode(
                     {"source": "ring", "sequence": ring_items[-1]["sequence"], "filters": filters}
@@ -314,35 +332,107 @@ class Diagnostics:
                 if ring_items
                 else None
             )
-            return Page(items=ring_items, next_cursor=next_cursor, source="ring", gap=True)
+            previous_cursor = (
+                self.codec.encode(
+                    {
+                        "source": "ring",
+                        "sequence": ring_items[0]["sequence"] - 1,
+                        "filters": filters,
+                    }
+                )
+                if ring_items
+                else None
+            )
+            return LogPage(
+                items=ring_items,
+                next_cursor=next_cursor,
+                previous_cursor=previous_cursor,
+                has_more_before=len(selected) > count if backward else bool(decoded),
+                has_more_after=bool(decoded) if backward else len(selected) > count,
+                source="ring",
+                gap=True,
+            )
         paths = [self.directory / f"mypowers.jsonl.{n}" for n in range(self.backups, 0, -1)]
         paths.append(self.directory / "mypowers.jsonl")
         deadline, scanned, skipped = time.monotonic() + 3, 0, 0
-        items: deque[dict[str, Any]] = deque(maxlen=tail or limit)
-        found = decoded is None
-        last_cursor: str | None = None
-        for path in paths:
-            try:
-                with path.open("rb") as file:
-                    inode = __import__("os").fstat(file.fileno()).st_ino
-                    if not found:
-                        if decoded is None or inode != decoded.get("inode"):
-                            continue
-                        if decoded.get("source") != "files":
-                            raise AppError("log_cursor_expired", "Cursor source changed.", 410)
-                        file.seek(decoded["offset"])
-                        found = True
-                    while True:
-                        raw = file.readline(16385)
-                        if not raw:
-                            break
-                        scanned += len(raw)
-                        if scanned > 67108864 or time.monotonic() > deadline:
-                            raise AppError(
-                                "log_scan_budget",
-                                "Log query exceeded scan budget; narrow the range.",
-                                503,
-                            )
+        rows: list[tuple[dict[str, Any], int, int, int]] = []
+
+        def charge(size: int) -> None:
+            nonlocal scanned
+            scanned += size
+            if scanned > 67108864 or time.monotonic() > deadline:
+                raise AppError(
+                    "log_scan_budget", "Log query exceeded scan budget; narrow the range.", 503
+                )
+
+        def lines(file: BinaryIO, start: int, end: int) -> Iterator[tuple[int, int, bytes]]:
+            if not backward:
+                file.seek(start)
+                while file.tell() < end:
+                    offset = file.tell()
+                    raw = file.readline(min(16385, end - offset))
+                    charge(len(raw))
+                    yield offset, file.tell(), raw
+                return
+            # Locate line boundaries in bounded chunks, reading only one bounded record at a time.
+            position, record_end = end, end
+            while position > start:
+                chunk_start = max(start, position - 65536)
+                file.seek(chunk_start)
+                chunk = file.read(position - chunk_start)
+                charge(len(chunk))
+                position = chunk_start
+                for index in range(len(chunk) - 1, -1, -1):
+                    if chunk[index] != 10:
+                        continue
+                    offset = chunk_start + index + 1
+                    if offset >= record_end:
+                        continue
+                    file.seek(offset)
+                    raw = file.read(min(16385, record_end - offset))
+                    yield offset, record_end, raw
+                    record_end = offset
+            if record_end > start:
+                file.seek(start)
+                yield start, record_end, file.read(min(16385, record_end - start))
+
+        try:
+            with ExitStack() as stack:
+                files: list[tuple[BinaryIO, int, int]] = []
+                for path in paths:
+                    try:
+                        opened = stack.enter_context(path.open("rb"))
+                    except FileNotFoundError:
+                        continue
+                    stat = __import__("os").fstat(opened.fileno())
+                    files.append((opened, stat.st_ino, stat.st_size))
+                boundary = None
+                if decoded:
+                    boundary = next(
+                        (
+                            i
+                            for i, (_, inode, _) in enumerate(files)
+                            if inode == decoded.get("inode")
+                        ),
+                        None,
+                    )
+                    if decoded.get("source") != "files" or boundary is None:
+                        raise AppError(
+                            "log_cursor_expired", "Rotation removed the cursor source.", 410
+                        )
+                    if decoded["offset"] > files[boundary][2]:
+                        raise AppError("log_cursor_expired", "Cursor source was truncated.", 410)
+                indices = range(len(files) - 1, -1, -1) if backward else range(len(files))
+                for index in indices:
+                    if boundary is not None and (
+                        index > boundary if backward else index < boundary
+                    ):
+                        continue
+                    file, inode, size = files[index]
+                    offset = decoded["offset"] if decoded and index == boundary else None
+                    start = offset if offset is not None and not backward else 0
+                    end = offset if offset is not None and backward else size
+                    for before, after, raw in lines(file, start, end):
                         if len(raw) > 16384 or not raw.endswith(b"\n"):
                             skipped += 1
                             continue
@@ -353,32 +443,38 @@ class Diagnostics:
                         except (ValueError, UnicodeDecodeError):
                             skipped += 1
                             continue
-                        items.append(record)
-                        last_cursor = self.codec.encode(
-                            {
-                                "source": "files",
-                                "inode": inode,
-                                "offset": file.tell(),
-                                "filters": filters,
-                            }
-                        )
-                        if tail is None and len(items) >= limit:
-                            return Page(
-                                items=list(items),
-                                next_cursor=last_cursor,
-                                source="files",
-                                skipped_lines=skipped,
-                            )
-            except FileNotFoundError:
-                continue
-            except OSError:
-                raise AppError(
-                    "log_files_unavailable", "Application log files are unavailable.", 503
-                ) from None
-        if not found:
-            raise AppError("log_cursor_expired", "Rotation removed the cursor source.", 410)
-        return Page(
-            items=list(items), next_cursor=last_cursor, source="files", skipped_lines=skipped
+                        rows.append((record, inode, before, after))
+                        if len(rows) > count:
+                            break
+                    if len(rows) > count:
+                        break
+        except OSError:
+            raise AppError(
+                "log_files_unavailable", "Application log files are unavailable.", 503
+            ) from None
+        more = len(rows) > count
+        rows = rows[:count]
+        if backward:
+            rows.reverse()
+
+        def cursor(row: tuple[dict[str, Any], int, int, int], before: bool) -> str:
+            return self.codec.encode(
+                {
+                    "source": "files",
+                    "inode": row[1],
+                    "offset": row[2 if before else 3],
+                    "filters": filters,
+                }
+            )
+
+        return LogPage(
+            items=[row[0] for row in rows],
+            next_cursor=cursor(rows[-1], False) if rows else None,
+            previous_cursor=cursor(rows[0], True) if rows else None,
+            has_more_before=more if backward else bool(decoded),
+            has_more_after=bool(decoded) if backward else more,
+            source="files",
+            skipped_lines=skipped,
         )
 
     async def close(self) -> None:

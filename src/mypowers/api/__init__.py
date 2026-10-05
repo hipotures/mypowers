@@ -4,7 +4,7 @@ import asyncio
 import hmac
 import json
 from contextlib import asynccontextmanager
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
 from urllib.parse import urlsplit
 from uuid import UUID, uuid4
 
@@ -25,6 +25,7 @@ from mypowers.contracts import (
     ErrorResponse,
     Level,
     LogLevelRequest,
+    LogPage,
     Output,
     OutputRequest,
     Page,
@@ -252,7 +253,7 @@ def create_app(config: ServerConfig, service: Service | None = None) -> FastAPI:
         runtime.supervisor.wakeup.set()
         return runtime.core.connection
 
-    @app.get("/api/v1/logs", response_model=Page, operation_id="logs")
+    @app.get("/api/v1/logs", response_model=LogPage, operation_id="logs")
     async def logs(
         tail: Annotated[int | None, Query(ge=1, le=1000)] = None,
         since: str | None = None,
@@ -260,9 +261,16 @@ def create_app(config: ServerConfig, service: Service | None = None) -> FastAPI:
         min_level: Level = Level.DEBUG,
         limit: Annotated[int, Query(ge=1, le=1000)] = 100,
         cursor: Annotated[str | None, Query(max_length=2048)] = None,
-    ) -> Page:
+        direction: Literal["forward", "backward"] = "forward",
+    ) -> LogPage:
         return await runtime.logs.query(
-            tail=tail, since=since, until=until, min_level=min_level, limit=limit, cursor=cursor
+            tail=tail,
+            since=since,
+            until=until,
+            min_level=min_level,
+            limit=limit,
+            cursor=cursor,
+            direction=direction,
         )
 
     @app.put("/api/v1/runtime/log-level", operation_id="set_log_level")

@@ -12,6 +12,110 @@ async def flush(logs):
     await asyncio.to_thread(logs.queue.join)
 
 
+async def test_bidirectional_day_pages_across_rotated_files_and_new_records(tmp_path):
+    logs = Diagnostics("instance", tmp_path, backups=2)
+    logs.state = "ok"
+    records = [
+        {
+            "timestamp": f"2026-10-0{4 if index < 70 else 5}T12:00:{index % 60:02}Z",
+            "sequence": index,
+            "level": "INFO" if index % 2 == 0 else "DEBUG",
+            "message": f"Record {index} — Unicode",
+        }
+        for index in range(90)
+    ]
+    for name, selected in [
+        ("mypowers.jsonl.2", records[:25]),
+        ("mypowers.jsonl.1", records[25:50]),
+        ("mypowers.jsonl", records[50:]),
+    ]:
+        (tmp_path / name).write_text(
+            "".join(json.dumps(row, ensure_ascii=False) + "\n" for row in selected)
+        )
+    arguments = {"since": "2026-10-04T00:00:00Z", "until": "2026-10-05T00:00:00Z", "limit": 7}
+    latest = await logs.query(**arguments, direction="backward")
+    assert [row["sequence"] for row in latest.items] == list(range(63, 70))
+    assert latest.has_more_before and not latest.has_more_after
+    older = await logs.query(**arguments, direction="backward", cursor=latest.previous_cursor)
+    assert [row["sequence"] for row in older.items] == list(range(56, 63))
+    newer = await logs.query(**arguments, cursor=older.next_cursor)
+    assert newer.items == latest.items
+    collected = list(latest.items)
+    page = latest
+    while page.has_more_before:
+        page = await logs.query(**arguments, direction="backward", cursor=page.previous_cursor)
+        assert len(page.items) <= 7
+        collected[:0] = page.items
+    assert [row["sequence"] for row in collected] == list(range(70))
+    first = await logs.query(**arguments)
+    assert not first.has_more_before and first.has_more_after
+    filtered = await logs.query(**arguments, direction="backward", min_level=Level.INFO)
+    assert all(row["level"] == "INFO" for row in filtered.items)
+    with pytest.raises(AppError, match="filters"):
+        await logs.query(
+            **{**arguments, "until": "2026-10-06T00:00:00Z"}, cursor=latest.next_cursor
+        )
+    with (tmp_path / "mypowers.jsonl").open("a") as file:
+        file.write(json.dumps({**records[0], "sequence": 90}) + "\n")
+    delta = await logs.query(**arguments, cursor=latest.next_cursor)
+    assert [row["sequence"] for row in delta.items] == [90]
+    stable_older = await logs.query(
+        **arguments, direction="backward", cursor=latest.previous_cursor
+    )
+    assert stable_older.items == older.items
+
+
+async def test_backward_scan_handles_chunk_boundaries_partial_lines_and_truncation(tmp_path):
+    logs = Diagnostics("instance", tmp_path)
+    logs.state = "ok"
+    rows = [
+        {"timestamp": "2026-10-04T12:00:00Z", "level": "INFO", "message": "x" * 9000, "sequence": i}
+        for i in range(30)
+    ]
+    path = tmp_path / "mypowers.jsonl"
+    path.write_text(
+        "".join(json.dumps(row) + "\n" for row in rows) + "x" * 20000 + "\nnot-json\n{partial"
+    )
+    page = await logs.query(limit=30, direction="backward")
+    assert [row["sequence"] for row in page.items] == list(range(30))
+    assert page.skipped_lines == 3
+    assert not page.has_more_before
+    path.write_text("")
+    with pytest.raises(AppError) as caught:
+        await logs.query(cursor=page.next_cursor)
+    assert caught.value.status == 410
+
+
+async def test_bidirectional_ring_pages_report_incomplete_history(tmp_path):
+    logs = Diagnostics("instance", tmp_path)
+    logs.state = "degraded"
+    logs.records.extend(
+        {"timestamp": "2026-10-04T12:00:00Z", "level": "INFO", "sequence": i} for i in range(1, 10)
+    )
+    latest = await logs.query(direction="backward", limit=3)
+    older = await logs.query(direction="backward", limit=3, cursor=latest.previous_cursor)
+    newer = await logs.query(limit=3, cursor=older.next_cursor)
+    assert [row["sequence"] for row in latest.items] == [7, 8, 9]
+    assert [row["sequence"] for row in older.items] == [4, 5, 6]
+    assert newer.items == latest.items
+    assert latest.gap and latest.source == "ring"
+
+
+async def test_log_level_changes_are_info_audit_records_even_when_info_is_disabled(tmp_path):
+    logs = Diagnostics("instance", tmp_path)
+    logs.start()
+    try:
+        logs.set_level(Level.ERROR)
+        logs.set_level(Level.INFO)
+        await flush(logs)
+        page = await logs.query(tail=10)
+        changes = [row for row in page.items if row["event"] == "log_level_changed"]
+        assert [row["level"] for row in changes] == ["INFO", "INFO"]
+        assert [row["context"]["effective"] for row in changes] == ["ERROR", "INFO"]
+    finally:
+        await logs.close()
+
+
 async def test_jsonl_redaction_debug_levels_expiry_and_rotation(tmp_path):
     secret = "credential-content-" * 3
     logs = Diagnostics(

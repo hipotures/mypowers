@@ -1093,6 +1093,20 @@
               ],
               "title": "Cursor"
             }
+          },
+          {
+            "name": "direction",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "forward",
+                "backward"
+              ],
+              "type": "string",
+              "default": "forward",
+              "title": "Direction"
+            }
           }
         ],
         "responses": {
@@ -1101,7 +1115,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Page"
+                  "$ref": "#/components/schemas/LogPage"
                 }
               }
             }
@@ -1821,6 +1835,77 @@
           "level"
         ],
         "title": "LogLevelRequest"
+      },
+      "LogPage": {
+        "properties": {
+          "schema_version": {
+            "type": "integer",
+            "const": 1,
+            "title": "Schema Version",
+            "default": 1
+          },
+          "items": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "default": "database"
+          },
+          "gap": {
+            "type": "boolean",
+            "title": "Gap",
+            "default": false
+          },
+          "skipped_lines": {
+            "type": "integer",
+            "title": "Skipped Lines",
+            "default": 0
+          },
+          "previous_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Previous Cursor"
+          },
+          "has_more_before": {
+            "type": "boolean",
+            "title": "Has More Before",
+            "default": false
+          },
+          "has_more_after": {
+            "type": "boolean",
+            "title": "Has More After",
+            "default": false
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "items"
+        ],
+        "title": "LogPage"
       },
       "Output": {
         "type": "string",

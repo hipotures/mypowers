@@ -13,6 +13,7 @@ import struct
 import subprocess
 import termios
 import time
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import httpx
@@ -91,7 +92,7 @@ class Session:
 
     def close(self):
         if self.process.poll() is None:
-            self.write(b"q")
+            self.write(b"\x11")  # Ctrl-Q bypasses quit confirmation.
             try:
                 self.process.wait(timeout=3)
             except subprocess.TimeoutExpired:
@@ -115,7 +116,7 @@ def wait_state(client, output, enabled):
     pytest.fail(f"No observed {output}={enabled}")
 
 
-@pytest.mark.parametrize("ending", ["q", "sigterm", "ctrlc", "ctrlz", "esc"])
+@pytest.mark.parametrize("ending", ["q", "sigterm", "ctrlc", "ctrlz", "ctrlq"])
 def test_native_controls_logs_paste_resize_and_restoration(
     daemon_process, tui_binary, tmp_path, ending
 ):
@@ -128,8 +129,13 @@ def test_native_controls_logs_paste_resize_and_restoration(
             session.screen.display
         )
         with httpx.Client(base_url=url, trust_env=False) as client:
-            # At 94x24 the two-row AC hit area is columns 2..31, rows 16..17.
-            mouse = b"\x1b[<0;10;17M\x1b[<0;10;17m"
+            row = next(
+                index
+                for index, text in enumerate(session.screen.display)
+                if "AC" in text and "DC" in text
+            )
+            column = session.screen.display[row].index("AC")
+            mouse = f"\x1b[<0;{column + 1};{row + 1}M\x1b[<0;{column + 1};{row + 1}m".encode()
             session.write(mouse[:5])
             time.sleep(0.05)
             session.write(mouse[5:])
@@ -158,10 +164,124 @@ def test_native_controls_logs_paste_resize_and_restoration(
         if ending == "sigterm":
             session.process.terminate()
         else:
-            session.write({"q": b"q", "ctrlc": b"\x03", "ctrlz": b"\x1a", "esc": b"\x1b"}[ending])
+            if ending == "q":
+                session.write(b"q")
+                session.read(b"Quit MyPowers?")
+                assert session.process.poll() is None
+                session.write(b"\x1b")
+                session.read(b"INPUT")
+                assert session.process.poll() is None
+                session.write(b"q")
+                session.read(b"Quit MyPowers?")
+                session.write(b"\r")
+            else:
+                session.write({"ctrlc": b"\x03", "ctrlz": b"\x1a", "ctrlq": b"\x11"}[ending])
         restored = session.read(b"\x1b[?2004l")
         assert b"\x1b[?1006l" in restored
         assert session.process.wait(timeout=3) == 0
+    finally:
+        session.close()
+
+
+def test_day_archive_refresh_lazy_pages_drag_and_live_resume(daemon_process, tui_binary, tmp_path):
+    _, url, env = daemon_process
+    helpers = tmp_path / "helpers"
+    helpers.mkdir()
+    captured = tmp_path / "clipboard.txt"
+    helper = helpers / "wl-copy"
+    helper.write_text("#!/bin/sh\ncat > " + shlex.quote(str(captured)) + "\n")
+    helper.chmod(0o755)
+    env = {**env, "PATH": str(helpers) + os.pathsep + env["PATH"]}
+    today = datetime.now(UTC).replace(hour=0, minute=0, second=0, microsecond=0)
+    yesterday = today - timedelta(days=1)
+    records = [
+        {
+            "schema_version": 1,
+            "timestamp": (date + timedelta(seconds=index)).isoformat(),
+            "server_instance_id": "88767477-2a2a-481f-843b-30d56a5e3f10",
+            "sequence": sequence,
+            "level": "INFO",
+            "message": f"{prefix} {index:03}",
+        }
+        for date, prefix, count, base in [
+            (yesterday, "Yesterday", 10, 0),
+            (today, "Archive", 205, 10),
+        ]
+        for index in range(count)
+        for sequence in [base + index]
+    ]
+    # Only the simulated daemon's temporary retained file is populated.
+    (tmp_path / "logs/mypowers.jsonl.1").write_text(
+        "".join(json.dumps(record) + "\n" for record in records)
+    )
+    session = Session(tui_binary, tmp_path, env, "--server", url, "--utc", "--no-color")
+    try:
+        session.read(b"LIVE")
+        session.write(b"\x1bOR")
+        session.read(b"Archive 000")
+        session.read(b"ARCHIVE")
+        session.write(b"-")
+        session.read(b"page 50")
+        session.read(b"50 loaded")
+        assert "Archive 000" in "\n".join(session.screen.display)
+        row = next(index for index, text in enumerate(session.screen.display) if " LOGS " in text)
+        column = session.screen.display[row].index("LOGS") + 1
+        click = f"\x1b[<0;{column + 1};{row + 1}M\x1b[<0;{column + 1};{row + 1}m".encode()
+        session.write(click)
+        time.sleep(0.15)
+        assert not captured.exists()
+        session.write(click)
+        session.read(b"Logs copied")
+        copied = captured.read_text()
+        assert len(copied.splitlines()) == 50
+        assert "INFO Archive 000" in copied and "INFO Archive 049" in copied
+        assert "Archive 050" not in copied
+        visible = [row for row in session.screen.display if "Archive" in row]
+        with httpx.Client(base_url=url, trust_env=False) as client:
+            client.put("/api/v1/runtime/log-level", json={"level": "DEBUG"}).raise_for_status()
+        session.read(b"new")
+        assert visible == [row for row in session.screen.display if "Archive" in row]
+        thumbs = [
+            (x, y)
+            for y, row in enumerate(session.screen.display)
+            for x, symbol in enumerate(row)
+            if symbol == "█"
+        ]
+        x = max(x for x, _ in thumbs)
+        y = min(y for column, y in thumbs if column == x)
+        bottom = max(
+            row
+            for row in range(session.screen.lines)
+            if session.screen.display[row][x] in {"█", "│"}
+        )
+        session.write(f"\x1b[<0;{x + 1};{y + 1}M".encode())
+        session.write(f"\x1b[<32;{x + 1};{bottom + 1}M".encode())
+        session.write(f"\x1b[<0;{x + 1};{bottom + 1}m".encode())
+        session.read(b"100 loaded")
+        session.write(b"\x1b[6~")
+        session.read(b"Archive 050")
+        session.write(b"r")
+        session.read(b"50 loaded")
+        session.read(b"Archive 000")
+        session.write(b"\x1b[D")
+        session.read(b"Yesterday 009")
+        assert yesterday.date().isoformat() in "\n".join(session.screen.display)
+        session.write(b"\x1b[B")
+        session.read(b"Archive 000")
+        session.write(b"\x1b[A")  # Start of today's range -> previous day.
+        session.read(b"Yesterday 009")
+        session.write(b"\x1b[F")
+        session.read(b"Received station frame")
+        assert today.date().isoformat() in "\n".join(session.screen.display)
+        assert "LIVE | UTC" in "\n".join(session.screen.display)
+        session.write(b"?")
+        session.read(b"HELP")
+        session.write(b"\x1b")
+        session.read(b"INPUT")
+        assert session.process.poll() is None
+        session.write(b"\x1b")
+        session.read(b"INPUT")
+        assert session.process.poll() is None
     finally:
         session.close()
 
@@ -347,7 +467,9 @@ def test_title_double_click_copies_actual_snapshot_without_touching_desktop_clip
     session = Session(tui_binary, tmp_path, env, "--server", url)
     try:
         session.read(b"LIVE")
-        click = b"\x1b[<0;46;2M\x1b[<0;46;2m"
+        row = next(index for index, text in enumerate(session.screen.display) if "MYPOWERS" in text)
+        column = session.screen.display[row].index("MYPOWERS") + 3
+        click = f"\x1b[<0;{column + 1};{row + 1}M\x1b[<0;{column + 1};{row + 1}m".encode()
         session.write(click)
         time.sleep(0.15)
         assert not captured.exists()
