@@ -13,6 +13,19 @@ layout, HTML/CSS mockup, daemon, BLE, HTTP, terminal session, or clipboard acces
 The command reports generated files only after every scene has rendered and all
 files have been written successfully; errors return a nonzero exit status.
 
+To verify the current renderer against the saved images without overwriting them:
+
+```sh
+cargo xtask ui-snapshots --check
+```
+
+The check fails if any scene differs or its saved SVG is missing, lists all affected
+files, and never creates or modifies artifacts. For internal changes, generate and
+save the images before editing, run the check afterwards, then regenerate and
+compare the before/after images. Commit each batch only after tests and visual
+comparison pass. A matching SVG is an exact comparison of exported symbols,
+positions, colors, and modifiers, not merely a matching text layout.
+
 Fixtures use UTC `2026-10-05T12:00:00Z`, battery 71%, fixed history arrays,
 fixed telemetry age, fixed feedback age, and a fixed idle animation frame.
 Normal scenes use 120x30 terminal cells with the production dashboard's 94x29

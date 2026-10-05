@@ -8,6 +8,12 @@ note is `artifacts/ui/README.md`. Do not create a second HTML/CSS layout for pre
 For direct image inspection, optionally convert an SVG to a temporary PNG with
 `rsvg-convert` if installed; never launch Chrome for conversion.
 
+For every internal TUI change, generate and save the before images, make the
+change, run `cargo xtask ui-snapshots --check`, then regenerate and compare the
+after images. The check compares all scenes without overwriting their saved SVGs.
+Preserve the appearance; commit each completed batch only after its tests and
+before/after comparison pass.
+
 # Fallback terminal screenshots
 
 Use the `terminal-screenshot` skill only when `cargo xtask ui-snapshots` is not
