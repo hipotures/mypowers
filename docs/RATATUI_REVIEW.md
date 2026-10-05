@@ -162,6 +162,51 @@ Reviewed the [layout concepts](https://ratatui.rs/concepts/layout/),
 layout uses bounded areas, integrated Block titles, Paragraph text, and the
 stateful Scrollbar as intended. No layout or cosmetic replacement is warranted.
 
+### 6. Enable Ratatui's bounded layout cache
+
+The [0.30.2 feature guide](https://ratatui.rs/installation/feature-flags/)
+identified a performance issue in the dependency configuration: disabling all
+defaults also disabled `layout-cache`. The local feature tree confirmed it was
+absent, and the installed `Layout::split_with_spacers` implementation consequently
+ran the layout solver on every call. Explicitly enabled this Ratatui feature;
+the existing layout/rendering code stays unchanged. The default thread-local LRU
+is bounded to 500 entries and keys on both the area and Layout, including its
+constraints, so resizing selects the correct results. No application cache,
+invalidation layer, or cache-size setting was added.
+
+The same release benchmark, fixtures, dimensions, and five rounds of 5,000 frames
+produced these medians (microseconds per frame):
+
+| Scene | Before cache | With cache | Ratio |
+| --- | ---: | ---: | ---: |
+| Live dashboard | 887.95 | 124.99 | 7.10x |
+| Idle dashboard | 874.05 | 119.46 | 7.32x |
+| Logs modal | 1208.53 | 265.93 | 4.54x |
+
+This is a substantial reduction in TestBackend frame cost, not a claim about
+total application CPU or real terminal throughput. The draw cadence remains
+4 FPS. Both lockfiles gained only Ratatui's `critical-section` dependency;
+resolution/builds used the existing offline crate cache.
+
+Validation: all 32 Rust tests and 9 xtask tests passed. Four native PTY cases
+passed controls, resize, modal transitions, paste, and terminal restoration
+against simulated daemons. Formatting, Clippy with warnings denied, and diff
+checks passed. All 15 SVGs pass `--check`; regenerated SVG hashes and live
+dashboard PNG bytes match the before set exactly. Inspected the after PNG.
+Built the locked release binary offline and installed it in `.venv/bin`; the
+installed file matches the release SHA-256 and its `--help` command succeeds.
+Existing running processes were not stopped or restarted.
+
+Also reviewed [widget traits](https://ratatui.rs/concepts/widgets/),
+[custom widgets](https://ratatui.rs/recipes/widgets/custom/),
+[popup clearing](https://ratatui.rs/recipes/render/overwrite-regions/),
+[debugging widget state](https://ratatui.rs/recipes/testing/debug-widget-state/),
+and [0.30.2 release fixes](https://ratatui.rs/highlights/v0302/).
+The battery correctly uses Buffer cells, modals clear their regions before
+drawing, and diagnostics have a separate view. Cargo resolves one Crossterm
+version (0.29.0) shared by direct input handling and Ratatui's backend. No widget
+replacement, terminal backend change, or dependency upgrade is justified.
+
 ## Remaining review
 
 - Finish Counter error-handling and JSON Editor tutorial details; review applicable examples.

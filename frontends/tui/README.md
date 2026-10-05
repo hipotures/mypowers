@@ -203,6 +203,8 @@ It measures the production renderer through TestBackend at 120x30, using live,
 idle, and Logs scenes. The output reports per-frame median/min/max across five
 rounds. Measurements include Ratatui buffer diffing, exclude real terminal I/O,
 and vary with system load; compare before/after runs on the same machine.
+Ratatui's `layout-cache` feature is explicitly enabled alongside Crossterm; its
+bounded built-in cache avoids solving unchanged layouts again on every frame.
 
 ```sh
 cargo fmt --check --manifest-path frontends/tui/Cargo.toml
