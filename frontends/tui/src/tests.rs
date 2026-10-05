@@ -1440,7 +1440,7 @@ fn history_backfill_ignores_old_daemons_and_preserves_segment_gaps_and_expiry() 
     assert_eq!(app.samples.len(), 3);
     let data = app.graph_data(40, false);
     assert_eq!(data[0], 0, "Historical segments must retain a gap");
-    assert_eq!(data[20], 35);
+    assert_eq!(data[19], 35);
     assert_eq!(data[39], 63);
     assert!(app.samples.iter().all(|point| point.segment_id != "future"));
 }
@@ -1470,6 +1470,91 @@ fn trends_use_timestamps_have_gap_columns_and_bounded_real_samples() {
     let mut invalid = status();
     invalid.telemetry.sample.as_mut().unwrap().battery_percent = 101;
     assert!(!invalid.valid());
+}
+
+#[test]
+fn completed_graph_bars_keep_their_values_and_colors_until_the_window_steps() {
+    use crate::{app::Trend, clock::Clock};
+
+    let now = "2026-10-05T12:00:00Z"
+        .parse::<chrono::DateTime<chrono::Utc>>()
+        .unwrap();
+    let clock = |elapsed| Clock::Fixed {
+        now,
+        telemetry_elapsed: elapsed,
+        animation_elapsed: Duration::ZERO,
+        feedback_elapsed: Duration::ZERO,
+    };
+    let mut app = App::with_clock(false, Some(chrono_tz::UTC), clock(Duration::ZERO));
+    let mut current = status();
+    current.server_time = now.to_rfc3339();
+    current.telemetry.sample.as_mut().unwrap().received_at = now.to_rfc3339();
+    app.update(Event::Status(Box::new(current)));
+    app.selected = None;
+    app.feedback = None;
+    app.samples = (-119..=0)
+        .enumerate()
+        .map(|(index, offset)| {
+            let low = index / 4 % 2 == 0;
+            Trend {
+                timestamp: (now + chrono::Duration::seconds(offset)).timestamp() as f64,
+                sequence: Some(index as u64 + 1),
+                segment_id: "segment".into(),
+                // Both pairs have equal quantized heights but different load colors.
+                input_power_w: if low { 44 } else { 47 },
+                output_power_w: if low { 134 } else { 141 },
+            }
+        })
+        .collect();
+
+    for width in [27, 40, 44] {
+        let step = 120.0 / f64::from(width);
+        for output in [false, true] {
+            app.clock = clock(Duration::from_secs_f64(step * 0.1));
+            let first = app.graph_data(width, output);
+            assert!(first.contains(&if output { 134 } else { 44 }));
+            assert!(first.contains(&if output { 141 } else { 47 }));
+            app.clock = clock(Duration::from_secs_f64(step * 0.8));
+            assert_eq!(
+                app.graph_data(width, output),
+                first,
+                "Redrawing within a time bucket must not replace historical readings"
+            );
+            app.clock = clock(Duration::from_secs_f64(step * 1.1));
+            let shifted = app.graph_data(width, output);
+            assert_eq!(
+                shifted[1..width as usize - 1],
+                first[2..],
+                "Completed bars must shift left together by exactly one column"
+            );
+        }
+    }
+
+    app.clock = clock(Duration::from_millis(250));
+    let first = render(&mut app, 94, 29);
+    app.clock = clock(Duration::from_millis(1000));
+    assert_eq!(
+        render(&mut app, 94, 29),
+        first,
+        "The production renderer must retain bar colors between column steps"
+    );
+
+    // New live telemetry changes the open rightmost bucket, not completed history.
+    let before = [app.graph_data(44, false), app.graph_data(44, true)];
+    app.clock = clock(Duration::ZERO);
+    let mut current = status();
+    current.server_time = (now + chrono::Duration::milliseconds(1500)).to_rfc3339();
+    let sample = current.telemetry.sample.as_mut().unwrap();
+    sample.received_at = current.server_time.clone();
+    sample.sequence = 121;
+    sample.input_power_w = 48;
+    sample.output_power_w = 142;
+    app.update(Event::Status(Box::new(current)));
+    for (index, output) in [false, true].into_iter().enumerate() {
+        let updated = app.graph_data(44, output);
+        assert_eq!(updated[..43], before[index][..43]);
+        assert_eq!(updated[43], if output { 142 } else { 48 });
+    }
 }
 
 #[test]
@@ -1911,7 +1996,7 @@ fn idle_graphs_wait_for_history_and_resume_independently_on_new_power() {
 
 #[test]
 fn idle_graph_waits_even_when_zero_overwrites_positive_history_in_the_same_column() {
-    let now = chrono::DateTime::parse_from_rfc3339("2026-10-05T12:00:00Z")
+    let now = chrono::DateTime::parse_from_rfc3339("2026-10-05T12:00:00.500Z")
         .unwrap()
         .with_timezone(&chrono::Utc);
     let mut app = App::with_clock(

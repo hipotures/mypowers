@@ -690,13 +690,20 @@ impl App {
             return data;
         }
         let now = self.timeline_now();
+        // Fixed time buckets retain their readings while the window moves by whole columns.
+        // Integer milliseconds also keep fractional-width bucket boundaries reproducible.
+        let bucket = |timestamp: f64| {
+            ((timestamp * 1000.0).round() as i128 * i128::from(width))
+                .div_euclid(i128::from(crate::history::WINDOW_SECONDS) * 1000)
+        };
+        let current_bucket = bucket(now);
         let mut previous: Option<(&str, usize)> = None;
         for trend in &self.samples {
-            let offset = trend.timestamp - (now - 120.0);
-            if !(0.0..=120.0).contains(&offset) {
+            if !(now - crate::history::WINDOW_SECONDS as f64..=now).contains(&trend.timestamp) {
                 continue;
             }
-            let column = ((offset / 120.0 * f64::from(width)) as usize).min(width as usize - 1);
+            let column = (bucket(trend.timestamp) - current_bucket + i128::from(width) - 1)
+                .clamp(0, i128::from(width) - 1) as usize;
             if let Some((segment, old_column)) = previous
                 && segment != trend.segment_id
             {
