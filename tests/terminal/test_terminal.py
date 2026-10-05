@@ -9,6 +9,7 @@ import select
 import shlex
 import signal
 import socket
+import sqlite3
 import struct
 import subprocess
 import termios
@@ -115,6 +116,96 @@ def wait_state(client, output, enabled):
             return status
         time.sleep(0.1)
     pytest.fail(f"No observed {output}={enabled}")
+
+
+def empty_graph_history(connection, request):
+    """Minimal history contract for fixtures that exercise only stream traffic."""
+    if request.path.startswith("/api/v1/history?"):
+        return connection.respond(
+            200,
+            json.dumps(
+                {
+                    "schema_version": 1,
+                    "source": "database",
+                    "gap": False,
+                    "items": [],
+                    "next_cursor": None,
+                }
+            ),
+        )
+    return None
+
+
+def test_startup_backfills_the_live_graph_window_from_server_history(
+    daemon_process, tui_binary, tmp_path
+):
+    _, url, env = daemon_process
+    with httpx.Client(base_url=url, trust_env=False) as client:
+        snapshot = client.get("/api/v1/status").json()
+        sample = snapshot["telemetry"]["sample"]
+        now_ms = int(datetime.fromisoformat(snapshot["server_time"]).timestamp() * 1000)
+        # Seed only the fresh simulated fixture database, never a user database.
+        with sqlite3.connect(tmp_path / "data" / "mypowers.db") as database:
+            device_id = database.execute("SELECT id FROM devices LIMIT 1").fetchone()[0]
+            database.executemany(
+                "INSERT INTO telemetry(device_id,received_at_ms,segment_id,battery_percent,"
+                "input_power_w,output_power_w,remaining_minutes,ac_enabled,dc_enabled,"
+                "light_enabled,status_flags) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+                [
+                    (
+                        device_id,
+                        now_ms - offset * 1000,
+                        sample["segment_id"],
+                        71,
+                        35,
+                        3,
+                        2880,
+                        int(sample["ac_enabled"]),
+                        int(sample["dc_enabled"]),
+                        int(sample["light_enabled"]),
+                        sample["status_flags"],
+                    )
+                    for offset in range(119, 4, -2)
+                ],
+            )
+        page = client.get(
+            "/api/v1/history",
+            params={
+                "since": datetime.fromtimestamp((now_ms - 120_000) / 1000, UTC).isoformat(),
+                "until": snapshot["server_time"],
+                "limit": 1000,
+            },
+        ).json()
+        assert len(page["items"]) >= 58
+    session = Session(tui_binary, tmp_path, env, "--server", url)
+    try:
+        session.read(b"CONNECTED")
+        deadline = time.monotonic() + 5
+        while time.monotonic() < deadline:
+            if select.select([session.master], [], [], 0.1)[0]:
+                session.stream.feed(session.decoder.decode(os.read(session.master, 65536)))
+            rows = session.screen.display
+            label_row = next(i for i, row in enumerate(rows) if "INPUT" in row and "OUTPUT" in row)
+            graph = rows[label_row + 2 : label_row + 4]
+            counts = [
+                sum(char in "▁▂▃▄▅▆▇█" for row in graph for char in row[start:end])
+                for start, end in [(2, 45), (48, 92)]
+            ]
+            if min(counts) >= 30:
+                break
+        else:
+            pytest.fail(
+                f"Historical graphs did not fill their 120-second window: {counts}\n"
+                + "\n".join(rows)
+            )
+        # Historical 35 W / 3 W cannot overwrite the simulated live numeric readings.
+        assert "INPUT 35 W" not in rows[label_row]
+        assert "OUTPUT 3 W" not in rows[label_row]
+        session.write(b"\x11")
+        session.process.wait(timeout=3)
+        assert session.process.returncode == 0
+    finally:
+        session.close()
 
 
 @pytest.mark.parametrize("ending", ["q", "sigterm", "sigint", "ctrlq"])
@@ -328,7 +419,14 @@ def test_stream_bursts_do_not_starve_modal_resize_or_quit(
         except ConnectionClosed:
             pass
 
-    with serve(stream, "127.0.0.1", 0, compression=None, close_timeout=1) as server:
+    with serve(
+        stream,
+        "127.0.0.1",
+        0,
+        process_request=empty_graph_history,
+        compression=None,
+        close_timeout=1,
+    ) as server:
         worker = threading.Thread(target=server.serve_forever)
         worker.start()
         session = None
@@ -416,7 +514,14 @@ def test_wide_station_names_clear_in_the_actual_terminal_stream(
         except ConnectionClosed:
             pass
 
-    with serve(stream, "127.0.0.1", 0, compression=None, close_timeout=1) as server:
+    with serve(
+        stream,
+        "127.0.0.1",
+        0,
+        process_request=empty_graph_history,
+        compression=None,
+        close_timeout=1,
+    ) as server:
         worker = threading.Thread(target=server.serve_forever)
         worker.start()
         session = None
@@ -721,6 +826,9 @@ def test_failed_live_archive_refresh_is_throttled_and_end_still_retries_immediat
         }
 
     def http(connection, request):
+        history = empty_graph_history(connection, request)
+        if history is not None:
+            return history
         if request.path.startswith("/api/v1/logs?"):
             queries.append(time.monotonic())
             if len(queries) > 2:

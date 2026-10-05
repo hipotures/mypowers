@@ -105,11 +105,23 @@ Several clients can read the same daemon. Other clients' output changes and
 command events appear live; the daemon admits only one output operation at once.
 No client opens BLE or SQLite or launches/stops the daemon.
 
-Trends retain at most 120 seconds and 512 actual notifications. Time buckets
+On startup and after reconnecting to the daemon, trends asynchronously backfill
+their 120-second window through `GET /api/v1/history`, then merge the persisted
+records with incoming live notifications. Paginated requests preserve their time
+window and have a total timeout; obsolete responses cannot replace a newer
+connection's history. Failed requests retry after two seconds without stopping
+live telemetry or controls. Disabled/degraded server history is not queried.
+Persisted samples follow the server's history interval (10 seconds by default),
+so backfilled history can be sparser than the subsequent live stream.
+
+Trends retain at most 120 seconds and 10,000 actual observations. Time buckets
 represent the last sample in each display column, with empty columns across
 missing intervals/segments. No synthetic history is generated. Scales remain
 0–100 W input and 0–300 W output; larger readings are displayed numerically while
-the graph saturates. Logs show history gaps. Clipboard support is optional and
+the graph saturates. Positive values always occupy at least one eighth-cell tick;
+zero remains empty. Oversized or malformed history is rejected as a complete
+request rather than silently accepting a partial window. Logs show history gaps.
+Clipboard support is optional and
 requires `wl-copy` and an accessible Wayland session.
 Log copies are plain text with timestamps in the selected timezone, levels, and
 complete messages, without terminal width clipping. Pages not yet loaded are not

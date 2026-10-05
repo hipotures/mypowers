@@ -86,7 +86,7 @@ fn fixture(view: View, idle: bool) -> App {
     app.samples = (0..40)
         .map(|index| Trend {
             timestamp: now.timestamp() as f64 - f64::from(39 - index) * 3.0,
-            sample: sample.clone(),
+            ..Trend::from_sample(&sample)
         })
         .collect();
     app.view = view;

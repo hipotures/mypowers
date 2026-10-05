@@ -2,6 +2,7 @@ pub mod app;
 pub mod clock;
 pub mod config;
 pub mod feedback;
+pub mod history;
 pub mod logs;
 pub mod model;
 pub mod network;

@@ -22,7 +22,25 @@ pub enum View {
 
 pub struct Trend {
     pub timestamp: f64,
-    pub sample: crate::model::Sample,
+    pub sequence: Option<u64>,
+    pub segment_id: String,
+    pub input_power_w: u64,
+    pub output_power_w: u64,
+}
+
+impl Trend {
+    pub fn from_sample(sample: &crate::model::Sample) -> Self {
+        Self {
+            timestamp: chrono::DateTime::parse_from_rfc3339(&sample.received_at)
+                .unwrap()
+                .timestamp_millis() as f64
+                / 1000.0,
+            sequence: Some(sample.sequence),
+            segment_id: sample.segment_id.clone(),
+            input_power_w: sample.input_power_w,
+            output_power_w: sample.output_power_w,
+        }
+    }
 }
 
 pub struct App {
@@ -54,6 +72,9 @@ pub struct App {
     pub quit_buttons: [Rect; 2],
     started_at: chrono::DateTime<chrono::Utc>,
     last_command: Option<(String, String)>,
+    history_generation: u64,
+    history_requested: bool,
+    history_retry_after: Option<Instant>,
 }
 
 pub enum Effect {
@@ -100,6 +121,9 @@ impl App {
             quit_buttons: [Rect::default(); 2],
             started_at: clock.now(),
             last_command: None,
+            history_generation: 0,
+            history_requested: false,
+            history_retry_after: None,
         }
     }
 
@@ -113,6 +137,7 @@ impl App {
                     .is_some_and(|old| old.server_instance_id != status.server_instance_id);
                 if changed {
                     self.samples.clear();
+                    self.reset_history();
                     self.press = None;
                     self.last_command = None;
                 }
@@ -127,8 +152,7 @@ impl App {
                     && let Some(sample) = &status.telemetry.sample
                 {
                     let duplicate = self.samples.back().is_some_and(|old| {
-                        old.sample.sequence == sample.sequence
-                            && old.sample.segment_id == sample.segment_id
+                        old.sequence == Some(sample.sequence) && old.segment_id == sample.segment_id
                     });
                     if !duplicate {
                         let timestamp = chrono::DateTime::parse_from_rfc3339(&sample.received_at)
@@ -141,12 +165,10 @@ impl App {
                             .is_some_and(|old| timestamp < old.timestamp)
                         {
                             self.samples.clear();
+                            self.reset_history();
                         }
-                        self.samples.push_back(Trend {
-                            timestamp,
-                            sample: sample.clone(),
-                        });
-                        while self.samples.len() > 512
+                        self.samples.push_back(Trend::from_sample(sample));
+                        while self.samples.len() > crate::history::MAX_POINTS
                             || self
                                 .samples
                                 .front()
@@ -177,6 +199,7 @@ impl App {
                     ));
                 }
                 self.connected = false;
+                self.reset_history();
                 self.press = None;
                 self.connection_notice = reason;
             }
@@ -214,6 +237,7 @@ impl App {
                     self.feedback = Some(feedback);
                 }
             }
+            Event::History(request, result) => self.accept_history(&request, result),
             Event::LogPage(request, page) => {
                 let current = request.generation == self.logs.generation();
                 let failed = page.is_err();
@@ -258,6 +282,96 @@ impl App {
         }
         self.last_command = Some(identity);
         self.feedback = Some(Feedback::command(command));
+    }
+
+    fn reset_history(&mut self) {
+        self.history_generation += 1;
+        self.history_requested = false;
+        self.history_retry_after = None;
+    }
+
+    pub fn history_request(&mut self) -> Option<crate::history::Request> {
+        if !self.connected
+            || self.history_requested
+            || self
+                .history_retry_after
+                .is_some_and(|deadline| Instant::now() < deadline)
+        {
+            return None;
+        }
+        let status = self.status.as_ref()?;
+        if status.history["state"] != "ok" {
+            return None;
+        }
+        let request = crate::history::Request::new(status, self.history_generation)?;
+        self.history_requested = true;
+        Some(request)
+    }
+
+    fn accept_history(
+        &mut self,
+        request: &crate::history::Request,
+        result: Result<Vec<crate::history::Point>, String>,
+    ) {
+        if request.generation != self.history_generation
+            || !self.connected
+            || self
+                .status
+                .as_ref()
+                .is_none_or(|status| status.server_instance_id != request.server_instance_id)
+        {
+            return;
+        }
+        let points = match result {
+            Ok(points) => points,
+            Err(_) => {
+                if self.history_retry_after.is_none()
+                    && self
+                        .feedback
+                        .as_ref()
+                        .is_none_or(|feedback| feedback.started <= request.started)
+                {
+                    self.feedback = Some(Feedback::new(
+                        "Recent graph history unavailable; live samples continue",
+                        Severity::Warning,
+                    ));
+                }
+                self.history_requested = false;
+                self.history_retry_after = Some(Instant::now() + Duration::from_secs(2));
+                return;
+            }
+        };
+        self.history_retry_after = None;
+        let now = self.timeline_now();
+        let mut trends: Vec<_> = points
+            .into_iter()
+            .map(|point| Trend {
+                timestamp: point.received_at_ms as f64 / 1000.0,
+                sequence: None,
+                segment_id: point.segment_id,
+                input_power_w: point.input_power_w,
+                output_power_w: point.output_power_w,
+            })
+            .collect();
+        // Stable ordering places current live observations after matching persisted rows.
+        trends.extend(self.samples.drain(..));
+        trends.sort_by(|left, right| left.timestamp.total_cmp(&right.timestamp));
+        for trend in trends {
+            if !(now - 120.0..=now).contains(&trend.timestamp) {
+                continue;
+            }
+            if let Some(last) = self.samples.back_mut()
+                && last.timestamp == trend.timestamp
+                && last.segment_id == trend.segment_id
+            {
+                *last = trend;
+            } else {
+                self.samples.push_back(trend);
+            }
+        }
+        while self.samples.len() > crate::history::MAX_POINTS {
+            self.samples.pop_front();
+        }
     }
 
     pub fn age(&self) -> Option<f64> {
@@ -583,16 +697,16 @@ impl App {
             }
             let column = ((offset / 120.0 * f64::from(width)) as usize).min(width as usize - 1);
             if let Some((segment, old_column)) = previous
-                && segment != trend.sample.segment_id
+                && segment != trend.segment_id
             {
                 data[old_column] = 0;
             }
             data[column] = if output {
-                trend.sample.output_power_w
+                trend.output_power_w
             } else {
-                trend.sample.input_power_w
+                trend.input_power_w
             };
-            previous = Some((&trend.sample.segment_id, column));
+            previous = Some((&trend.segment_id, column));
         }
         data
     }
@@ -602,9 +716,9 @@ impl App {
         self.samples.iter().any(|trend| {
             (now - 120.0..=now).contains(&trend.timestamp)
                 && if output {
-                    trend.sample.output_power_w > 0
+                    trend.output_power_w > 0
                 } else {
-                    trend.sample.input_power_w > 0
+                    trend.input_power_w > 0
                 }
         })
     }

@@ -239,13 +239,10 @@ fn app(scene: Scene) -> Result<App, String> {
                 sample.input_power_w = input[index as usize % input.len()];
                 sample.output_power_w = output[index as usize % output.len()];
             }
-            app.samples.push_back(Trend {
-                timestamp: timestamp.timestamp_millis() as f64 / 1000.0,
-                sample,
-            });
+            app.samples.push_back(Trend::from_sample(&sample));
         }
         // The latest graph column agrees with the current numeric readings.
-        app.samples.back_mut().unwrap().sample = sample.clone();
+        *app.samples.back_mut().unwrap() = Trend::from_sample(sample);
     }
     app.status = Some(status);
     Ok(app)

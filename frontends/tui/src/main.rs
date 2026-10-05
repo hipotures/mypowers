@@ -48,12 +48,17 @@ fn run() -> Result<(), String> {
     let (events, mut incoming) = mpsc::channel(256);
     let (requests, operations) = mpsc::channel(8);
     let (log_requests, log_operations) = tokio::sync::watch::channel(None);
+    let (history_requests, history_operations) = tokio::sync::watch::channel(None);
     let mut app = App::new(config.no_color, config.timezone);
     let session =
         terminal::Session::enter(!config.no_mouse).map_err(|_| "Cannot initialize terminal.")?;
     runtime.spawn(api.clone().stream(false, events.clone()));
     runtime.spawn(api.clone().stream(true, events.clone()));
     runtime.spawn(api.clone().log_pages(log_operations, events.clone()));
+    runtime.spawn(
+        api.clone()
+            .history_pages(history_operations, events.clone()),
+    );
     runtime.spawn(api.operations(operations, events.clone()));
     let signal_events = events.clone();
     runtime.spawn(async move {
@@ -67,9 +72,17 @@ fn run() -> Result<(), String> {
             for _ in 0..256 {
                 match incoming.try_recv() {
                     Ok(Event::Exit) => break 'ui,
-                    Ok(event) => app.update(event),
+                    Ok(event) => {
+                        if matches!(event, Event::Disconnected(_)) {
+                            let _ = history_requests.send(None);
+                        }
+                        app.update(event);
+                    }
                     Err(_) => break,
                 }
+            }
+            if let Some(request) = app.history_request() {
+                let _ = history_requests.send(Some(request));
             }
             if let Some(request) = app.logs.maintenance() {
                 let _ = log_requests.send(Some(request));

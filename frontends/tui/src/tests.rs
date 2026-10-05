@@ -11,12 +11,13 @@ use serde_json::json;
 use std::time::{Duration, Instant};
 
 pub(crate) fn status() -> Status {
+    let stamp = chrono::Utc::now().to_rfc3339();
     serde_json::from_value(json!({
-        "schema_version":1,"server_time":chrono::Utc::now().to_rfc3339(),"server_instance_id":"88767477-2a2a-481f-843b-30d56a5e3f10","state_version":1,
+        "schema_version":1,"server_time":stamp,"server_instance_id":"88767477-2a2a-481f-843b-30d56a5e3f10","state_version":1,
         "device":{"name":"AP S300 V2.0"},
         "connection":{"phase":"connected","desired":"running","link_connected":true,"session_id":"session","message":"Connected","adapter_id":"hci0"},
         "telemetry":{"state":"live","age_seconds":0.0,"sample":{
-            "sequence":1,"received_at":chrono::Utc::now().to_rfc3339(),"segment_id":"segment",
+            "sequence":1,"received_at":stamp,"segment_id":"segment",
             "battery_percent":78,"input_power_w":63,"output_power_w":181,"remaining_minutes":2937,
             "ac_enabled":false,"dc_enabled":false,"light_enabled":false}},
         "controls":{"allowed":true,"outputs_revision":2,"pending_command_id":null,"reason_code":null},
@@ -1317,6 +1318,134 @@ fn click_activates_once_on_release_and_resize_or_revision_discards_old_press() {
 }
 
 #[test]
+fn history_backfill_merges_live_samples_without_changing_current_telemetry() {
+    use crate::{clock::Clock, history::Point};
+    let now = "2026-10-05T12:00:00Z"
+        .parse::<chrono::DateTime<chrono::Utc>>()
+        .unwrap();
+    let mut app = App::with_clock(
+        false,
+        Some(chrono_tz::UTC),
+        Clock::Fixed {
+            now,
+            telemetry_elapsed: Duration::ZERO,
+            animation_elapsed: Duration::ZERO,
+            feedback_elapsed: Duration::ZERO,
+        },
+    );
+    let reading = |sequence, offset| {
+        let mut value = status();
+        value.server_time = (now + chrono::Duration::seconds(offset)).to_rfc3339();
+        let sample = value.telemetry.sample.as_mut().unwrap();
+        sample.received_at = value.server_time.clone();
+        sample.sequence = sequence;
+        value
+    };
+    app.update(Event::Status(Box::new(reading(1, 0))));
+    let request = app.history_request().unwrap();
+    assert_eq!((request.until - request.since).num_seconds(), 120);
+    assert!(
+        app.history_request().is_none(),
+        "Do not fetch history on every state update"
+    );
+    // Live data arrives while HTTP pagination is in progress.
+    app.update(Event::Status(Box::new(reading(2, 1))));
+    let before = serde_json::to_value(app.status.as_ref().unwrap()).unwrap();
+    let points = (-119..=0)
+        .enumerate()
+        .map(|(index, offset)| Point {
+            id: index as u64 + 1,
+            received_at_ms: (now + chrono::Duration::seconds(offset)).timestamp_millis(),
+            segment_id: "segment".into(),
+            input_power_w: 35,
+            output_power_w: 3,
+        })
+        .collect();
+    app.update(Event::History(request.clone(), Ok(points)));
+    assert_eq!(app.samples.len(), 121);
+    assert_eq!(app.samples.back().unwrap().sequence, Some(2));
+    assert_eq!(
+        app.samples[119].sequence,
+        Some(1),
+        "Live data must win duplicate timestamps"
+    );
+    assert!(app.graph_data(40, true).iter().all(|&value| value > 0));
+    assert_eq!(
+        serde_json::to_value(app.status.as_ref().unwrap()).unwrap(),
+        before
+    );
+    assert!(app.allowed());
+    assert!(app.history_request().is_none());
+    // A disconnected/reconnected stream needs its missed measurements, even without a restart.
+    app.update(Event::Disconnected("Temporary disconnect".into()));
+    app.update(Event::Status(Box::new(reading(3, 2))));
+    let recovered = app.history_request().unwrap();
+    assert!(recovered.generation > request.generation);
+    let length = app.samples.len();
+    app.update(Event::History(request, Ok(vec![])));
+    assert_eq!(app.samples.len(), length);
+    app.update(Event::History(recovered, Err("HTTP unavailable".into())));
+    assert!(
+        app.history_request().is_none(),
+        "Failed history loads must wait before retrying"
+    );
+    assert!(
+        app.allowed(),
+        "History failures cannot disable fresh control telemetry"
+    );
+}
+
+#[test]
+fn history_backfill_ignores_old_daemons_and_preserves_segment_gaps_and_expiry() {
+    use crate::{clock::Clock, history::Point};
+    let now = "2026-10-05T12:00:00Z"
+        .parse::<chrono::DateTime<chrono::Utc>>()
+        .unwrap();
+    let mut app = App::with_clock(
+        false,
+        Some(chrono_tz::UTC),
+        Clock::Fixed {
+            now,
+            telemetry_elapsed: Duration::ZERO,
+            animation_elapsed: Duration::ZERO,
+            feedback_elapsed: Duration::ZERO,
+        },
+    );
+    let mut current = status();
+    current.server_time = now.to_rfc3339();
+    current.telemetry.sample.as_mut().unwrap().received_at = now.to_rfc3339();
+    app.update(Event::Status(Box::new(current.clone())));
+    let old = app.history_request().unwrap();
+    current.server_instance_id = "4621ca79-497e-411c-a959-080c7527c01a".into();
+    app.update(Event::Status(Box::new(current)));
+    let request = app.history_request().unwrap();
+    let point = |offset, segment: &str| Point {
+        id: 1,
+        received_at_ms: (now + chrono::Duration::seconds(offset)).timestamp_millis(),
+        segment_id: segment.into(),
+        input_power_w: 35,
+        output_power_w: 3,
+    };
+    app.update(Event::History(old, Ok(vec![point(-30, "old")])));
+    assert_eq!(app.samples.len(), 1);
+    app.update(Event::History(
+        request,
+        Ok(vec![
+            point(-121, "expired"),
+            point(-120, "old"),
+            point(-60, "segment"),
+            point(1, "future"),
+        ]),
+    ));
+    assert_eq!(app.samples.len(), 3);
+    let data = app.graph_data(40, false);
+    assert_eq!(data[0], 0, "Historical segments must retain a gap");
+    assert_eq!(data[20], 35);
+    assert_eq!(data[39], 63);
+    assert!(app.samples.iter().all(|point| point.segment_id != "future"));
+}
+
+#[test]
 fn trends_use_timestamps_have_gap_columns_and_bounded_real_samples() {
     let mut app = app();
     app.samples.clear();
@@ -1331,12 +1460,12 @@ fn trends_use_timestamps_have_gap_columns_and_bounded_real_samples() {
     let data = app.graph_data(40, false);
     assert_eq!(data.iter().filter(|&&v| v != 0).count(), 4);
     assert!(data[10..25].iter().all(|&v| v == 0));
-    for sequence in 5..700 {
+    for sequence in 5..crate::history::MAX_POINTS as u64 + 5 {
         let mut current = status();
         current.telemetry.sample.as_mut().unwrap().sequence = sequence;
         app.update(Event::Status(Box::new(current)));
     }
-    assert_eq!(app.samples.len(), 512);
+    assert_eq!(app.samples.len(), crate::history::MAX_POINTS);
     assert!(status().valid());
     let mut invalid = status();
     invalid.telemetry.sample.as_mut().unwrap().battery_percent = 101;
@@ -1428,7 +1557,7 @@ fn trend_identity_and_clock_changes_do_not_join_unrelated_history() {
     // A backwards clock jump starts a new ordered timeline.
     app.update(Event::Status(Box::new(reading(3, -5, instance, "first"))));
     assert_eq!(app.samples.len(), 1);
-    assert_eq!(app.samples.front().unwrap().sample.sequence, 3);
+    assert_eq!(app.samples.front().unwrap().sequence, Some(3));
 
     // A daemon restart may reuse the previous sequence and segment identifiers.
     let restarted = "4621ca79-497e-411c-a959-080c7527c01a";
@@ -1746,9 +1875,24 @@ fn idle_graphs_wait_for_history_and_resume_independently_on_new_power() {
 
 #[test]
 fn idle_graph_waits_even_when_zero_overwrites_positive_history_in_the_same_column() {
-    let mut app = app();
-    app.samples.front_mut().unwrap().timestamp -= 0.1;
+    let now = chrono::DateTime::parse_from_rfc3339("2026-10-05T12:00:00Z")
+        .unwrap()
+        .with_timezone(&chrono::Utc);
+    let mut app = App::with_clock(
+        false,
+        None,
+        crate::clock::Clock::Fixed {
+            now,
+            telemetry_elapsed: Duration::ZERO,
+            animation_elapsed: Duration::ZERO,
+            feedback_elapsed: Duration::ZERO,
+        },
+    );
     let mut current = status();
+    current.server_time = now.to_rfc3339();
+    current.telemetry.sample.as_mut().unwrap().received_at = now.to_rfc3339();
+    app.update(Event::Status(Box::new(current.clone())));
+    app.samples.front_mut().unwrap().timestamp -= 0.1;
     let sample = current.telemetry.sample.as_mut().unwrap();
     sample.sequence = 2;
     sample.input_power_w = 0;

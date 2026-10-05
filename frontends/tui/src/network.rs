@@ -30,6 +30,10 @@ pub enum Event {
     Command(Command),
     Log(Value),
     LogPage(crate::logs::Request, Result<crate::logs::Page, String>),
+    History(
+        crate::history::Request,
+        Result<Vec<crate::history::Point>, String>,
+    ),
     Notice(String),
     Finished(Feedback),
     Copied(bool, ClipboardTarget),
@@ -311,6 +315,92 @@ impl Api {
             let feedback = self.perform(intent, &events).await;
             if events.send(Event::Finished(feedback)).await.is_err() {
                 return;
+            }
+        }
+    }
+
+    async fn history(
+        &self,
+        request: &crate::history::Request,
+    ) -> Result<Vec<crate::history::Point>, String> {
+        let mut points = Vec::new();
+        let mut cursor: Option<String> = None;
+        let mut cursors = std::collections::HashSet::new();
+        let mut previous = None;
+        loop {
+            let mut url = self
+                .origin
+                .join("/history")
+                .map_err(|_| "Invalid history URL.")?;
+            url.query_pairs_mut()
+                .append_pair("since", &request.since.to_rfc3339())
+                .append_pair("until", &request.until.to_rfc3339())
+                .append_pair("limit", &crate::history::PAGE_SIZE.to_string());
+            if let Some(cursor) = &cursor {
+                url.query_pairs_mut().append_pair("cursor", cursor);
+            }
+            let value = self
+                .request(
+                    reqwest::Method::GET,
+                    &format!("/history?{}", url.query().unwrap()),
+                    None,
+                    None,
+                )
+                .await?;
+            let page: crate::history::Page =
+                serde_json::from_value(value).map_err(|_| "Invalid history response.")?;
+            if page.schema_version != 1
+                || page.source != "database"
+                || page.gap
+                || page.items.len() > crate::history::PAGE_SIZE
+                || points.len() + page.items.len() > crate::history::MAX_POINTS
+                || (page.next_cursor.is_some() && page.items.is_empty())
+            {
+                return Err("Invalid or oversized history page.".into());
+            }
+            for point in &page.items {
+                let order = (point.received_at_ms, point.id);
+                if !point.valid(request) || previous.is_some_and(|last| order <= last) {
+                    return Err("Invalid history sample or order.".into());
+                }
+                previous = Some(order);
+            }
+            points.extend(page.items);
+            let Some(next) = page.next_cursor else {
+                return Ok(points);
+            };
+            if next.is_empty() || next.len() > 2048 || !cursors.insert(next.clone()) {
+                return Err("Invalid history pagination cursor.".into());
+            }
+            cursor = Some(next);
+        }
+    }
+
+    pub async fn history_pages(
+        self: Arc<Self>,
+        mut requests: tokio::sync::watch::Receiver<Option<crate::history::Request>>,
+        events: mpsc::Sender<Event>,
+    ) {
+        loop {
+            if requests.changed().await.is_err() {
+                return;
+            }
+            let Some(mut request) = requests.borrow_and_update().clone() else {
+                continue;
+            };
+            loop {
+                tokio::select! {
+                    changed = requests.changed() => {
+                        if changed.is_err() { return; }
+                        let Some(next) = requests.borrow_and_update().clone() else { break; };
+                        request = next;
+                    }
+                    result = timeout(self.timeout, self.history(&request)) => {
+                        let result = result.unwrap_or_else(|_| Err("History request timed out.".into()));
+                        if events.send(Event::History(request, result)).await.is_err() { return; }
+                        break;
+                    }
+                }
             }
         }
     }
@@ -1212,6 +1302,202 @@ mod tests {
         }
     }
 
+    fn graph_history_request(generation: u64) -> crate::history::Request {
+        let until = chrono::DateTime::parse_from_rfc3339("2026-10-05T12:00:00Z")
+            .unwrap()
+            .with_timezone(&chrono::Utc);
+        crate::history::Request {
+            generation,
+            server_instance_id: "test-daemon".into(),
+            since: until - chrono::TimeDelta::seconds(120),
+            until,
+            started: std::time::Instant::now(),
+        }
+    }
+
+    fn graph_history_point(id: u64, offset: i64) -> Value {
+        json!({
+            "id": id,
+            "received_at_ms": graph_history_request(0).until.timestamp_millis() + offset,
+            "segment_id": "station-session", "input_power_w": 35, "output_power_w": 3
+        })
+    }
+
+    async fn respond_json(socket: &mut tokio::net::TcpStream, value: Value) {
+        let body = value.to_string();
+        socket
+            .write_all(
+                format!(
+                    "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+                    body.len()
+                )
+                .as_bytes(),
+            )
+            .await
+            .unwrap();
+    }
+
+    #[tokio::test]
+    async fn graph_history_pages_preserve_the_window_and_encode_cursors() {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let api = api_for(&listener);
+        let request = graph_history_request(4);
+        let expected = request.clone();
+        let server =
+            tokio::spawn(async move {
+                for index in 0..2 {
+                    let (mut socket, headers) = accept_http_request(&listener).await;
+                    let path = headers
+                        .lines()
+                        .next()
+                        .unwrap()
+                        .split_whitespace()
+                        .nth(1)
+                        .unwrap();
+                    let url = reqwest::Url::parse(&format!("http://localhost{path}")).unwrap();
+                    assert_eq!(url.path(), "/api/v1/history");
+                    let query: std::collections::HashMap<_, _> = url.query_pairs().collect();
+                    assert_eq!(query["since"], expected.since.to_rfc3339());
+                    assert_eq!(query["until"], expected.until.to_rfc3339());
+                    assert_eq!(query["limit"], "1000");
+                    assert_eq!(
+                        query.get("cursor").map(|v| v.as_ref()),
+                        (index == 1).then_some("a+b/= signed")
+                    );
+                    respond_json(&mut socket, json!({
+                    "schema_version": 1, "source": "database", "gap": false,
+                    "items": [graph_history_point(index + 1, -119_000 + index as i64 * 1000)],
+                    "next_cursor": (index == 0).then_some("a+b/= signed")
+                })).await;
+                }
+            });
+        let points = api.history(&request).await.unwrap();
+        assert_eq!(points.iter().map(|p| p.id).collect::<Vec<_>>(), vec![1, 2]);
+        server.await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn graph_history_rejects_invalid_pages_without_partial_results() {
+        let valid = json!({
+            "schema_version": 1, "source": "database", "gap": false,
+            "items": [graph_history_point(1, -1000)], "next_cursor": null
+        });
+        let mut invalid = Vec::new();
+        for (key, value) in [
+            ("schema_version", json!(2)),
+            ("source", json!("files")),
+            ("gap", json!(true)),
+        ] {
+            let mut page = valid.clone();
+            page[key] = value;
+            invalid.push(page);
+        }
+        for (key, value) in [
+            ("id", json!(0)),
+            ("segment_id", json!("")),
+            ("input_power_w", json!(65536)),
+            ("output_power_w", json!(-1)),
+            (
+                "received_at_ms",
+                json!(graph_history_request(0).until.timestamp_millis()),
+            ),
+            (
+                "received_at_ms",
+                json!(graph_history_request(0).since.timestamp_millis() - 1),
+            ),
+        ] {
+            let mut page = valid.clone();
+            page["items"][0][key] = value;
+            invalid.push(page);
+        }
+        let mut missing = valid.clone();
+        missing["items"][0]
+            .as_object_mut()
+            .unwrap()
+            .remove("received_at_ms");
+        invalid.push(missing);
+        invalid.push(
+            json!({"schema_version": 1, "source": "database", "gap": false,
+            "items": [], "next_cursor": "loop"}),
+        );
+        for page in invalid {
+            let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+            let api = api_for(&listener);
+            let server = tokio::spawn(async move {
+                let (mut socket, _) = accept_http_request(&listener).await;
+                respond_json(&mut socket, page).await;
+            });
+            assert!(api.history(&graph_history_request(0)).await.is_err());
+            server.await.unwrap();
+        }
+        for repeat_cursor in [false, true] {
+            let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+            let api = api_for(&listener);
+            let server = tokio::spawn(async move {
+                for index in 0..2 {
+                    let (mut socket, _) = accept_http_request(&listener).await;
+                    respond_json(&mut socket, json!({
+                        "schema_version": 1, "source": "database", "gap": false,
+                        "items": [graph_history_point(if index == 0 || !repeat_cursor { 1 } else { 2 }, -1000)],
+                        "next_cursor": if index == 0 || repeat_cursor { Some("loop") } else { None }
+                    })).await;
+                }
+            });
+            assert!(api.history(&graph_history_request(0)).await.is_err());
+            server.await.unwrap();
+        }
+    }
+
+    #[tokio::test]
+    async fn graph_history_worker_cancels_obsolete_requests_and_bounds_total_wait() {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let mut api = api_for(&listener);
+        api.timeout = Duration::from_millis(300);
+        let (requests, operations) = tokio::sync::watch::channel(None);
+        let (events, mut incoming) = mpsc::channel(4);
+        let worker = tokio::spawn(Arc::new(api).history_pages(operations, events));
+        requests.send(Some(graph_history_request(1))).unwrap();
+        let (_stalled, _) = accept_http_request(&listener).await;
+        requests.send(Some(graph_history_request(2))).unwrap();
+        let (mut socket, _) = accept_http_request(&listener).await;
+        respond_json(
+            &mut socket,
+            json!({"schema_version": 1, "source": "database", "gap": false,
+            "items": [], "next_cursor": null}),
+        )
+        .await;
+        let Event::History(request, result) = timeout(Duration::from_secs(1), incoming.recv())
+            .await
+            .unwrap()
+            .unwrap()
+        else {
+            panic!("Expected history");
+        };
+        assert_eq!(request.generation, 2);
+        assert!(result.unwrap().is_empty());
+        assert!(incoming.try_recv().is_err());
+        requests.send(Some(graph_history_request(3))).unwrap();
+        let (_stalled, _) = accept_http_request(&listener).await;
+        let Event::History(request, result) = timeout(Duration::from_secs(1), incoming.recv())
+            .await
+            .unwrap()
+            .unwrap()
+        else {
+            panic!("Expected deadline");
+        };
+        assert_eq!(request.generation, 3);
+        assert_eq!(result.unwrap_err(), "History request timed out.");
+        requests.send(Some(graph_history_request(4))).unwrap();
+        let (_stalled, _) = accept_http_request(&listener).await;
+        requests.send(None).unwrap();
+        drop(requests);
+        timeout(Duration::from_secs(1), worker)
+            .await
+            .unwrap()
+            .unwrap();
+        assert!(incoming.recv().await.is_none());
+    }
+
     async fn accept_http_request(
         listener: &tokio::net::TcpListener,
     ) -> (tokio::net::TcpStream, String) {
@@ -1512,7 +1798,7 @@ mod tests {
         let new_snapshot = serde_json::to_value(&next).unwrap();
         app.update(Event::Status(Box::new(next)));
         assert_eq!(app.samples.len(), 1);
-        assert_eq!(app.samples[0].sample.segment_id, "new-segment");
+        assert_eq!(app.samples[0].segment_id, "new-segment");
         assert!(matches!(app.toggle(0), crate::app::Effect::None));
         restarted.send(()).unwrap();
         let feedback = timeout(Duration::from_secs(3), worker)

@@ -1311,3 +1311,44 @@ and six targeted native PTY cases in 34.58 seconds. Formatting, Clippy with
 warnings denied, snapshot checks and diff checks passed. The updated installed
 release matches the immutable copy used by those terminal tests. Existing
 processes and the user's daemon were not restarted.
+
+### 44. Backfill the live graph window through the history API
+
+The user identified that opening a new TUI started its graphs empty despite the
+daemon having recent persisted measurements. Following the asynchronous event
+handling review, added an independent cancellable history worker using the
+existing HTTP client and Tokio watch channel. It requests the same 120-second
+window through `/api/v1/history`, preserving since/until across cursor pages,
+and delivers a complete validated result to the existing application state.
+The production renderer and graph layout are unchanged; no frontend database
+access, daemon changes, new dependencies or synthetic measurements were added.
+
+Compact graph observations contain timestamps, session segments and real power
+values. Persisted observations merge with live samples received during the
+request, with live values winning duplicate timestamps. Current telemetry,
+freshness and control permissions remain independent of archive values. Old
+connection generations/daemon instances cannot apply results. Queries have a
+total deadline, 1,000-row pages, a 10,000-observation window bound, strict ordering
+and cursor checks; malformed/oversized results fail without partial application.
+Failed queries retry after two seconds without a status-message retry storm.
+Disabled/degraded history is not queried. Persisted samples retain the server's
+actual history cadence, normally ten seconds, rather than inventing intermediate
+readings or joining session gaps.
+
+Unit and real loopback HTTP tests cover fixed windows, escaped cursor values,
+pagination, malformed/out-of-range rows, repeated cursors, ordering, cancellation,
+timeouts, live merging, expiry, reconnects and obsolete results. A new real PTY
+test seeds only its fresh simulated fixture database and checks both complete
+graph windows without replacing current numeric values: it failed against the
+previous release and passed against the updated one. Stream-only native fixtures
+now explicitly implement the empty history API contract. The full run exposed
+an existing fixture race in which two separate clock reads could place a sample
+after its own server timestamp; fixtures now use one timestamp, and the idle
+overwrite regression uses a fixed clock.
+
+All 69 Rust tests passed in 35.07 seconds, nine xtask tests in 0.41 seconds,
+and all 34 native terminal tests, including isolated HTTPS/WSS, passed in 99.22
+seconds. Formatting, Ruff, Clippy with warnings denied and diff checks passed.
+All 16 SVGs pass `--check`; all 18 saved SVG/PNG images remain byte-identical.
+The dashboard PNG was inspected before and after. The installed release matches
+the immutable terminal-tested candidate; existing user processes were untouched.
