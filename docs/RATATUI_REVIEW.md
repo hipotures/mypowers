@@ -240,9 +240,43 @@ simulated daemons. Formatting, Ruff, Clippy with warnings denied, and diff check
 passed. All 15 SVGs pass `--check`; regenerated SVG hashes and Logs PNG bytes
 match the before set exactly. Inspected the after PNG.
 
+### 8. Keep complete Unicode graphemes when truncating feedback
+
+Reviewed Ratatui's [text recipe](https://ratatui.rs/recipes/render/display-text/)
+and [`Span::styled_graphemes`](https://docs.rs/ratatui/0.30.2/ratatui/text/struct.Span.html#method.styled_graphemes),
+then compared them with status-line truncation. The existing code walked Unicode
+scalar values and could split a displayed grapheme: a narrow status region turned
+`🇵🇱 connection restored` into `🇵…`. A TestBackend regression reproduced this
+before the fix.
+
+Truncation now walks Ratatui's own grapheme iterator and measures each complete
+grapheme with `Span::width`, reserving the existing ellipsis column. No new
+dependency or layout implementation was added. Fitting messages borrow their
+original text; truncated messages no longer clone and remeasure the growing
+prefix for each scalar value. These remove unnecessary allocations, without a
+claim about overall terminal throughput.
+
+Validation: 35 Rust tests and 9 xtask tests passed, including flag, keycap, ZWJ
+emoji, combining-accent, double-width, exact-fit, one-column, and zero-column
+status cases. The native PTY status-confirmation/fading case passed against an
+isolated simulated daemon. Formatting, Clippy with warnings denied, and diff
+checks passed. All 15 SVGs pass `--check`; regenerated SVG hashes and command-pending
+dashboard PNG bytes match the before set exactly. Inspected before and after PNGs.
+
+Finished the remaining Counter
+[error-handling tutorial](https://ratatui.rs/tutorials/counter-app/error-handling/)
+sections, and reviewed JSON Editor's
+[editing](https://ratatui.rs/tutorials/json-editor/ui-editing/),
+[exit](https://ratatui.rs/tutorials/json-editor/ui-exit/), and
+[closing thoughts](https://ratatui.rs/tutorials/json-editor/closing-thoughts/) details.
+The production guard restores the terminal before reporting a fatal error;
+recoverable daemon failures stay in the status strip. Modal rendering already
+uses `Clear` within its bounded region. Adding an error-reporting framework or
+copying the tutorial's screen layout is unnecessary.
+
 ## Remaining review
 
-- Finish Counter error-handling and JSON Editor tutorial details; review applicable examples.
+- Review remaining applicable application examples and tutorial integration details.
 - Further task lifetime/cancellation checks; terminal cleanup and signals now have PTY coverage.
 - Key/mouse routing, resize handling, input bursts, and operation responsiveness.
 - Production widgets: Block, Paragraph, Sparkline, Scrollbar, and custom battery Buffer writes.

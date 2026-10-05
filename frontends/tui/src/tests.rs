@@ -228,6 +228,48 @@ fn status_strip_reserves_right_indicators_and_ellipsizes_unicode_feedback() {
 }
 
 #[test]
+fn status_strip_truncation_preserves_complete_graphemes() {
+    use ratatui::{layout::Rect, text::Line};
+    for (message, width, expected) in [
+        ("🇵🇱 connection restored", 2, "…"),
+        ("🇵🇱 connection restored", 3, "🇵🇱…"),
+        ("1\u{fe0f}\u{20e3} command confirmed", 2, "…"),
+        (
+            "👨\u{200d}👩\u{200d}👧\u{200d}👦 connected",
+            3,
+            "👨\u{200d}👩\u{200d}👧\u{200d}👦…",
+        ),
+        ("e\u{301} connection restored", 2, "e\u{301}…"),
+        ("你好 connection restored", 4, "你…"),
+        ("connected", 1, "…"),
+        ("connected", 9, "connected"),
+        ("connected", 0, ""),
+    ] {
+        let feedback = Feedback::new(message, Severity::Info);
+        let mut terminal = Terminal::new(TestBackend::new(width, 1)).unwrap();
+        terminal
+            .draw(|frame| {
+                ui::status_line(
+                    frame,
+                    Rect::new(0, 0, width, 1),
+                    Some(&feedback),
+                    Line::default(),
+                    Duration::ZERO,
+                )
+            })
+            .unwrap();
+        let buffer = terminal.backend().buffer();
+        let rendered: String = buffer.content.iter().map(|cell| cell.symbol()).collect();
+        // Wide graphemes have a blank continuation cell in the terminal buffer.
+        assert_eq!(
+            rendered.replace(' ', ""),
+            expected,
+            "{message:?} at {width} columns"
+        );
+    }
+}
+
+#[test]
 fn operational_feedback_ignores_debug_old_logs_and_repeated_telemetry() {
     let mut app = app();
     app.feedback = Some(Feedback::new("AC ON confirmed", Severity::Success));

@@ -14,6 +14,7 @@ use ratatui::{
         ScrollbarState, Sparkline, SparklineBar, Widget,
     },
 };
+use std::borrow::Cow;
 
 pub const MIN_WIDTH: u16 = 60;
 pub const MIN_HEIGHT: u16 = 19;
@@ -315,25 +316,27 @@ pub(crate) fn status_line(
     );
 }
 
-fn ellipsize(message: &str, width: u16) -> String {
+fn ellipsize(message: &str, width: u16) -> Cow<'_, str> {
     let width = usize::from(width);
     if width == 0 {
-        return String::new();
+        return Cow::Borrowed("");
     }
-    if Span::raw(message).width() <= width {
-        return message.to_owned();
+    let span = Span::raw(message);
+    if span.width() <= width {
+        return Cow::Borrowed(message);
     }
     let mut result = String::new();
-    for character in message.chars() {
-        let mut next = result.clone();
-        next.push(character);
-        if Span::raw(next.as_str()).width() >= width {
+    let mut used = 0;
+    for grapheme in span.styled_graphemes(Style::default()) {
+        let grapheme_width = Span::raw(grapheme.symbol).width();
+        if used + grapheme_width >= width {
             break;
         }
-        result = next;
+        result.push_str(grapheme.symbol);
+        used += grapheme_width;
     }
     result.push('…');
-    result
+    Cow::Owned(result)
 }
 
 fn dim_background(frame: &mut Frame) {
