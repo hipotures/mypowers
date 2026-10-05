@@ -134,7 +134,7 @@ fn layouts_preserve_inline_values_two_row_graphs_and_unknown_values() {
                 .all(|cell| cell.fg == ratatui::style::Color::Reset
                     && cell.bg == ratatui::style::Color::Reset)
         );
-        for view in [View::Logs, View::Help] {
+        for view in [View::Logs, View::Help, View::Settings] {
             app.view = view;
             render(&mut app, width, height);
             assert!(app.controls.iter().all(|rect| rect.is_empty()));
@@ -203,6 +203,7 @@ fn status_strip_reserves_right_indicators_and_ellipsizes_unicode_feedback() {
                 Rect::new(0, 0, 30, 1),
                 Some(&feedback),
                 indicators.clone(),
+                Duration::ZERO,
             )
         })
         .unwrap();
@@ -219,6 +220,7 @@ fn status_strip_reserves_right_indicators_and_ellipsizes_unicode_feedback() {
                 Rect::new(0, 0, 5, 1),
                 Some(&feedback),
                 Line::default(),
+                Duration::ZERO,
             )
         })
         .unwrap();
@@ -754,13 +756,14 @@ fn runtime_action_feedback_stays_only_in_status_strip_despite_concurrent_log_pag
 
 #[test]
 fn shortcuts_are_confined_to_the_active_context() {
-    for view in [View::Logs, View::Help, View::Quit] {
+    for view in [View::Logs, View::Help, View::Settings, View::Quit] {
         for code in [
             KeyCode::Char('a'),
             KeyCode::Char('d'),
             KeyCode::Char('l'),
             KeyCode::Char('r'),
             KeyCode::Char('p'),
+            KeyCode::Char('s'),
             KeyCode::F(2),
             KeyCode::F(3),
             KeyCode::F(5),
@@ -784,7 +787,13 @@ fn shortcuts_are_confined_to_the_active_context() {
         ));
         assert!(app.pending.is_none());
     }
-    for view in [View::Dashboard, View::Logs, View::Help, View::Quit] {
+    for view in [
+        View::Dashboard,
+        View::Logs,
+        View::Help,
+        View::Settings,
+        View::Quit,
+    ] {
         let mut app = app();
         app.view = view;
         for code in [KeyCode::Char('c'), KeyCode::Char('z'), KeyCode::Char('a')] {
@@ -865,7 +874,7 @@ fn logs_layout_gains_two_rows_and_moves_contextual_diagnostics_to_status() {
 
 #[test]
 fn help_lists_only_the_context_that_opened_it() {
-    for context in [View::Dashboard, View::Logs] {
+    for context in [View::Dashboard, View::Logs, View::Settings] {
         let mut app = app();
         app.view = context;
         app.key(KeyEvent::new(KeyCode::Char('?'), KeyModifiers::NONE));
@@ -874,6 +883,9 @@ fn help_lists_only_the_context_that_opened_it() {
         assert!(app.title.is_empty());
         if context == View::Logs {
             assert!(screen.contains("HELP — LOGS") && screen.contains("End"));
+            assert!(!screen.contains("Request AC") && !screen.contains("F3"));
+        } else if context == View::Settings {
+            assert!(screen.contains("HELP — SETTINGS") && screen.contains("Toggle runtime DEBUG"));
             assert!(!screen.contains("Request AC") && !screen.contains("F3"));
         } else {
             assert!(screen.contains("F3") && !screen.contains("Toggle runtime DEBUG"));
@@ -1023,4 +1035,85 @@ fn idle_marker_never_animates_missing_stale_or_disconnected_telemetry() {
     assert!(!text(&render(&mut app, 94, 29)).contains('○'));
     app.status = None;
     assert!(!text(&render(&mut app, 94, 29)).contains('○'));
+}
+
+#[test]
+fn frozen_clock_controls_freshness_history_animation_feedback_and_override_expiry() {
+    use crate::clock::Clock;
+    let now: chrono::DateTime<chrono::Utc> = "2026-10-05T12:00:00Z".parse().unwrap();
+    let mut app = App::with_clock(
+        false,
+        Some(chrono_tz::UTC),
+        Clock::Fixed {
+            now,
+            telemetry_elapsed: Duration::ZERO,
+            animation_elapsed: Duration::from_secs(10),
+            feedback_elapsed: Duration::from_secs(3),
+        },
+    );
+    let mut current = status();
+    current.server_time = now.to_rfc3339();
+    current.logging =
+        json!({"effective_level":"DEBUG", "override_expires_at":"2026-10-05T12:15:00Z"});
+    let sample = current.telemetry.sample.as_mut().unwrap();
+    sample.received_at = now.to_rfc3339();
+    sample.input_power_w = 0;
+    sample.output_power_w = 0;
+    app.status = Some(current);
+    app.connected = true;
+    app.feedback = Some(Feedback::new("Fixed feedback", Severity::Success));
+    let dashboard = render(&mut app, 120, 30);
+    assert!(app.live() && text(&dashboard).contains('○'));
+    app.received -= Duration::from_secs(86_400);
+    app.animation_started -= Duration::from_secs(37);
+    app.feedback.as_mut().unwrap().started -= Duration::from_secs(86_400);
+    assert_eq!(dashboard, render(&mut app, 120, 30));
+    assert!(app.live());
+    app.view = View::Logs;
+    assert!(text(&render(&mut app, 120, 30)).contains("until 2026-10-05 12:15:00"));
+    assert_eq!(app.logs.day.to_string(), "2026-10-05");
+}
+
+#[test]
+fn settings_and_help_are_bounded_modal_overlays_with_inactive_dashboard_hitboxes() {
+    let mut app = app();
+    let normal = render(&mut app, 94, 29);
+    let station_color = normal[(2, 1)].fg;
+    app.key(KeyEvent::new(KeyCode::Char('s'), KeyModifiers::NONE));
+    assert!(app.view == View::Settings);
+    for (width, height) in [(60, 19), (80, 24), (94, 29)] {
+        let screen = text(&render(&mut app, width, height));
+        assert!(screen.contains("SETTINGS") && screen.contains("Debug / Diagnostics"));
+        assert!(app.controls.iter().all(|rect| rect.is_empty()) && app.title.is_empty());
+    }
+    let settings = render(&mut app, 94, 29);
+    assert_ne!(settings[(2, 1)].fg, station_color);
+    assert!(text(&settings).contains("hci0") && text(&settings).contains("Runtime logging"));
+    assert!(matches!(
+        app.key(KeyEvent::new(KeyCode::Char('b'), KeyModifiers::NONE)),
+        Effect::Request(Intent::Debug(true))
+    ));
+    app.key(KeyEvent::new(KeyCode::Char('?'), KeyModifiers::NONE));
+    let help = render(&mut app, 94, 29);
+    assert!(text(&help).contains("HELP — SETTINGS") && text(&help).contains("AP S300 V2.0"));
+    assert_ne!(help[(2, 1)].fg, station_color);
+    app.key(KeyEvent::new(KeyCode::Esc, KeyModifiers::NONE));
+    assert!(app.view == View::Dashboard);
+}
+
+#[test]
+fn persistent_status_indicators_include_only_nonzero_counts() {
+    let mut app = app();
+    app.feedback = None;
+    for (warnings, errors, expected) in [
+        (0, 0, ""),
+        (1, 0, "warn:1"),
+        (0, 2, "err:2"),
+        (2, 1, "warn:2 • err:1"),
+    ] {
+        app.warning_count = warnings;
+        app.error_count = errors;
+        let screen = text(&render(&mut app, 94, 29));
+        assert_eq!(screen.lines().last().unwrap().trim(), expected);
+    }
 }

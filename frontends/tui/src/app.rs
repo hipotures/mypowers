@@ -1,4 +1,5 @@
 use crate::{
+    clock::Clock,
     feedback::{Feedback, Severity, output_name},
     model::{Command, Status},
     network::{ClipboardTarget, Event, Intent},
@@ -15,6 +16,7 @@ pub enum View {
     Dashboard,
     Logs,
     Help,
+    Settings,
     Quit,
 }
 
@@ -24,6 +26,9 @@ pub struct Trend {
 }
 
 pub struct App {
+    pub clock: Clock,
+    pub warning_count: u32,
+    pub error_count: u32,
     pub status: Option<Status>,
     pub connected: bool,
     pub received: Instant,
@@ -62,7 +67,14 @@ pub enum Effect {
 
 impl App {
     pub fn new(no_color: bool, timezone: Option<chrono_tz::Tz>) -> Self {
+        Self::with_clock(no_color, timezone, Clock::Live)
+    }
+
+    pub fn with_clock(no_color: bool, timezone: Option<chrono_tz::Tz>, clock: Clock) -> Self {
         Self {
+            clock,
+            warning_count: 0,
+            error_count: 0,
             status: None,
             connected: false,
             received: Instant::now(),
@@ -78,7 +90,7 @@ impl App {
             pending: None,
             view: View::Dashboard,
             help_context: View::Dashboard,
-            logs: crate::logs::Logs::new(timezone),
+            logs: crate::logs::Logs::new_at(timezone, clock.now()),
             no_color,
             timezone,
             title_click: None,
@@ -86,7 +98,7 @@ impl App {
             generation: 0,
             quit_yes: true,
             quit_buttons: [Rect::default(); 2],
-            started_at: chrono::Utc::now(),
+            started_at: clock.now(),
             last_command: None,
         }
     }
@@ -253,7 +265,7 @@ impl App {
             .as_ref()?
             .telemetry
             .age_seconds
-            .map(|age| age + self.received.elapsed().as_secs_f64())
+            .map(|age| age + self.clock.telemetry_elapsed(self.received).as_secs_f64())
     }
 
     fn connection_feedback(&mut self, status: &Status) {
@@ -407,6 +419,10 @@ impl App {
                     }
                 }
                 KeyCode::F(1) | KeyCode::Char('?') => self.open_help(),
+                KeyCode::Char('s') => {
+                    self.view = View::Settings;
+                    self.resize();
+                }
                 KeyCode::Char('a' | 'd' | 'l') => {
                     return self.toggle(match key.code {
                         KeyCode::Char('a') => 0,
@@ -432,6 +448,11 @@ impl App {
                         return Effect::Logs(request);
                     }
                 }
+            },
+            View::Settings => match key.code {
+                KeyCode::F(1) | KeyCode::Char('?') => self.open_help(),
+                KeyCode::Char('b') => return self.operation('b'),
+                _ => {}
             },
             View::Help => {}
             View::Quit => match key.code {
@@ -593,7 +614,8 @@ impl App {
             .as_ref()
             .and_then(|status| chrono::DateTime::parse_from_rfc3339(&status.server_time).ok())
             .map(|time| {
-                time.timestamp_millis() as f64 / 1000.0 + self.received.elapsed().as_secs_f64()
+                time.timestamp_millis() as f64 / 1000.0
+                    + self.clock.telemetry_elapsed(self.received).as_secs_f64()
             })
             .unwrap_or(0.0)
     }

@@ -1011,7 +1011,9 @@ the right region empty until alerts exist; never render zero counters or
 reassuring health text. Preserve the right region and one separating space when
 shortening a long left message with an ellipsis. Keep full details in Logs/API.
 Permanent age, history health, adapter, and log-level diagnostics belong in the
-future Settings diagnostics view, not on the normal dashboard.
+Settings diagnostics view, not on the normal dashboard. The current read-only
+Settings overlay shows preferences and runtime diagnostics; mutable server
+settings remain a separate feature.
 
 ### 14.3 Data and controls
 
@@ -1045,8 +1047,9 @@ Implement at least Tab/Shift-Tab focus, Enter/Space activation, keyboard view se
 
 Only q, Ctrl+Q, and Esc are global. Other keys belong to the active context and
 must not fall through from modals to dashboard actions. F3 opens Logs from the
-dashboard; F1/? open help for the active dashboard or Logs context. Dashboard
-r/p retry or pause acquisition; b toggles DEBUG only in Logs. Help content and
+dashboard; s opens read-only Settings / Diagnostics. F1/? open Help over the
+dashboard for the active dashboard, Logs, or Settings context. Dashboard
+r/p retry or pause acquisition; b toggles DEBUG in Logs or Settings. Help content and
 border hotkeys match the active context. Remove F2 and log refresh actions.
 
 Keep terminal event decoding isolated and tested. Use bounded incremental parsing for fragmented escape sequences. Recognize SGR mouse sequences, resize, and bracketed paste; ignore pasted content as control actions. Register an action once per complete click, not once for both press and release. After layout/state changes, do not apply an old press/release pair to a different widget. Prevent duplicate mutation from double clicks while a command is pending.
@@ -1056,6 +1059,18 @@ Record original termios/terminal settings before modification. Use cbreak/noncan
 Test normal exit, Ctrl+Q, external SIGINT/SIGTERM, initialization failure, API failure, render exception, and resize. Typed Ctrl+C/Ctrl+Z are ignored in raw mode. No cleanup guarantee is possible after SIGKILL or terminal destruction; do not claim one. After supported exit paths, the shell must accept input with normal echo and no mouse escape garbage, without requiring `reset` or `stty sane`.
 
 In non-TTY output/input, refuse full-screen mode with a useful message directing the user to the CLI. A TUI connection loss never stops server collection.
+
+### 14.6 Deterministic UI snapshots
+
+`cargo xtask ui-snapshots` generates SVGs in `artifacts/ui/` using fixed fake
+state, a frozen rendering clock, and Ratatui TestBackend. Call the same production
+`ui::draw` used by the interactive TUI and export its Buffer cells; never duplicate
+the UI layout in HTML or a second renderer. No daemon, BLE, HTTP, or terminal is
+required. Preserve cell positions, Unicode, foreground/background colors, bold,
+and dim. Cover live, idle, reconnecting, device/daemon offline, pending commands,
+Logs/Settings/Help overlays, resizing, and the undersized-terminal message.
+Report success only after every requested artifact has been written; failures
+return nonzero. SVG is canonical; PNG conversion is optional for inspection.
 
 ## 15. Deployment and security
 

@@ -52,7 +52,8 @@ uv run mypowers tui
 | Enter / Space on dashboard | Activate the focused output |
 | Left click, released over the same dashboard control | Activate that output |
 | F3 on dashboard | Open the logs modal |
-| F1 / ? on dashboard or in logs | Help for the active context |
+| s on dashboard | Open read-only Settings / Diagnostics |
+| F1 / ? on dashboard, in logs, or in settings | Help for the active context |
 | f in logs | Cycle minimum log level |
 | Up/Down / PageUp/PageDown / mouse wheel / scrollbar drag in logs | Scroll records; lazily load adjacent pages |
 | Left/Right or [ / ] in logs | Previous/next log day |
@@ -61,7 +62,7 @@ uv run mypowers tui
 | End in logs | Return to today and follow its live bottom |
 | r on dashboard | Request connection retry |
 | p on dashboard | Pause/resume daemon BLE acquisition |
-| b in logs | Toggle runtime DEBUG override |
+| b in logs or settings | Toggle runtime DEBUG override |
 | Double-click MYPOWERS | Copy current rendered API snapshot through Wayland `wl-copy` |
 | Double-click LOGS title | Copy every currently loaded log record, including rows outside the viewport |
 
@@ -77,6 +78,9 @@ total size 94x29. Hotkeys stay
 in the dashboard's bottom border. The logs modal stays inside that frame with two-cell
 margins on every side (90x24 when the dashboard has its full size). Opening a
 modal dims the dashboard while telemetry updates continue underneath.
+Help and Settings are overlays using the same margins. Settings currently shows
+read-only timezone/page-size preferences and actual runtime diagnostics: daemon,
+station phase, BLE adapter, telemetry age/state, history, and effective logging.
 Resize invalidates old mouse presses and
 hitboxes. Bracketed paste never activates controls. Drawing is limited to 4 FPS;
 HTTP and the independent event/log streams run outside the input/render loop.
@@ -121,7 +125,8 @@ history never replace the message. Regular telemetry and repeated command states
 do not restart its timer. Feedback fades in four two-second color/style stages
 and becomes empty after eight seconds. Success uses green, information muted
 cyan, warnings yellow, and errors red. The right region is reserved for future
-alerts. While Logs is open, it shows contextual runtime metadata: `Log: INFO`,
+alerts, displaying only nonzero counts supplied to the UI. While Logs is open,
+it also shows contextual runtime metadata: `Log: INFO`,
 with `| until YYYY-MM-DD HH:MM:SS` in the selected timezone only when an override
 has a future expiry. It is empty on the normal dashboard until alerts exist.
 Long messages are shortened with
@@ -136,9 +141,9 @@ Removing the two old instruction/diagnostic header rows leaves 19 visible record
 at the maximum dashboard size.
 
 Permanent age, history health, adapter, and logging diagnostics are absent from
-the normal dashboard. They remain available through the API; a future Settings
-diagnostics view will present them separately. Full command details remain in
-Logs and the API.
+the normal dashboard and appear in Settings / Diagnostics. Full command details
+remain in Logs and the API. Mutable settings and server alert tracking are not
+implemented by the snapshot tool.
 
 The logs modal opens as a stationary archive for today. Days use the selected
 IANA timezone (or the local system timezone), including daylight-saving transitions;
@@ -168,6 +173,18 @@ already running process. Runtime log-level changes are INFO audit records even
 when the selected level suppresses ordinary INFO messages.
 
 ## Verify
+
+Generate deterministic SVG images from the same production Ratatui renderer,
+without a daemon or terminal:
+
+```sh
+cargo xtask ui-snapshots
+```
+
+See [the snapshot developer note](../../artifacts/ui/README.md) for scenes, fixed
+time/data, exporter limitations, and optional PNG inspection. The shared library
+contains the production renderer; `xtask` contains only fixture data, cell-to-SVG
+export, and file generation.
 
 ```sh
 cargo fmt --check --manifest-path frontends/tui/Cargo.toml

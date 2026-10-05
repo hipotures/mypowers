@@ -54,15 +54,11 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
         }
         return;
     }
-    let surface = if app.view != View::Help {
-        centered(
-            screen,
-            screen.width.min(DASHBOARD_WIDTH),
-            screen.height.min(DASHBOARD_HEIGHT + 1),
-        )
-    } else {
-        centered(screen, screen.width.min(120), screen.height.min(41))
-    };
+    let surface = centered(
+        screen,
+        screen.width.min(DASHBOARD_WIDTH),
+        screen.height.min(DASHBOARD_HEIGHT + 1),
+    );
     let area = Rect {
         height: surface.height - 1,
         ..surface
@@ -126,7 +122,39 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
             frame.render_widget(block, modal);
             logs(frame, inner, app);
         }
-        View::Help => help(frame, content, app.help_context),
+        View::Help | View::Settings => {
+            dashboard(frame, content, app);
+            dim_background(frame);
+            app.controls = [Rect::default(); 3];
+            let modal = centered(area, area.width - 4, area.height - 4);
+            frame.render_widget(Clear, modal);
+            let block = Block::default()
+                .borders(Borders::ALL)
+                .border_type(BorderType::Rounded)
+                .border_style(Style::default().fg(BORDER))
+                .style(Style::default().bg(BACKGROUND).fg(TEXT))
+                .title_top(
+                    Line::from(if app.view == View::Help {
+                        " HELP "
+                    } else {
+                        " SETTINGS "
+                    })
+                    .centered()
+                    .style(Style::default().fg(TEXT).add_modifier(Modifier::BOLD)),
+                );
+            let inner = block.inner(modal);
+            frame.render_widget(block, modal);
+            let inner = Rect {
+                x: inner.x + 1,
+                width: inner.width - 2,
+                ..inner
+            };
+            if app.view == View::Help {
+                help(frame, inner, app.help_context);
+            } else {
+                settings(frame, inner, app);
+            }
+        }
         View::Quit => {
             dashboard(frame, content, app);
             dim_background(frame);
@@ -135,7 +163,7 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
             quit_modal(frame, screen, app);
         }
     }
-    if matches!(app.view, View::Logs | View::Quit) {
+    if app.view != View::Dashboard {
         // The footer belongs to the active context, so it stays readable over a dimmed dashboard.
         frame.render_widget(
             Paragraph::new(footer).style(Style::default().fg(MUTED).bg(BACKGROUND)),
@@ -151,6 +179,10 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
         status_area,
         app.feedback.as_ref(),
         context_status(app),
+        app.feedback
+            .as_ref()
+            .map(|feedback| app.clock.feedback_elapsed(feedback.started))
+            .unwrap_or_default(),
     );
     if app.no_color {
         for cell in &mut frame.buffer_mut().content {
@@ -162,10 +194,11 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
 fn outer_footer(view: View, width: u16) -> &'static str {
     match view {
         View::Dashboard if width >= 80 => {
-            " a AC  d DC  l lamps  F3 logs  r retry  p pause  ? help  q quit "
+            " a AC  d DC  l lamps  F3 logs  s settings  r retry  p pause  ? help  q quit "
         }
-        View::Dashboard => " a/d/l outputs  F3 logs  r retry  p pause  ? help  q quit ",
+        View::Dashboard => " a/d/l outputs  F3 logs  s settings  ? help  q quit ",
         View::Logs => " Esc close  ? help  q quit  Ctrl-Q quit now ",
+        View::Settings => " b DEBUG  Esc close  ? help  q quit  Ctrl-Q quit now ",
         View::Help => " Esc close  q quit  Ctrl-Q quit now ",
         View::Quit => " Ctrl-Q quit now ",
     }
@@ -182,9 +215,31 @@ fn logs_footer(width: u16) -> &'static str {
 }
 
 fn context_status(app: &App) -> Line<'static> {
-    if app.view != View::Logs {
-        return Line::default();
+    let mut spans = Vec::new();
+    if app.view == View::Logs {
+        spans.push(Span::styled(
+            logging_status(app),
+            Style::default().fg(MUTED),
+        ));
     }
+    for (count, name, color) in [
+        (app.warning_count, "warn", YELLOW),
+        (app.error_count, "err", RED),
+    ] {
+        if count > 0 {
+            if !spans.is_empty() {
+                spans.push(Span::raw(" • "));
+            }
+            spans.push(Span::styled(
+                format!("{name}:{count}"),
+                Style::default().fg(color),
+            ));
+        }
+    }
+    Line::from(spans)
+}
+
+fn logging_status(app: &App) -> String {
     let logging = app.status.as_ref().map(|status| &status.logging);
     let level = logging
         .and_then(|logging| logging["effective_level"].as_str())
@@ -194,7 +249,7 @@ fn context_status(app: &App) -> Line<'static> {
     if let Some(expiry) = logging
         .and_then(|logging| logging["override_expires_at"].as_str())
         .and_then(|stamp| chrono::DateTime::parse_from_rfc3339(stamp).ok())
-        .filter(|expiry| *expiry > chrono::Utc::now())
+        .filter(|expiry| *expiry > app.clock.now())
     {
         let expiry = match app.timezone {
             Some(zone) => expiry
@@ -208,7 +263,7 @@ fn context_status(app: &App) -> Line<'static> {
         };
         text.push_str(&format!(" | until {expiry}"));
     }
-    Line::from(text).style(Style::default().fg(MUTED))
+    text
 }
 
 pub(crate) fn status_line(
@@ -216,13 +271,14 @@ pub(crate) fn status_line(
     area: Rect,
     feedback: Option<&Feedback>,
     indicators: Line<'_>,
+    feedback_elapsed: std::time::Duration,
 ) {
     let right_width = indicators.width().min(usize::from(area.width)) as u16;
     let left_width = area
         .width
         .saturating_sub(right_width.saturating_add(u16::from(right_width > 0)));
     if let Some(feedback) = feedback
-        && let Some(stage) = feedback.stage()
+        && let Some(stage) = feedback.stage(feedback_elapsed)
     {
         let color = match feedback.severity {
             Severity::Success => GREEN,
@@ -412,7 +468,11 @@ fn dashboard(frame: &mut Frame, content: Rect, app: &mut App) {
         );
         let data = app.graph_data(parts[2].width, output);
         if app.live() && value == Some(0) && !app.has_power_history(output) {
-            idle_graph(frame, parts[2], app.animation_started.elapsed());
+            idle_graph(
+                frame,
+                parts[2],
+                app.clock.animation_elapsed(app.animation_started),
+            );
             continue;
         }
         let data: Vec<_> = data
@@ -686,11 +746,80 @@ fn quit_modal(frame: &mut Frame, screen: Rect, app: &mut App) {
     }
 }
 
+fn settings(frame: &mut Frame, area: Rect, app: &App) {
+    let status = app.status.as_ref();
+    let row = |label: &str, value: String| {
+        Line::from(vec![
+            Span::styled(format!("{label:<20}"), Style::default().fg(MUTED)),
+            Span::styled(safe(&value), Style::default().fg(TEXT)),
+        ])
+    };
+    let heading = |title: &'static str| {
+        Line::from(title).style(Style::default().fg(TEXT).add_modifier(Modifier::BOLD))
+    };
+    let lines = vec![
+        heading("Preferences (read-only)"),
+        row(
+            "Timezone",
+            app.timezone
+                .map(|zone| zone.name().to_owned())
+                .unwrap_or_else(|| "System local".into()),
+        ),
+        row("Logs page size", app.logs.page_size.to_string()),
+        Line::default(),
+        heading("Debug / Diagnostics"),
+        row(
+            "Daemon",
+            if app.connected {
+                "Connected"
+            } else {
+                "Offline"
+            }
+            .into(),
+        ),
+        row(
+            "Station phase",
+            status
+                .map(|s| s.connection.phase.clone())
+                .unwrap_or_else(|| "Unknown".into()),
+        ),
+        row(
+            "BLE adapter",
+            status
+                .and_then(|s| s.connection.adapter_id.clone())
+                .unwrap_or_else(|| "--".into()),
+        ),
+        row(
+            "Telemetry",
+            status
+                .map(|s| s.telemetry.state.clone())
+                .unwrap_or_else(|| "unknown".into()),
+        ),
+        row(
+            "Sample age",
+            app.age()
+                .map(|age| format!("{age:.1} s"))
+                .unwrap_or_else(|| "--".into()),
+        ),
+        row(
+            "History",
+            status
+                .and_then(|s| s.history["state"].as_str())
+                .unwrap_or("unknown")
+                .into(),
+        ),
+        row("Runtime logging", logging_status(app)),
+    ];
+    frame.render_widget(Paragraph::new(lines), area);
+}
+
 fn help(frame: &mut Frame, area: Rect, context: View) {
-    let text = if context == View::Logs {
+    let text = if context == View::Settings {
+        "HELP — SETTINGS\n\nPreferences are read-only in this version.\nDebug / Diagnostics shows current daemon state.\nb                        Toggle runtime DEBUG override\n\nEsc                      Return to dashboard\nq                        Confirm quit\nCtrl-Q                   Quit immediately"
+    } else if context == View::Logs {
         "HELP — LOGS\n\nUp/Down, PageUp/PageDown   Scroll records\nMouse wheel / scrollbar   Scroll or drag\nLeft/Right or [ / ]       Previous/next day\nf                        Change minimum log level\n+ / -                    Change page size\nHome                     Beginning of selected day\nEnd                      Today: latest records and live follow\nb                        Toggle runtime DEBUG override\nDouble-click LOGS        Copy all loaded records\n\nEsc close   q confirm quit   Ctrl-Q quit immediately"
     } else {
-        "HELP — DASHBOARD\n\na / d / l                Request AC / DC / lamps ON/OFF\nTab / Shift-Tab          Focus output control\nEnter / Space            Activate focused output\nF3                       Open Logs\nr                        Retry station connection\np                        Pause/resume station connection\nF1 / ?                   Help for the active window\nDouble-click MYPOWERS    Copy current API snapshot\n\nEsc close   q confirm quit   Ctrl-Q quit immediately\n\nClosing this client leaves the daemon and outputs running."
+        "HELP — DASHBOARD\n\na / d / l                Request AC / DC / lamps ON/OFF\nTab / Shift-Tab          Focus output control\nEnter / Space            Activate focused output\nF3                       Open Logs\ns                        Open Settings / Diagnostics\nr                        Retry station connection\np                        Pause/resume station connection\nF1 / ?                   Help for the active window\nDouble-click MYPOWERS    Copy current API snapshot\n\nEsc close   q confirm quit   Ctrl-Q quit immediately"
     };
     frame.render_widget(Paragraph::new(text).style(Style::default().fg(MUTED)), area);
 }

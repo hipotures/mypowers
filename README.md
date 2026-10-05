@@ -57,6 +57,7 @@ uv run mypowers debug off
 
 Use `a`/`d`/`l` for AC/DC/lamps, Tab/Shift-Tab and Enter/Space, mouse clicks for controls,
 F3 to open logs, `r` for retry and `p` for pause/resume on the dashboard.
+Use `s` for the read-only Settings / Diagnostics modal.
 In Logs, use `b` for runtime DEBUG, `f` to filter, Left/Right for days, Home for the
 selected day's beginning, and End to fetch today/live. `?` opens contextual help.
 Only Esc, `q`, and Ctrl+Q are global: Esc closes a modal, `q` confirms exit, and
@@ -67,6 +68,10 @@ Unknown/unconfirmed outcomes show concise feedback and are never automatically r
 command IDs remain in the API and logs.
 
 ## Verification and installation
+
+Generate deterministic SVG previews from the actual Ratatui renderer, without
+running a daemon or terminal: `cargo xtask ui-snapshots`. Files are written to
+[`artifacts/ui`](artifacts/ui/README.md).
 
 ```bash
 uv run ruff check src frontends tests

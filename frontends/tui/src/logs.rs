@@ -78,8 +78,12 @@ struct CachedPage {
 
 impl Logs {
     pub fn new(timezone: Option<chrono_tz::Tz>) -> Self {
+        Self::new_at(timezone, Utc::now())
+    }
+
+    pub fn new_at(timezone: Option<chrono_tz::Tz>, now: DateTime<Utc>) -> Self {
         Self {
-            day: local_date(Utc::now(), timezone),
+            day: local_date(now, timezone),
             level: 0,
             page_size: 100,
             records: VecDeque::new(),

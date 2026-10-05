@@ -1,16 +1,10 @@
-mod app;
-mod config;
-mod feedback;
-mod logs;
-mod model;
-mod network;
 mod terminal;
-#[cfg(test)]
-mod tests;
-mod ui;
 
-use app::{App, Effect};
 use crossterm::event::{self, Event as TerminalEvent, KeyEventKind};
+use mypowers_tui::{
+    app::{App, Effect},
+    config, feedback, model, network, ui,
+};
 use network::{Api, ClipboardTarget, Event};
 use ratatui::{Terminal, backend::CrosstermBackend};
 use std::{

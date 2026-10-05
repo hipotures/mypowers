@@ -1,6 +1,6 @@
 use crate::model::{Command, safe};
 use serde_json::Value;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Severity {
@@ -25,8 +25,8 @@ impl Feedback {
         }
     }
 
-    pub fn stage(&self) -> Option<u8> {
-        let seconds = self.started.elapsed().as_secs();
+    pub fn stage(&self, elapsed: Duration) -> Option<u8> {
+        let seconds = elapsed.as_secs();
         (seconds < 8).then_some((seconds / 2) as u8)
     }
 
