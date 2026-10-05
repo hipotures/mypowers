@@ -14,6 +14,7 @@ use std::time::Duration;
 #[derive(Clone, Copy)]
 pub enum Scene {
     Live,
+    LowLoad,
     Idle,
     Reconnecting,
     DeviceOffline,
@@ -30,6 +31,7 @@ pub const SCENES: &[(&str, Scene, u16, u16)] = &[
     ("dashboard-live.svg", Scene::Live, 120, 30),
     ("dashboard-live-80x24.svg", Scene::Live, 80, 24),
     ("dashboard-live-60x19.svg", Scene::Live, 60, 19),
+    ("dashboard-low-load.svg", Scene::LowLoad, 120, 30),
     ("dashboard-idle.svg", Scene::Idle, 120, 30),
     ("dashboard-reconnecting.svg", Scene::Reconnecting, 120, 30),
     (
@@ -104,6 +106,12 @@ fn app(scene: Scene) -> Result<App, String> {
     app.selected = None;
     app.feedback = Some(Feedback::new("AC ON confirmed", Severity::Success));
     match scene {
+        Scene::LowLoad => {
+            let sample = status.telemetry.sample.as_mut().unwrap();
+            sample.input_power_w = 35;
+            sample.output_power_w = 3;
+            app.feedback = None;
+        }
         Scene::Idle => {
             let sample = status.telemetry.sample.as_mut().unwrap();
             sample.input_power_w = 0;
@@ -227,7 +235,7 @@ fn app(scene: Scene) -> Result<App, String> {
             let mut sample = sample.clone();
             sample.sequence = index as u64;
             sample.received_at = timestamp.to_rfc3339();
-            if !matches!(scene, Scene::Idle) {
+            if !matches!(scene, Scene::Idle | Scene::LowLoad) {
                 sample.input_power_w = input[index as usize % input.len()];
                 sample.output_power_w = output[index as usize % output.len()];
             }

@@ -36,6 +36,10 @@ Normal scenes use 120x30 terminal cells with the production dashboard's 94x29
 limit. Additional scenes cover 80x24, 60x19, contextual Help, quit confirmation,
 and an undersized 50x14 terminal. Reconnecting/device-offline scenes deliberately
 have no telemetry sample; daemon-offline retains explicitly unavailable readings.
+`dashboard-low-load.svg` covers INPUT 35 W / OUTPUT 3 W. The production Sparkline
+keeps fixed 0–100 W / 0–300 W scales; positive samples below its first quantization
+step receive one visible eighth-cell tick, while zero stays empty. This is a
+visibility floor, not an independently autoscaled graph or a change to telemetry.
 
 SVG is canonical. Each cell is 10x20 SVG units. Background rectangles cover every
 cell without gaps. Text preserves Unicode, RGB/ANSI colors, bold, and foreground

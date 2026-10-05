@@ -442,14 +442,14 @@ fn dashboard(frame: &mut Frame, content: Rect, app: &mut App) {
             "INPUT",
             sample.map(|s| s.input_power_w),
             false,
-            100,
+            100_u64,
         ),
         (
             power[2],
             "OUTPUT",
             sample.map(|s| s.output_power_w),
             true,
-            300,
+            300_u64,
         ),
     ] {
         let parts = Layout::vertical([
@@ -478,11 +478,14 @@ fn dashboard(frame: &mut Frame, content: Rect, app: &mut App) {
             );
             continue;
         }
+        // Sparkline floors to eighth-cell ticks; keep positive readings visible at fixed scales.
+        let minimum = maximum.div_ceil(8 * u64::from(parts[2].height.max(1)));
         let data = app
             .graph_data(parts[2].width, output)
             .into_iter()
             .map(|value| {
-                SparklineBar::from(value).style(Style::default().fg(if live {
+                let visible = if value == 0 { 0 } else { value.max(minimum) };
+                SparklineBar::from(visible).style(Style::default().fg(if live {
                     load_color(value, maximum)
                 } else {
                     DIM

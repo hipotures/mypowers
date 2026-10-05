@@ -1650,6 +1650,53 @@ fn help_lists_only_the_context_that_opened_it() {
 }
 
 #[test]
+fn positive_power_samples_draw_at_least_one_tick_without_changing_fixed_scales() {
+    let symbols = [" ", "▁", "▂", "▃", "▄", "▅", "▆", "▇", "█"];
+    for (width, height) in [(60, 19), (80, 24), (120, 30)] {
+        for value in [
+            0, 1, 3, 6, 7, 18, 19, 20, 99, 100, 101, 299, 300, 301, 65535,
+        ] {
+            let mut app = app();
+            let mut current = status();
+            let sample = current.telemetry.sample.as_mut().unwrap();
+            sample.sequence = 2;
+            sample.input_power_w = value;
+            sample.output_power_w = value;
+            app.samples.clear();
+            app.update(Event::Status(Box::new(current)));
+            let buffer = render(&mut app, width, height);
+            let screen = text(&buffer);
+            let power_row = screen
+                .lines()
+                .position(|line| line.contains("INPUT"))
+                .unwrap() as u16;
+            for (start, end, maximum) in [(0, width / 2, 100), (width / 2, width, 300)] {
+                let bars: Vec<_> = (start..end)
+                    .filter(|&x| {
+                        (power_row + 2..=power_row + 3).any(|y| {
+                            let symbol = buffer[(x, y)].symbol();
+                            symbols[1..].contains(&symbol)
+                        })
+                    })
+                    .collect();
+                if value == 0 {
+                    assert!(bars.is_empty(), "Zero power must not get a minimum bar");
+                    continue;
+                }
+                assert_eq!(bars.len(), 1, "{width}x{height}: {value} W / {maximum} W");
+                let ticks = (value * 16 / maximum).clamp(1, 16) as usize;
+                let x = bars[0];
+                assert_eq!(buffer[(x, power_row + 3)].symbol(), symbols[ticks.min(8)]);
+                assert_eq!(
+                    buffer[(x, power_row + 2)].symbol(),
+                    symbols[ticks.saturating_sub(8)]
+                );
+            }
+        }
+    }
+}
+
+#[test]
 fn idle_graphs_wait_for_history_and_resume_independently_on_new_power() {
     let mut app = App::new(false, None);
     let mut historical = status();
@@ -1666,7 +1713,7 @@ fn idle_graphs_wait_for_history_and_resume_independently_on_new_power() {
     app.update(Event::Status(Box::new(idle)));
     let screen = text(&render(&mut app, 94, 29));
     assert!(screen.contains("INPUT 0 W") && screen.contains("OUTPUT 0 W"));
-    // Even a positive sample too small to draw a sparkline bar delays the idle track.
+    // Positive history delays the idle track even when the current reading is zero.
     assert_eq!(screen.matches('○').count(), 1);
     let circles = |buffer: &Buffer| {
         buffer

@@ -1281,3 +1281,33 @@ Formatting, lint, Clippy with warnings denied and diff checks passed. All 15 SVG
 pass `--check` and match the saved before set exactly; the Logs PNG is byte-identical
 and was inspected before and after. The updated installed release matches the
 immutable terminal-tested copy; existing processes were not restarted.
+
+### 43. Preserve visible positive samples at fixed power scales
+
+During the continuation the user explicitly requested a correction for OUTPUT
+3 W displaying no graph. This is a narrowly authorized exception to visual
+preservation. Rechecked the [Sparkline example](https://ratatui.rs/examples/widgets/sparkline/)
+and the installed widget's `scale_height` implementation: it computes
+`value * rows * 8 / maximum` using integer division. At two rows and a 300 W
+maximum, 3 W therefore becomes zero ticks. A production-renderer regression
+also failed for 1 W before the fix.
+
+Only the display value supplied to Sparkline gets a one-tick visibility floor
+for positive samples. Zero remains zero; numeric readings, histories, colors
+based on actual power, two-row height and fixed 100 W / 300 W maxima are unchanged.
+The existing Ratatui widget still performs all drawing. The regression checks
+both independent graphs at 60x19, 80x24 and 120x30, from zero through small values,
+quantization boundaries, maximum values and above-range saturation.
+
+Added `dashboard-low-load.svg` with deterministic INPUT 35 W / OUTPUT 3 W and
+the same production renderer. Saved the broken fixture before the correction:
+it had no bottom-eighth glyphs; the corrected SVG contains 40 minimal OUTPUT
+bars. Rasterized and inspected both images. All 15 original SVGs and the live
+dashboard PNG remain byte-identical; only the new low-load SVG/PNG changed as
+requested. The generator now checks all 16 canonical scenes.
+
+All 64 Rust tests passed in 35.06 seconds, nine xtask tests in 0.39 seconds,
+and six targeted native PTY cases in 34.58 seconds. Formatting, Clippy with
+warnings denied, snapshot checks and diff checks passed. The updated installed
+release matches the immutable copy used by those terminal tests. Existing
+processes and the user's daemon were not restarted.
