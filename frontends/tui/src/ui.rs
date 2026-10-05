@@ -898,3 +898,117 @@ fn battery_color(position: f64) -> Color {
     let lerp = |x: f64, y: f64| (x + (y - x) * blend).round() as u8;
     Color::Rgb(lerp(a.0, b.0), lerp(a.1, b.1), lerp(a.2, b.2))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use ratatui::{buffer::Cell, layout::Position};
+
+    #[test]
+    fn battery_fill_is_monotonic_accurate_and_confined_to_its_row() {
+        let mut marker = Cell::new(".");
+        marker.set_fg(Color::Magenta).set_bg(Color::Blue);
+        for width in [1, 2, 3, 5, 10, 27, 54] {
+            let area = Rect::new(9, 12, width, 1);
+            let original = Buffer::filled(Rect::new(7, 11, width + 4, 3), marker.clone());
+            let mut previous_fill = 0;
+            for percent in 0..=100 {
+                let mut buffer = original.clone();
+                Battery {
+                    percent,
+                    no_color: false,
+                }
+                .render(area, &mut buffer);
+                let mut fill = 0;
+                let mut unfilled = false;
+                for x in area.x..area.right() {
+                    let cell = &buffer[(x, area.y)];
+                    let coverage = if cell.symbol() == "▌" {
+                        assert_eq!(cell.bg, TRACK);
+                        assert_ne!(cell.fg, TRACK);
+                        1
+                    } else if cell.bg == TRACK {
+                        assert_eq!(cell.symbol(), " ");
+                        assert_eq!(cell.fg, TRACK);
+                        0
+                    } else {
+                        assert_eq!(cell.symbol(), " ");
+                        assert_eq!(cell.fg, cell.bg);
+                        2
+                    };
+                    assert!(!unfilled || coverage == 0, "Gap before a filled cell");
+                    unfilled |= coverage < 2;
+                    fill += coverage;
+                }
+                assert!(fill >= previous_fill);
+                previous_fill = fill;
+                let actual = f64::from(fill) / 2.0;
+                let desired = f64::from(width) * f64::from(percent) / 100.0;
+                assert!((actual - desired).abs() <= 0.25 + f64::EPSILON * 100.0);
+                for y in original.area.y..original.area.bottom() {
+                    for x in original.area.x..original.area.right() {
+                        if !area.contains(Position::new(x, y)) {
+                            assert_eq!(buffer[(x, y)], original[(x, y)]);
+                        }
+                    }
+                }
+            }
+            assert_eq!(previous_fill, width * 2);
+        }
+        let original = Buffer::filled(Rect::new(7, 11, 10, 3), marker);
+        for area in [Rect::new(9, 12, 0, 1), Rect::new(9, 12, 3, 0)] {
+            let mut buffer = original.clone();
+            Battery {
+                percent: 50,
+                no_color: false,
+            }
+            .render(area, &mut buffer);
+            assert_eq!(buffer, original);
+        }
+    }
+
+    #[test]
+    fn battery_keeps_gradient_stops_and_monochrome_half_cells() {
+        let area = Rect::new(0, 0, 5, 1);
+        let mut buffer = Buffer::empty(area);
+        Battery {
+            percent: 100,
+            no_color: false,
+        }
+        .render(area, &mut buffer);
+        assert_eq!(
+            buffer
+                .content
+                .iter()
+                .map(|cell| cell.bg)
+                .collect::<Vec<_>>(),
+            vec![RED, ORANGE, YELLOW, Color::Rgb(169, 209, 106), GREEN,]
+        );
+        let full = buffer.clone();
+        Battery {
+            percent: u16::MAX,
+            no_color: false,
+        }
+        .render(area, &mut buffer);
+        assert_eq!(buffer, full);
+        let area = Rect::new(0, 0, 10, 1);
+        for (percent, expected) in [
+            (0, "░░░░░░░░░░"),
+            (5, "▌░░░░░░░░░"),
+            (10, "█░░░░░░░░░"),
+            (55, "█████▌░░░░"),
+            (100, "██████████"),
+        ] {
+            let mut buffer = Buffer::empty(area);
+            Battery {
+                percent,
+                no_color: true,
+            }
+            .render(area, &mut buffer);
+            assert_eq!(
+                buffer.content.iter().map(Cell::symbol).collect::<String>(),
+                expected
+            );
+        }
+    }
+}

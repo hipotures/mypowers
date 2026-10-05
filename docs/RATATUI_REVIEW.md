@@ -467,6 +467,30 @@ SVG hashes and daemon-offline PNG bytes match the before set exactly. Inspected
 the offline PNG before and after. The release build and local installed frontend
 were updated without restarting existing processes.
 
+### 16. Verify the battery widget's Buffer and fill boundaries
+
+Reviewed [custom widgets](https://ratatui.rs/recipes/widgets/custom/),
+[widget selection guidance](https://ratatui.rs/concepts/widgets/), the complete
+[Gauge example](https://ratatui.rs/examples/widgets/gauge/), and the installed
+0.30.2 Gauge implementation. The small custom battery Widget remains justified:
+the built-in gauge styles do not provide this per-cell RGB gradient. Its writes
+stay inside Ratatui's Buffer and the production renderer supplies a one-row,
+in-bounds area. No raw ANSI output or new widget abstraction is needed.
+
+Added two focused regressions. Across seven widths and all 101 valid percentages
+(707 combinations), filled coverage must grow monotonically, have no holes, and
+stay within a quarter cell of the requested proportion. Non-zero Buffer origins
+and sentinel cells verify that neighboring rows/columns remain untouched. Empty
+areas are no-ops. Separate cases verify the five gradient stops, clamping above
+100%, and monochrome full/half/unfilled symbols. These test rendering invariants
+without reproducing the widget's integer rounding formula.
+
+All 43 Rust tests, formatting, Clippy with warnings denied, and diff checks passed.
+No production change was needed. All 15 SVGs pass `--check`; regenerated SVG hashes
+and live dashboard PNG bytes match the before set exactly. Inspected the live
+PNG before and after. The installed binary from cycle 15 remains current because
+this cycle changes only tests and documentation.
+
 ## Remaining review
 
 - Review remaining applicable application examples and tutorial integration details.
