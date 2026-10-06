@@ -266,11 +266,11 @@ fn outer_footer(
         "spark"
     };
     match view {
-        View::Dashboard if width >= 80 => format!(
-            " a AC d DC l light F3 logs s settings t {interval} g {alternate} ? help q quit "
-        ),
+        View::Dashboard if width >= 80 => {
+            format!(" l logs s settings t {interval} g {alternate} ? help q quit ")
+        }
         View::Dashboard => {
-            format!(" a/d/l outputs F3 logs s settings t {interval} g view ? q quit ")
+            format!(" l logs s settings t {interval} g view ? q quit ")
         }
         View::Logs => " Esc close  ? help  q quit ".into(),
         View::Settings if width < 80 => {
@@ -1570,7 +1570,7 @@ Click     Activate a button"
     } else if context == View::Logs {
         "HELP — LOGS\n\nUp/Down, PageUp/PageDown   Scroll records\nMouse wheel / scrollbar   Scroll or drag\nLeft/Right or [ / ]       Previous/next day\nf                        Change minimum log level\n+ / -                    Change page size\nHome                     Beginning of selected day\nEnd                      Today: latest records and live follow\nb                        Toggle runtime DEBUG override\nDouble-click LOGS        Copy all loaded records\n\nEsc close   q confirm quit".into()
     } else {
-        "HELP — DASHBOARD\n\na / d / l                Request AC / DC / light ON/OFF\nTab / Shift-Tab          Focus output control\nEnter / Space            Activate focused output\nF3                       Open Logs\ns                        Open Settings / Diagnostics\nt                        Cycle average per bar: 10s / 60s / 1h\ng                        Switch Sparkline / Chart (session only)\nF1 / ?                   Help for the active window\nDouble-click MYPOWERS    Copy current API snapshot\n\nEsc close   q confirm quit".into()
+        "HELP — DASHBOARD\n\nTab / Shift-Tab          Focus output control\nEnter / Space            Activate focused output\nl                        Open Logs\ns                        Open Settings / Diagnostics\nt                        Cycle average per bar: 10s / 60s / 1h\ng                        Switch Sparkline / Chart (session only)\nF1 / ?                   Help for the active window\nDouble-click MYPOWERS    Copy current API snapshot\n\nEsc close   q confirm quit".into()
     };
     frame.render_widget(
         Paragraph::new(text).style(Style::default().fg(theme.muted_foreground)),

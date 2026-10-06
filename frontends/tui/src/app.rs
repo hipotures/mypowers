@@ -559,7 +559,7 @@ impl App {
         }
         match self.view {
             View::Dashboard => match key.code {
-                KeyCode::F(3) => {
+                KeyCode::Char('l') | KeyCode::F(3) => {
                     self.view = View::Logs;
                     self.resize();
                     if let Some(request) = self.logs.open() {
@@ -570,13 +570,6 @@ impl App {
                 KeyCode::Char('s') => {
                     self.view = View::Settings;
                     self.resize();
-                }
-                KeyCode::Char('a' | 'd' | 'l') => {
-                    return self.toggle(match key.code {
-                        KeyCode::Char('a') => 0,
-                        KeyCode::Char('d') => 1,
-                        _ => 2,
-                    });
                 }
                 KeyCode::Tab | KeyCode::BackTab => {
                     let step = if key.code == KeyCode::Tab { 1 } else { 2 };

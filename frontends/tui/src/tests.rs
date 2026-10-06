@@ -2175,7 +2175,9 @@ fn help_lists_only_the_context_that_opened_it() {
             assert!(screen.contains("Activate selected button") && screen.contains("Click"));
             assert!(!screen.contains("Request AC") && !screen.contains("F3"));
         } else {
-            assert!(screen.contains("F3") && !screen.contains("Select Retry / Pause / Debug"));
+            assert!(
+                screen.contains("Open Logs") && !screen.contains("Select Retry / Pause / Debug")
+            );
             assert!(!screen.contains("Retry station") && !screen.contains("Pause/resume station"));
         }
         app.key(KeyEvent::new(KeyCode::Esc, KeyModifiers::NONE));
@@ -3397,4 +3399,28 @@ fn segmented_field_labels_keep_the_same_style_when_focused() {
             }
         }
     }
+}
+
+#[test]
+fn dashboard_l_opens_logs_without_changing_outputs_and_old_control_shortcuts_are_inert() {
+    for code in [KeyCode::Char('a'), KeyCode::Char('d')] {
+        let mut app = app();
+        assert!(matches!(
+            app.key(KeyEvent::new(code, KeyModifiers::NONE)),
+            Effect::None
+        ));
+        assert!(app.pending.is_none() && app.view == View::Dashboard);
+    }
+    let mut app = app();
+    let snapshot = serde_json::to_value(&app.status).unwrap();
+    let screen = text(&render(&mut app, 120, 30));
+    assert!(screen.contains("l logs") && screen.contains("s settings"));
+    assert!(!screen.contains("a AC") && !screen.contains("l light") && !screen.contains("F3 logs"));
+    assert!(screen.contains("AC") && screen.contains("DC") && screen.contains("LIGHT"));
+    assert!(matches!(
+        app.key(KeyEvent::new(KeyCode::Char('l'), KeyModifiers::NONE)),
+        Effect::Logs(_)
+    ));
+    assert!(app.view == View::Logs && app.pending.is_none());
+    assert_eq!(serde_json::to_value(&app.status).unwrap(), snapshot);
 }

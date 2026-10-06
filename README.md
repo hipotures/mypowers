@@ -77,12 +77,11 @@ see [deployment](deploy/README.md).
 
 | Key | Action |
 | --- | --- |
-| `a` / `d` / `l` | Toggle AC / DC / LIGHT on the dashboard |
 | `Tab`, then `Enter` or `Space` | Select and activate an output |
 | `g` | Switch Chart / Sparkline for the current session |
 | `t` | Cycle graph bucket interval: 10s / 30s / 60s / 1h |
 | `s` | Open Settings |
-| `F3` | Open application logs |
+| `l` | Open application logs |
 | `?` or `F1` | Open contextual help |
 | `Esc` | Close the current overlay |
 | `q` | Open quit confirmation |

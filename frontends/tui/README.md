@@ -72,11 +72,10 @@ uv run mypowers tui
 | Esc | Close a modal/help and return to the dashboard; no action on the dashboard |
 | q | Open quit confirmation; Enter confirms, Esc cancels |
 | Ctrl-Q | Quit immediately and restore the terminal |
-| a / d / l on dashboard | Request AC / DC / light ON or OFF from the displayed snapshot |
 | Tab / Shift-Tab on dashboard | Focus an output |
 | Enter / Space on dashboard | Activate the focused output |
 | Left click, released over the same dashboard control | Activate that output |
-| F3 on dashboard | Open the logs modal |
+| l on dashboard | Open the logs modal (F3 remains an alias) |
 | s on dashboard | Open Settings tabs |
 | t on dashboard | Cycle average per bucket: 10 seconds, 30 seconds, 60 seconds, 1 hour |
 | g on dashboard | Switch two sparklines / shared line chart (session only) |
