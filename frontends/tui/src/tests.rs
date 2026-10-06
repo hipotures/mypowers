@@ -134,7 +134,7 @@ fn settings_tabs_wrap_route_contextual_keys_and_mouse_without_dashboard_actions(
     assert_eq!(app.settings_tab, SettingsTab::Charts);
     app.key(KeyEvent::new(KeyCode::Char('?'), KeyModifiers::NONE));
     let help = text(&render(&mut app, 94, 29));
-    assert!(help.contains("HELP — SETTINGS / Charts") && help.contains("confirm / save"));
+    assert!(help.contains("HELP — SETTINGS / Charts") && help.contains("confirm"));
     assert!(!help.contains("Retry station connection"));
     app.key(KeyEvent::new(KeyCode::Esc, KeyModifiers::NONE));
     assert!(app.view == View::Dashboard);
@@ -158,7 +158,6 @@ fn battery_alert_settings_and_telegram_test_work_at_minimum_size() {
         "Hysteresis",
         "5 pp",
         "10 min",
-        "Save changes",
     ] {
         assert!(screen.contains(label), "Missing {label}");
     }
@@ -167,15 +166,15 @@ fn battery_alert_settings_and_telegram_test_work_at_minimum_size() {
     app.key(KeyEvent::new(KeyCode::Down, KeyModifiers::NONE));
     app.key(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE));
     assert_eq!(app.settings_draft.battery_alert.threshold_percent, 21);
-    app.settings_selected = 4;
     assert!(matches!(
-        app.key(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE)),
+        app.key(KeyEvent::new(KeyCode::Esc, KeyModifiers::NONE)),
         Effect::Request(Intent::SaveSettings(_))
     ));
     app.update(Event::Finished(Feedback::new(
         "Settings saved",
         Severity::Success,
     )));
+    app.view = View::Settings;
     app.settings_tab = SettingsTab::Notify;
     app.settings_selected = 0;
     let screen = text(&render(&mut app, 60, 19));
@@ -240,9 +239,8 @@ fn settings_form_lists_values_saves_every_field_and_preserves_failed_drafts() {
     app.settings_draft.graph_base_scale_w = 300;
     app.settings_draft.timezone = "Europe/Warsaw".into();
     app.settings_draft.logs_page_size = 250;
-    app.settings_selected = 3;
     let Effect::Request(Intent::SaveSettings(draft)) =
-        app.key(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE))
+        app.key(KeyEvent::new(KeyCode::Esc, KeyModifiers::NONE))
     else {
         panic!("Expected complete settings save");
     };
@@ -253,7 +251,11 @@ fn settings_form_lists_values_saves_every_field_and_preserves_failed_drafts() {
     )));
     assert_eq!(app.settings, Some(original));
     assert_eq!(app.settings_draft, draft);
-    app.key(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE));
+    app.settings_save_due = Some(app.clock.now());
+    assert!(matches!(
+        app.autosave(),
+        Effect::Request(Intent::SaveSettings(_))
+    ));
     app.update(Event::Settings(draft.clone()));
     app.update(Event::Finished(Feedback::new(
         "Settings saved",
@@ -271,21 +273,8 @@ fn settings_form_lists_values_saves_every_field_and_preserves_failed_drafts() {
     app.key(KeyEvent::new(KeyCode::Esc, KeyModifiers::NONE));
     app.key(KeyEvent::new(KeyCode::Char('s'), KeyModifiers::NONE));
     render(&mut app, 94, 29);
-    let target = app.settings_save;
-    for kind in [
-        MouseEventKind::Down(MouseButton::Left),
-        MouseEventKind::Up(MouseButton::Left),
-    ] {
-        let effect = app.mouse(MouseEvent {
-            kind,
-            column: target.x,
-            row: target.y,
-            modifiers: KeyModifiers::NONE,
-        });
-        if matches!(kind, MouseEventKind::Up(_)) {
-            assert!(matches!(effect, Effect::Request(Intent::SaveSettings(_))));
-        }
-    }
+    assert!(matches!(app.autosave(), Effect::None));
+    assert!(!text(&render(&mut app, 94, 29)).contains("Save changes"));
     let mut late = fixed_graph_app();
     late.key(KeyEvent::new(KeyCode::Char('t'), KeyModifiers::NONE));
     late.key(KeyEvent::new(KeyCode::Char('g'), KeyModifiers::NONE));
@@ -3101,7 +3090,7 @@ fn all_settings_tabs_and_value_dialogs_share_the_active_theme() {
 }
 
 #[test]
-fn segmented_settings_preserve_saved_choices_and_support_keyboard_mouse_and_explicit_save() {
+fn segmented_settings_preserve_saved_choices_and_support_keyboard_mouse_and_autosave() {
     use crate::history::Visualization;
     use crate::settings::{Field, SettingsTab};
     for (field, tab, row) in [
@@ -3182,9 +3171,8 @@ fn segmented_settings_preserve_saved_choices_and_support_keyboard_mouse_and_expl
                 ));
                 assert_eq!(app.settings_draft.value(field), field.choices()[0]);
                 assert_eq!(app.settings, Some(saved.clone()));
-                app.settings_selected = if tab == SettingsTab::Charts { 3 } else { 4 };
                 assert!(matches!(
-                    app.key(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE)),
+                    app.key(KeyEvent::new(KeyCode::Esc, KeyModifiers::NONE)),
                     Effect::Request(Intent::SaveSettings(_))
                 ));
             }
@@ -3218,54 +3206,121 @@ fn segmented_fields_stay_disabled_when_settings_are_missing_or_an_operation_is_p
 }
 
 #[test]
-fn unsaved_settings_pulse_without_changing_save_label_or_geometry_in_any_tab_or_theme() {
-    use crate::{clock::Clock, settings::SettingsTab};
-    for name in crate::client_ui::THEMES {
+fn settings_autosave_debounces_retries_and_flushes_on_exit() {
+    use crate::clock::Clock;
+    let mut app = app();
+    let start = app.clock.now();
+    let advance = |app: &mut App, seconds| {
+        app.clock = Clock::Fixed {
+            now: start + chrono::Duration::seconds(seconds),
+            telemetry_elapsed: Duration::ZERO,
+            animation_elapsed: Duration::ZERO,
+            feedback_elapsed: Duration::ZERO,
+        };
+    };
+    advance(&mut app, 0);
+    app.update(Event::Settings(Settings::default()));
+    app.view = View::Settings;
+    app.settings_tab = SettingsTab::Charts;
+    app.settings_selected = 0;
+    app.key(KeyEvent::new(KeyCode::Right, KeyModifiers::NONE));
+    assert!(matches!(app.autosave(), Effect::None));
+    advance(&mut app, 4);
+    app.settings_selected = 2;
+    app.key(KeyEvent::new(KeyCode::Right, KeyModifiers::NONE));
+    advance(&mut app, 5);
+    assert!(matches!(app.autosave(), Effect::None));
+    advance(&mut app, 9);
+    let Effect::Request(Intent::SaveSettings(draft)) = app.autosave() else {
+        panic!("Expected debounced save");
+    };
+    assert_eq!(draft.graph_base_scale_w, 300);
+    assert!(matches!(app.autosave(), Effect::None));
+    app.update(Event::Finished(Feedback::new(
+        "Save failed",
+        Severity::Error,
+    )));
+    advance(&mut app, 13);
+    assert!(matches!(app.autosave(), Effect::None));
+    advance(&mut app, 14);
+    assert!(matches!(
+        app.autosave(),
+        Effect::Request(Intent::SaveSettings(_))
+    ));
+    app.update(Event::Settings(draft));
+    app.update(Event::Finished(Feedback::new(
+        "Settings saved",
+        Severity::Success,
+    )));
+    assert!(matches!(app.autosave(), Effect::None));
+    app.settings_selected = 0;
+    app.key(KeyEvent::new(KeyCode::Left, KeyModifiers::NONE));
+    // Re-selecting the same value does not postpone a pending save.
+    let due = app.settings_save_due;
+    advance(&mut app, 15);
+    app.key(KeyEvent::new(KeyCode::Left, KeyModifiers::NONE));
+    assert_eq!(app.settings_save_due, due);
+    assert!(matches!(
+        app.key(KeyEvent::new(KeyCode::Char('q'), KeyModifiers::CONTROL)),
+        Effect::Request(Intent::SaveSettings(_))
+    ));
+    assert!(app.quit_after_settings);
+    app.update(Event::Finished(Feedback::new(
+        "Save failed",
+        Severity::Error,
+    )));
+    assert!(!app.quit_after_settings && app.settings_dirty());
+    // Offline drafts survive; reconnect resumes the overdue save.
+    app.connected = false;
+    advance(&mut app, 30);
+    assert!(matches!(app.autosave(), Effect::None));
+    app.connected = true;
+    assert!(matches!(
+        app.autosave(),
+        Effect::Request(Intent::SaveSettings(_))
+    ));
+}
+
+#[test]
+fn settings_have_no_save_button_or_waiting_notice_in_any_theme() {
+    for theme in crate::client_ui::THEMES {
         for tab in [
             SettingsTab::Preferences,
             SettingsTab::Charts,
             SettingsTab::Alerts,
         ] {
-            for (width, height) in [(60, 19), (120, 30)] {
-                let mut app = fixed_graph_app();
-                app.update(Event::Settings(Settings::default()));
-                app.client_preferences.theme = name.into();
-                app.view = View::Settings;
-                app.settings_tab = tab;
-                app.feedback = None;
-                let clean = render(&mut app, width, height);
-                let rect = app.settings_save;
-                let label = |buffer: &Buffer| {
-                    (rect.x..rect.right())
-                        .map(|x| buffer[(x, rect.y)].symbol())
-                        .collect::<String>()
-                };
-                let clean_label = label(&clean);
-                assert!(clean_label.contains("[ Save changes ]"));
-                app.settings_draft.battery_alert.enabled = false;
-                let now = app.clock.now();
-                let mut colors = Vec::new();
-                for phase in [0, 1, 2, 3, 4] {
-                    app.clock = Clock::Fixed {
-                        now,
-                        telemetry_elapsed: Duration::ZERO,
-                        animation_elapsed: Duration::from_secs(phase),
-                        feedback_elapsed: Duration::ZERO,
-                    };
-                    let buffer = render(&mut app, width, height);
-                    assert_eq!(app.settings_save, rect);
-                    assert_eq!(label(&buffer), clean_label);
-                    assert!(!label(&buffer).contains('*'));
-                    colors.push(buffer[(rect.x + 2, rect.y)].fg);
-                }
-                assert_ne!(colors[0], colors[2]);
-                assert_eq!(colors[0], colors[4]);
-                app.settings_draft = app.settings.clone().unwrap();
-                assert_eq!(
-                    render(&mut app, width, height)[(rect.x + 2, rect.y)].fg,
-                    clean[(rect.x + 2, rect.y)].fg
-                );
+            let mut app = app();
+            app.update(Event::Settings(Settings::default()));
+            app.view = View::Settings;
+            app.settings_tab = tab;
+            app.client_preferences.theme = theme.into();
+            app.feedback = None;
+            app.settings_draft.battery_alert.enabled = false;
+            for size in [(60, 19), (120, 30)] {
+                let screen = text(&render(&mut app, size.0, size.1));
+                assert!(!screen.contains("Save changes") && !screen.contains("Waiting"));
+                assert!(app.settings_actions.iter().all(|r| r.width == 0));
             }
         }
     }
+}
+
+#[test]
+fn reverting_settings_cancels_autosave_and_pending_write_blocks_picker_confirmation() {
+    let mut app = app();
+    app.update(Event::Settings(Settings::default()));
+    app.view = View::Settings;
+    app.settings_tab = SettingsTab::Charts;
+    app.key(KeyEvent::new(KeyCode::Right, KeyModifiers::NONE));
+    assert!(app.settings_save_due.is_some());
+    app.key(KeyEvent::new(KeyCode::Left, KeyModifiers::NONE));
+    assert!(app.settings_save_due.is_none() && !app.settings_dirty());
+    app.settings_selected = 1;
+    app.key(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE));
+    app.key(KeyEvent::new(KeyCode::Down, KeyModifiers::NONE));
+    app.pending = Some("settings request".into());
+    let draft = app.settings_draft.clone();
+    app.key(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE));
+    assert_eq!(app.settings_draft, draft);
+    assert!(app.settings_picker.is_some());
 }

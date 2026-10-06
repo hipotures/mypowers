@@ -198,37 +198,37 @@ pub const GALLERY: &[(&str, Scene, u16, u16)] = &[
 
 pub const SCENES: &[(&str, Scene, u16, u16)] = &[
     (
-        "settings-preferences-unsaved-bright.svg",
+        "settings-preferences-unsaved.svg",
         Scene::SettingsDirty(SettingsTab::Preferences, true),
         120,
         30,
     ),
     (
-        "settings-preferences-unsaved-dim.svg",
+        "settings-preferences-saving.svg",
         Scene::SettingsDirty(SettingsTab::Preferences, false),
         120,
         30,
     ),
     (
-        "settings-charts-unsaved-bright.svg",
+        "settings-charts-unsaved.svg",
         Scene::SettingsDirty(SettingsTab::Charts, true),
         120,
         30,
     ),
     (
-        "settings-charts-unsaved-dim.svg",
+        "settings-charts-saving.svg",
         Scene::SettingsDirty(SettingsTab::Charts, false),
         120,
         30,
     ),
     (
-        "settings-alerts-unsaved-bright.svg",
+        "settings-alerts-unsaved.svg",
         Scene::SettingsDirty(SettingsTab::Alerts, true),
         120,
         30,
     ),
     (
-        "settings-alerts-unsaved-dim.svg",
+        "settings-alerts-saving.svg",
         Scene::SettingsDirty(SettingsTab::Alerts, false),
         120,
         30,
@@ -626,11 +626,16 @@ fn app(scene: Scene) -> Result<App, String> {
             SettingsTab::Preferences => Scene::Settings,
             SettingsTab::Charts => Scene::SettingsCharts,
             SettingsTab::Alerts => Scene::SettingsAlerts,
-            _ => return Err("No save button in this Settings tab".into()),
+            _ => return Err("No editable settings in this tab".into()),
         };
         let mut app = app(base)?;
         app.settings_draft.battery_alert.enabled = false;
-        app.feedback = None;
+        app.feedback = if bright {
+            None
+        } else {
+            app.pending = Some("settings request".into());
+            Some(Feedback::new("Saving settings...", Severity::Info))
+        };
         app.clock = Clock::Fixed {
             now: app.clock.now(),
             telemetry_elapsed: Duration::ZERO,

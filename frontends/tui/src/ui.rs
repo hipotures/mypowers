@@ -110,7 +110,6 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
     app.settings_segments.clear();
     app.settings_choices.clear();
     app.settings_actions = [Rect::default(); 3];
-    app.settings_save = Rect::default();
     app.logs.clear_hitboxes();
     if screen.width < MIN_WIDTH || screen.height < MIN_HEIGHT {
         frame.render_widget(
@@ -1243,9 +1242,9 @@ fn settings(frame: &mut Frame, area: Rect, app: &mut App) {
             lines.push(Line::default());
             lines.push(note("←/→ changes segments; Enter opens lists."));
             lines.push(note(if app.settings_tab == SettingsTab::Preferences {
-                "Theme saves locally; other choices save on server."
+                "Theme saves locally; server autosave after 5s."
             } else {
-                "Save applies choices now and on next start."
+                "Autosave after 5s; closing settings saves now."
             }));
             lines
         }
@@ -1425,63 +1424,7 @@ fn settings(frame: &mut Frame, area: Rect, app: &mut App) {
             );
         }
     }
-    if matches!(
-        app.settings_tab,
-        SettingsTab::Preferences | SettingsTab::Charts | SettingsTab::Alerts
-    ) {
-        let count = if app.settings_tab == SettingsTab::Charts {
-            3
-        } else if app.settings_tab == SettingsTab::Alerts {
-            4
-        } else {
-            3
-        };
-        app.settings_save = Rect::new(rows[2].x, rows[2].y + count + 4, 20, 1);
-        let label = if app.settings.is_none() {
-            "[ Loading... ]"
-        } else if app.pending.as_deref() == Some("settings request") {
-            "[ Saving... ]"
-        } else {
-            "[ Save changes ]"
-        };
-        frame.render_widget(
-            action_button(
-                label,
-                &theme,
-                app.settings_selected == count as usize,
-                app.settings.is_none() || app.pending.is_some(),
-            ),
-            app.settings_save,
-        );
-        if app.pending.is_none()
-            && app
-                .settings
-                .as_ref()
-                .is_some_and(|saved| saved != &app.settings_draft)
-        {
-            let color =
-                save_pulse_color(&theme, app.clock.animation_elapsed(app.animation_started));
-            for x in app.settings_save.x..app.settings_save.right() {
-                let cell = &mut frame.buffer_mut()[(x, app.settings_save.y)];
-                cell.set_fg(color);
-                if app.no_color {
-                    cell.set_style(
-                        Style::default()
-                            .remove_modifier(Modifier::BOLD | Modifier::DIM)
-                            .add_modifier(
-                                if app.clock.animation_elapsed(app.animation_started).as_secs() % 4
-                                    < 2
-                                {
-                                    Modifier::BOLD
-                                } else {
-                                    Modifier::DIM
-                                },
-                            ),
-                    );
-                }
-            }
-        }
-    } else if app.settings_tab == SettingsTab::Notify {
+    if app.settings_tab == SettingsTab::Notify {
         app.settings_actions[0] = Rect::new(rows[2].x, rows[2].y + 5, rows[2].width, 1);
         let label = if app.pending.as_deref() == Some("telegram test") {
             "[ Sending test... ]"
@@ -1610,29 +1553,13 @@ fn settings(frame: &mut Frame, area: Rect, app: &mut App) {
     }
 }
 
-// A four-second color pulse keeps the label readable and the button geometry fixed.
-fn save_pulse_color(theme: &ratcn::Theme, elapsed: std::time::Duration) -> Color {
-    let phase = elapsed.as_secs_f64() * std::f64::consts::TAU / 4.0;
-    let strength = 0.625 + 0.375 * phase.cos();
-    match (theme.muted_foreground, theme.primary) {
-        (Color::Rgb(r, g, b), Color::Rgb(pr, pg, pb)) => {
-            let blend = |muted: u8, accent: u8| {
-                (f64::from(muted) + (f64::from(accent) - f64::from(muted)) * strength).round() as u8
-            };
-            Color::Rgb(blend(r, pr), blend(g, pg), blend(b, pb))
-        }
-        _ if strength > 0.625 => theme.primary,
-        _ => theme.muted_foreground,
-    }
-}
-
 fn help(frame: &mut Frame, area: Rect, context: View, tab: SettingsTab, theme: &ratcn::Theme) {
     let text = if context == View::Settings {
         let actions = match tab {
             SettingsTab::Preferences | SettingsTab::Charts => {
-                "Up/Down   Select a field or Save changes
-Left/Right Change a segmented choice\nEnter     Cycle segment / open / confirm / save
-Click     Choose a field, value or Save changes
+                "Up/Down   Select a field
+Left/Right Change a segmented choice\nEnter     Cycle segment / open / confirm
+Click     Choose a field or value
 Timezone list supports typing to search."
             }
             SettingsTab::Debug => {
@@ -1641,7 +1568,7 @@ Enter     Activate selected button
 Click     Activate a button"
             }
             SettingsTab::Alerts => {
-                "←/→ changes segments; Enter opens other values.\nSave applies the server rule and persists it.\nALERT at battery <= threshold.\nRECOVERED at battery >= threshold + hysteresis.\nCooldown keeps only the latest state; no repeats.\nOnly fresh LIVE telemetry is evaluated."
+                "←/→ changes segments; Enter opens other values.\nAutosave after 5s; closing settings saves now.\nALERT at battery <= threshold.\nRECOVERED at battery >= threshold + hysteresis.\nCooldown keeps only the latest state; no repeats.\nOnly fresh LIVE telemetry is evaluated."
             }
             SettingsTab::Notify => {
                 "Enter / click sends a Telegram test message.\nThe server stores credentials and sends notifications.\nThe test does not change battery alert state or cooldown."

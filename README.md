@@ -96,7 +96,7 @@ Themes apply throughout the TUI: dashboard, charts, logs, Settings, dialogs and 
 Local styles and navigation shortcuts live in `~/.config/mypowers/client.toml`;
 see the [example client configuration](config/client.example.toml).
 
-Save changes to persist chart/log preferences and the battery rule on the server. Notify sends
+Settings autosave chart/log preferences and the battery rule after 5 seconds without another change. Closing Settings saves immediately. Notify sends
 a test message; Debug shows connection details and offers retry, pause/resume and
 runtime debug logging. Output controls require current telemetry and daemon permission.
 

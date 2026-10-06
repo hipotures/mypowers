@@ -91,7 +91,7 @@ uv run mypowers tui
 | Retry / Pause or Resume / Debug buttons in Settings → Debug | Click or focus with Up/Down and activate with Enter |
 | Tab / Shift-Tab or click in Settings | Select Preferences / Charts / Alerts / Notify / Debug |
 | Up/Down, Enter or click in Settings | Select a field, open its value list and confirm a value |
-| Save changes in Preferences, Charts or Alerts | Persist preferences and battery alert rule on the server |
+| Change a setting | Autosave on the server after 5 seconds without another change; closing Settings saves immediately |
 | Send test message in Notify | Ask the server to send a Telegram test; does not change alert cooldown |
 | Double-click MYPOWERS | Copy current rendered API snapshot through Wayland `wl-copy` |
 | Double-click LOGS title | Copy every currently loaded log record, including rows outside the viewport |
@@ -159,7 +159,7 @@ endpoints. Axes remain visible during idle. When both channels are idle it shows
 one shared idle marker.
 Settings provides editable Preferences and Charts forms. Click a field or focus
 it with Up/Down and press Enter to see its available values. Timezone supports
-text search over the IANA list. Save changes commits visualization, interval,
+text search over the IANA list. Autosave commits visualization, interval,
 base scale, timezone and log page size together through the daemon API. Confirmed
 saves apply immediately and are used on subsequent starts; failures retain the
 draft and existing active values. Dashboard `g` and `t` remain session choices,
@@ -352,7 +352,7 @@ remove all foreground/background colors.
 Choosing **Preferences → Theme** applies and atomically saves the
 theme immediately, including when the daemon is offline. This rewrites the
 TOML while retaining its other values; comments are not retained. No request
-is sent to the server. **Save changes** continues to save chart/log preferences
+is sent to the server. Autosave persists chart/log preferences
 and battery alerts on the server.
 
 Keybindings are scoped to `dashboard`, `settings` or `logs`. A configured key
@@ -373,11 +373,12 @@ TOML file. Precedence: built-in defaults < TOML < dotenv < process environment
 Settings with up to three values use inline segments: Visualization, Base scale
 and Battery alert. The active value stays highlighted. Click a segment or use
 Left/Right on the selected row; Enter/Space cycles its values. Up/Down chooses
-rows and Tab/Shift-Tab switches Settings tabs. Changes remain in the draft until
-Save changes; no device controls or server requests are sent by choosing a segment.
+rows and Tab/Shift-Tab switches Settings tabs. Changes are saved after 5 seconds without another change, or immediately when
+closing Settings. Choosing a segment never changes device outputs.
 Longer value lists, including the four graph intervals, retain their picker.
 
-Unsaved settings keep the fixed `[ Save changes ]` label. Its text gently pulses
-between muted and accent theme colors over four seconds; the button does not move.
-The pulse stops after saving or reverting the draft. In no-color mode it uses
-bold/dim text instead of colors.
+Settings autosave after five seconds from the last actual change. There is no save
+button or waiting message. The shared feedback line shows saving, success or error.
+Failed writes retain the draft and retry after five seconds, including after a
+reconnection. Closing Settings flushes changes immediately. Quitting waits for an
+outstanding settings save; a failed save keeps the application open.

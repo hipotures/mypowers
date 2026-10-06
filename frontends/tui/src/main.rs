@@ -84,6 +84,17 @@ fn run() -> Result<(), String> {
                     Err(_) => break,
                 }
             }
+            if app.quit_after_settings && !app.settings_dirty() && app.pending.is_none() {
+                break;
+            }
+            if let Effect::Request(intent) = app.autosave()
+                && requests.try_send(intent).is_err()
+            {
+                app.update(Event::Finished(feedback::Feedback::new(
+                    "Could not save settings; retrying",
+                    feedback::Severity::Error,
+                )));
+            }
             if let Some(request) = app.history_request() {
                 let _ = history_requests.send(Some(request));
             }
@@ -114,11 +125,10 @@ fn run() -> Result<(), String> {
                     }
                     Effect::Request(intent) => {
                         if requests.try_send(intent).is_err() {
-                            app.pending = None;
-                            app.feedback = Some(feedback::Feedback::new(
+                            app.update(Event::Finished(feedback::Feedback::new(
                                 "Request unavailable; no command sent",
                                 feedback::Severity::Error,
-                            ));
+                            )));
                         }
                     }
                     Effect::Copy => {

@@ -261,7 +261,7 @@ impl Api {
                         let _ = events.send(Event::Settings(settings)).await;
                         Feedback::new("Settings saved", Severity::Success)
                     }
-                    _ => Feedback::new("Could not save settings; try again", Severity::Error),
+                    _ => Feedback::new("Could not save settings; retrying", Severity::Error),
                 }
             }
 
