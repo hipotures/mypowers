@@ -1,0 +1,20 @@
+{
+  "captured_at": "2026-10-06T09:48:03.732Z",
+  "height": 620,
+  "screenshots": [
+    "dashboard-chart-30s.svg",
+    "dashboard-chart-60s.svg",
+    "dashboard-chart-1h.svg",
+    "dashboard-live-30s.svg",
+    "settings-modal.svg",
+    "settings-charts.svg",
+    "settings-alerts.svg",
+    "settings-notify.svg",
+    "settings-debug.svg",
+    "logs-modal.svg",
+    "help-modal.svg",
+    "settings-visualization-picker.svg"
+  ],
+  "source": "daemon telemetry and database history",
+  "width": 980
+}
