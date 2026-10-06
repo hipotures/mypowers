@@ -149,11 +149,8 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
             app.settings_tab,
         )
     };
-    let outer = panel(&palette.theme, " MYPOWERS ").title_bottom(
-        Line::from(footer.as_str())
-            .style(Style::default().fg(palette.theme.muted_foreground))
-            .centered(),
-    );
+    let outer = panel(&palette.theme, " MYPOWERS ")
+        .title_bottom(hotkey_line(&footer, &palette.theme, app.no_color).centered());
     let inner = outer.inner(area);
     frame.render_widget(outer, area);
     let content = Rect {
@@ -176,9 +173,7 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
             frame.render_widget(Clear, modal);
             app.logs.title = Rect::new(modal.x + (modal.width - 6) / 2 + 1, modal.y, 4, 1);
             let block = panel(&palette.theme, " LOGS ").title_bottom(
-                Line::from(logs_footer(modal.width))
-                    .centered()
-                    .style(Style::default().fg(palette.theme.muted_foreground)),
+                hotkey_line(logs_footer(modal.width), &palette.theme, app.no_color).centered(),
             );
             let inner = block.inner(modal);
             frame.render_widget(block, modal);
@@ -223,7 +218,7 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
     if app.view != View::Dashboard {
         // The footer belongs to the active context, so it stays readable over a dimmed dashboard.
         frame.render_widget(
-            Paragraph::new(footer.as_str()).style(
+            Paragraph::new(hotkey_line(&footer, &palette.theme, app.no_color)).style(
                 Style::default()
                     .fg(palette.theme.muted_foreground)
                     .bg(palette.theme.background),
@@ -251,6 +246,48 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
             cell.set_fg(Color::Reset).set_bg(Color::Reset);
         }
     }
+}
+
+fn hotkey_line<'a>(text: &'a str, theme: &ratcn::Theme, no_color: bool) -> Line<'a> {
+    let spans = text
+        .split_inclusive(' ')
+        .map(|token| {
+            let key = matches!(
+                token.trim(),
+                "l" | "s"
+                    | "t"
+                    | "g"
+                    | "?"
+                    | "q"
+                    | "f"
+                    | "b"
+                    | "Tab"
+                    | "Enter"
+                    | "Esc"
+                    | "Home"
+                    | "End"
+                    | "↑↓"
+                    | "↑/↓"
+                    | "←/→"
+                    | "+/-"
+            );
+            Span::styled(
+                token,
+                if key {
+                    Style::default()
+                        .fg(theme.foreground)
+                        .add_modifier(if no_color {
+                            Modifier::BOLD
+                        } else {
+                            Modifier::empty()
+                        })
+                } else {
+                    Style::default()
+                },
+            )
+        })
+        .collect::<Vec<_>>();
+    Line::from(spans).style(Style::default().fg(theme.muted_foreground))
 }
 
 fn outer_footer(
@@ -1104,9 +1141,7 @@ fn quit_modal(frame: &mut Frame, screen: Rect, app: &mut App) {
     let area = centered(screen, 50, 8);
     frame.render_widget(Clear, area);
     let block = panel(&palette.theme, " QUIT ").title_bottom(
-        Line::from(" Enter select  Esc cancel ")
-            .centered()
-            .style(Style::default().fg(palette.theme.muted_foreground)),
+        hotkey_line(" Enter select  Esc cancel ", &palette.theme, app.no_color).centered(),
     );
     let inner = block.inner(area);
     frame.render_widget(block, area);
@@ -1240,7 +1275,11 @@ fn settings(frame: &mut Frame, area: Rect, app: &mut App) {
                 lines.push(line);
             }
             lines.push(Line::default());
-            lines.push(note("←/→ changes segments; Enter opens lists."));
+            lines.push(hotkey_line(
+                "←/→ changes segments; Enter opens lists.",
+                &theme,
+                app.no_color,
+            ));
             lines.push(note(if app.settings_tab == SettingsTab::Preferences {
                 "Theme saves locally; server autosave after 5s."
             } else {
@@ -1488,10 +1527,11 @@ fn settings(frame: &mut Frame, area: Rect, app: &mut App) {
             .max(3 + search_rows);
         let popup = centered(area, area.width.min(48), height);
         frame.render_widget(Clear, popup);
-        let block = panel(&theme, format!(" {} ", picker.field.label())).title_bottom(
-            Line::from(" Enter select  Esc cancel ")
-                .style(Style::default().fg(theme.muted_foreground)),
-        );
+        let block = panel(&theme, format!(" {} ", picker.field.label())).title_bottom(hotkey_line(
+            " Enter select  Esc cancel ",
+            &theme,
+            app.no_color,
+        ));
         let inner = block.inner(popup);
         frame.render_widget(block, popup);
         if search_rows > 0 {

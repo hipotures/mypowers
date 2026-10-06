@@ -3424,3 +3424,43 @@ fn dashboard_l_opens_logs_without_changing_outputs_and_old_control_shortcuts_are
     assert!(app.view == View::Logs && app.pending.is_none());
     assert_eq!(serde_json::to_value(&app.status).unwrap(), snapshot);
 }
+
+#[test]
+fn footer_hotkeys_use_foreground_in_each_menu_without_the_theme_accent() {
+    for name in crate::client_ui::THEMES {
+        for view in [
+            View::Dashboard,
+            View::Settings,
+            View::Logs,
+            View::Help,
+            View::Quit,
+        ] {
+            let mut app = app();
+            app.update(Event::Settings(Settings::default()));
+            app.client_preferences.theme = name.into();
+            app.view = view;
+            app.feedback = None;
+            let foreground = app.client_preferences.theme().foreground;
+            let buffer = render(&mut app, 120, 30);
+            let expected = match view {
+                View::Dashboard => "l logs",
+                View::Settings => "Tab tabs",
+                View::Logs | View::Help => "Esc close",
+                View::Quit => "Enter select",
+            };
+            let mut found = false;
+            for y in (0..30).rev() {
+                let row = (0..120)
+                    .map(|x| buffer[(x, y)].symbol())
+                    .collect::<String>();
+                if let Some(start) = row.find(expected) {
+                    let x = row[..start].chars().count() as u16;
+                    assert_eq!(buffer[(x, y)].fg, foreground, "{name}: {expected}");
+                    found = true;
+                    break;
+                }
+            }
+            assert!(found, "Missing {expected}");
+        }
+    }
+}
