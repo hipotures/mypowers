@@ -94,3 +94,65 @@ MYPOWERS_CADDY_TEST_BINARY=/absolute/path/to/caddy \
 The default offline suite skips this optional external-binary test. The release validation report
 records its explicit execution and Caddy version. No CA is installed into system trust. For a manual
 client, pass `--ca-file PATH_TO_TEST_ROOT_CRT`; TLS verification remains enabled.
+
+## Offline bundle for the Alpine Python LXC
+
+Build a daemon bundle on the development machine:
+
+```bash
+uv run python scripts/build-install-bundle.py
+```
+
+The default target is CPython 3.14 on musl x86_64. Override
+`--python-version` and `--platform` for other targets. The archive in `dist/`
+contains the application wheel, all server dependency wheels selected from
+`uv.lock`, their hash-locked requirements, installer and Supervisor configuration.
+Native CLI/TUI binaries are separate client installations.
+
+Copy the archive to the LXC, extract it, then run as root:
+
+```sh
+tar -xzf mypowers-install-py314-musllinux_1_2_x86_64.tar.gz
+python3 mypowers-install/install.py \
+  --hostname mypowers.lxc.efez.net --startup-python /startup.py
+```
+
+The installer uses Alpine repositories for Supervisor, CA certificates and timezone
+data; Python dependencies install offline without a compiler. It creates a
+`mypowers` service account, a release-specific venv under `/opt/mypowers/releases`
+and the `current` symlink. Existing daemon configuration, token and database are
+preserved. The initial configuration uses real BLE; unavailable Bluetooth is
+reported by the daemon and does not prevent HTTPS/API operation.
+
+This boot integration is specifically for the inspected Python LXC image whose
+`/startup.py` starts SSH then sleeps forever. Other entrypoints are rejected.
+It backs up that script as `/startup.py.pre-mypowers`, retains SSH startup and
+executes Supervisor to run/restart MyPowers and Caddy. It also recreates the
+daemon runtime directory after reboot. Caddy currently runs as root to retain
+the certificate storage used by the initial manual setup. Its OVH credentials
+remain in `/etc/conf.d/caddy`. The Caddyfile is backed up once and changed to
+proxy the supplied hostname to `127.0.0.1:8765`.
+
+For the first start, stop any manually running Caddy and run:
+
+```sh
+/usr/bin/supervisord -c /etc/mypowers/supervisord.conf
+```
+
+After reboot the image entrypoint starts it automatically. Inspect services with:
+
+```sh
+supervisorctl -c /etc/mypowers/supervisord.conf status
+tail -n 50 /var/log/mypowers/daemon-console.log
+tail -n 50 /var/log/mypowers/caddy.log
+```
+
+For an update, install a new bundle, then restart only the daemon:
+
+```sh
+supervisorctl -c /etc/mypowers/supervisord.conf restart mypowers
+```
+
+Older release directories are retained. To roll back the code, point
+`/opt/mypowers/current` to the previous release printed by the installer, then
+restart the daemon. Database migration compatibility must be checked separately.
