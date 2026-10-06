@@ -128,3 +128,7 @@ PNG conversion is not required by the generator and adds no Cargo dependency.
 cargo test --locked --manifest-path xtask/Cargo.toml
 cargo clippy --locked --manifest-path xtask/Cargo.toml --all-targets -- -D warnings
 ```
+
+`cli-status.svg` exercises the same dashboard in one-shot snapshot mode: actual output
+states are displayed, focus highlights and interactive keyboard hints are omitted.
+The native CLI writes this buffer to standard output without raw mode or an alternate screen.

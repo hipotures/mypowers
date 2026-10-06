@@ -1,4 +1,4 @@
-"""Shared HTTP/WS API client; no BLE, API-server or persistence imports."""
+"""Python API helper for capture scripts and tests; native clients use Rust."""
 
 import asyncio
 import json

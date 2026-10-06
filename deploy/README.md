@@ -11,7 +11,7 @@ or a daemon deliberately using another runtime directory. Do not start simultane
 
 ## Locked wheel installation
 
-Build once using the committed lockfile, then install outside the checkout. Server/client exports
+Build once using the committed lockfile, then install outside the checkout. Server exports
 include exact runtime versions and hashes. The deployer chooses a suitable interpreter; MyPowers
 never creates an application venv or installs packages during startup.
 
@@ -20,16 +20,17 @@ uv build
 # An appropriately provisioned single-purpose system interpreter:
 uv pip install --system --require-hashes -r deploy/requirements-server.txt
 uv pip install --system --no-deps dist/mypowers-0.1.0-py3-none-any.whl
-# On a client instead:
-uv pip install --system --require-hashes -r deploy/requirements-client.txt
-uv pip install --system --no-deps dist/mypowers-0.1.0-py3-none-any.whl
+# Build both native client binaries separately:
+cargo build --release --locked --manifest-path frontends/tui/Cargo.toml
+# Copy mypowers and mypowers-tui from frontends/tui/target/release/ to the client PATH.
 ```
 
 If the OS marks Python externally managed, provision an appropriate interpreter or select an
 operator-managed environment. Do not bypass that policy with automatic `--break-system-packages`.
 For an operator-selected venv, `uv venv /chosen/path` and `uv pip install --python /chosen/path/bin/python`
-are equivalent build/install-time options, never runtime behavior. Extras are one distribution:
-`mypowers[server]` and `mypowers[cli]`. Install the native Rust TUI separately with `cargo install --locked --path frontends/tui`.
+are equivalent build/install-time options, never runtime behavior. The Python distribution provides `mypowers[server]`.
+CLI and TUI are native Rust binaries and need no Python or client dependency export.
+Install both with `cargo install --locked --path frontends/tui`.
 Requirements exports allow locked deployment
 rather than resolving unspecified new dependencies at the destination.
 

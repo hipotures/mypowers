@@ -15,6 +15,7 @@ use std::time::Duration;
 
 #[derive(Clone, Copy)]
 pub enum Scene {
+    Snapshot,
     Live,
     LiveMinute,
     LiveHour,
@@ -182,6 +183,7 @@ pub const GALLERY: &[(&str, Scene, u16, u16)] = &[
 ];
 
 pub const SCENES: &[(&str, Scene, u16, u16)] = &[
+    ("cli-status.svg", Scene::Snapshot, 120, 30),
     ("dashboard-live.svg", Scene::Live, 120, 30),
     ("dashboard-live-60s.svg", Scene::LiveMinute, 120, 30),
     ("dashboard-live-1h.svg", Scene::LiveHour, 120, 30),
@@ -291,6 +293,13 @@ fn app(scene: Scene) -> Result<App, String> {
     app.selected = None;
     app.feedback = Some(Feedback::new("AC ON confirmed", Severity::Success));
     match scene {
+        Scene::Snapshot => {
+            app.snapshot = true;
+            app.feedback = None;
+            app.graph.visualization = Visualization::Chart;
+            app.graph.resolution = Resolution::ThirtySeconds;
+            status.telemetry.sample.as_mut().unwrap().dc_enabled = true;
+        }
         Scene::ChartNearby => {
             let sample = status.telemetry.sample.as_mut().unwrap();
             sample.input_power_w = 51;

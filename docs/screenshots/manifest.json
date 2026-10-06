@@ -13,8 +13,12 @@
     "settings-debug.svg",
     "logs-modal.svg",
     "help-modal.svg",
-    "settings-visualization-picker.svg"
+    "settings-visualization-picker.svg",
+    "cli-status.svg"
   ],
   "source": "daemon telemetry and database history",
-  "width": 980
+  "width": 980,
+  "capture_times": {
+    "cli-status.svg": "2026-10-06T10:25:35.059Z"
+  }
 }

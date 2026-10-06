@@ -1,4 +1,4 @@
-"""Build artifact installation smoke tests, run from outside the checkout."""
+"""Verify server-only wheels and native clients from outside the checkout."""
 
 import argparse
 import json
@@ -26,54 +26,57 @@ def main() -> None:
     root = Path(__file__).resolve().parents[1]
     with zipfile.ZipFile(wheel) as archive:
         names = archive.namelist()
-        assert any(name.startswith("mypowers_cli/") for name in names)
-        assert not any(name.startswith("mypowers_tui/") for name in names)
+        assert any(name.startswith("mypowers/") for name in names)
+        assert not any(name.startswith(("mypowers_cli/", "mypowers_tui/")) for name in names)
         assert not any(
             name.startswith(("tests/", "docs/", "config/", ".env", ".local/")) for name in names
         )
     results = {}
     with tempfile.TemporaryDirectory(prefix="mypowers-wheel-") as temporary:
         directory = Path(temporary)
-        for kind in ("server", "client"):
+        for kind in ("server", "base"):
             target = directory / kind
             execute(["uv", "venv", "--python", sys.executable, str(target)], directory)
             python = target / "bin/python"
             install = ["uv", "pip", "install", "--python", str(python)]
             if args.offline:
                 install.append("--offline")
-            execute(
-                [*install, "--require-hashes", "-r", str(root / f"deploy/requirements-{kind}.txt")],
-                directory,
-            )
-            execute([*install, "--no-deps", str(wheel)], directory)
-            absent = (
-                ["rich", "httpx"]
-                if kind == "server"
-                else ["bleak", "dbus_fast", "fastapi", "uvicorn", "aiosqlite", "yaml"]
-            )
+            if kind == "server":
+                execute(
+                    [
+                        *install,
+                        "--require-hashes",
+                        "-r",
+                        str(root / "deploy/requirements-server.txt"),
+                    ],
+                    directory,
+                )
+                execute([*install, "--no-deps", str(wheel)], directory)
+            else:
+                execute([*install, str(wheel)], directory)
+            absent = ["rich", "httpx"]
+            if kind == "base":
+                absent += ["bleak", "dbus_fast", "fastapi", "uvicorn", "aiosqlite", "yaml"]
             code = (
                 "import importlib.util; assert all("
                 "importlib.util.find_spec(name) is None for name in " + repr(absent) + ")"
             )
             execute([str(python), "-c", code], directory)
-            programs = ["mypowersd"] if kind == "server" else ["mypowers"]
-            for name in programs:
-                execute([str(target / "bin" / name), "--help"], directory)
-            missing = "mypowers" if kind == "server" else "mypowersd"
-            hint = subprocess.run(
-                [str(target / "bin" / missing)], cwd=directory, capture_output=True, text=True
-            )
-            assert (
-                hint.returncode == 2
-                and "Install mypowers[" in hint.stderr
-                and "Traceback" not in hint.stderr
-            )
-            results[kind] = {
-                "result": "PASS",
-                "absent_dependencies": absent,
-                "outside_checkout": True,
-                "missing_extra_hint": "PASS",
-            }
+            assert not (target / "bin/mypowers").exists()
+            if kind == "server":
+                execute([str(target / "bin/mypowersd"), "--help"], directory)
+            else:
+                hint = subprocess.run(
+                    [str(target / "bin/mypowersd")], cwd=directory, capture_output=True, text=True
+                )
+                assert hint.returncode == 2 and "Install mypowers[server]" in hint.stderr
+                assert "Traceback" not in hint.stderr
+            results[kind] = {"result": "PASS", "absent_dependencies": absent}
+        for name in ("mypowers", "mypowers-tui"):
+            binary = root / "frontends/tui/target/debug" / name
+            assert binary.is_file(), "Build the native clients before wheel verification."
+            execute([str(binary), "--help"], directory)
+        results["native_clients"] = {"result": "PASS", "outside_checkout": True}
     if args.result_file:
         Path(args.result_file).write_text(json.dumps(results, indent=2) + "\n")
     print(json.dumps(results, indent=2))

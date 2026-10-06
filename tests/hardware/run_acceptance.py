@@ -203,7 +203,7 @@ async def acceptance(args: argparse.Namespace) -> dict[str, Any]:
             ):
                 process = await asyncio.to_thread(
                     subprocess.run,
-                    [str(bindir / "mypowers"), *args_list],
+                    ["mypowers", *args_list],
                     env=client_env,
                     capture_output=True,
                     text=True,

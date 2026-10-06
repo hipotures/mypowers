@@ -29,7 +29,7 @@ impl Config {
         Self::parse(arguments)
     }
 
-    fn parse(args: Vec<String>) -> io::Result<Option<Self>> {
+    pub fn parse(args: Vec<String>) -> io::Result<Option<Self>> {
         let mut options = HashMap::new();
         let (mut no_color, mut no_mouse, mut utc) =
             (env::var_os("NO_COLOR").is_some(), false, false);

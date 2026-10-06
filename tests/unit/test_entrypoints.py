@@ -8,28 +8,20 @@ from mypowers import entrypoints
 from mypowers.daemon import main as daemon
 
 
-@pytest.mark.parametrize(
-    "name,module,extra",
-    [
-        ("daemon", "mypowers.daemon.main", "server"),
-        ("cli", "mypowers_cli.main", "cli"),
-    ],
-)
-def test_lazy_entrypoints_and_missing_extra(monkeypatch, capsys, name, module, extra):
+def test_lazy_daemon_entrypoint_and_missing_server_extra(monkeypatch, capsys):
     function = Mock()
     importer = Mock(return_value=SimpleNamespace(main=function))
     monkeypatch.setattr(entrypoints.importlib, "import_module", importer)
-    getattr(entrypoints, name)()
-    importer.assert_called_once_with(module)
+    entrypoints.daemon()
+    importer.assert_called_once_with("mypowers.daemon.main")
     function.assert_called_once()
     importer.side_effect = ModuleNotFoundError("missing", name="dependency")
     with pytest.raises(SystemExit) as caught:
-        getattr(entrypoints, name)()
+        entrypoints.daemon()
     assert caught.value.code == 2
     message = capsys.readouterr().err
-    assert f"mypowers[{extra}]" in message
-    command = "mypowersd" if name == "daemon" else "mypowers"
-    assert f"uv run --locked --extra {extra} {command}" in message
+    assert "mypowers[server]" in message
+    assert "uv run --locked --extra server mypowersd" in message
 
 
 def test_daemon_config_foreground_workers_and_private_token(config, tmp_path, monkeypatch, capsys):

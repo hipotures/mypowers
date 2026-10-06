@@ -1,9 +1,33 @@
-# MyPowers Ratatui client
+# MyPowers native clients
+
+This crate builds the Rust CLI (`mypowers`) and interactive TUI (`mypowers-tui`).
+The one-shot `mypowers status` shares the dashboard renderer, retains output states,
+and omits focus highlights and keyboard hints. `--json` returns clean API JSON.
 
 This is the working Rust TUI. Its visual design follows `prototypes/ratatui-ui`,
 with a rounded composition, battery gradient, inline independent INPUT/OUTPUT
 readings, two-row sparklines or a shared chart with seven plot rows, and unboxed AC/DC/light controls.
 There is no Python/Rich TUI implementation or rendering fallback.
+
+## CLI
+
+```sh
+cargo run --locked --manifest-path frontends/tui/Cargo.toml --bin mypowers -- status
+cargo run --locked --manifest-path frontends/tui/Cargo.toml --bin mypowers -- status --json
+```
+
+After installing both binaries, use `mypowers status`, `mypowers logs --follow`,
+`mypowers ac on` or `mypowers tui`. Common options work before or after the command.
+Status uses saved chart settings and database aggregates, retains actual ON/OFF states,
+and has no focus highlight or interactive shortcuts. The snapshot stays in scrollback;
+raw mode, mouse capture, hidden cursor and alternate screen are used only by the TUI.
+JSON status fetches only `/status` and preserves the API response fields.
+
+Exit codes: 0 success, 1 server/command failure, 2 usage/configuration error,
+3 unavailable server/invalid response, 4 authentication, 5 rejected/not-live,
+6 uncertain or unconfirmed output change, 130 interruption. Output admission is
+one PUT with a captured server UUID/revision and a fresh idempotency key; polling
+never replays it and cannot confirm a different output intention.
 
 ## Run
 
@@ -26,7 +50,7 @@ Install the native binary:
 ```sh
 cargo install --locked --path frontends/tui
 mypowers-tui
-# The Python CLI invokes that installed native binary:
+# The native CLI invokes its sibling TUI binary:
 mypowers tui
 ```
 
@@ -35,6 +59,7 @@ virtual environment; no Python TUI dependency set is needed:
 
 ```sh
 cargo build --release --locked --manifest-path frontends/tui/Cargo.toml
+install -m 755 frontends/tui/target/release/mypowers .venv/bin/mypowers
 install -m 755 frontends/tui/target/release/mypowers-tui .venv/bin/mypowers-tui
 uv run mypowers-tui
 uv run mypowers tui
@@ -53,7 +78,7 @@ uv run mypowers tui
 | Left click, released over the same dashboard control | Activate that output |
 | F3 on dashboard | Open the logs modal |
 | s on dashboard | Open Settings tabs |
-| t on dashboard | Cycle average per bucket: 10 seconds, 60 seconds, 1 hour |
+| t on dashboard | Cycle average per bucket: 10 seconds, 30 seconds, 60 seconds, 1 hour |
 | g on dashboard | Switch two sparklines / shared line chart (session only) |
 | F1 / ? on dashboard, in logs, or in settings | Help for the active context |
 | f in logs | Cycle minimum log level |

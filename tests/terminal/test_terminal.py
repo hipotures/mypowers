@@ -1402,6 +1402,8 @@ def test_battery_alert_form_saves_and_notify_test_reports_missing_connector(
             session.write(b"\t")
             session.read(b"Not configured")
             session.write(b"\r")
-            session.read(b"Telegram test failed")
+            # The operation receipt and its server log can arrive in either order.
+            session.read(b"failed")
+            assert "Telegram test" in "\n".join(session.screen.display)
         finally:
             session.close()

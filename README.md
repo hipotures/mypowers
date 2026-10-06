@@ -8,7 +8,7 @@ estimated remaining time and input/output power history.
 ![MyPowers dashboard with a 30-second power chart](docs/screenshots/dashboard-chart-30s.svg)
 
 A Python daemon owns the Bluetooth connection and runs collection and alerts continuously.
-The Rust/Ratatui TUI and Python CLI connect through an HTTP/WebSocket API, locally or remotely.
+The Rust/Ratatui TUI and native Rust CLI connect through an HTTP/WebSocket API, locally or remotely.
 Closing the TUI leaves the daemon, recording and alerts running.
 
 ## Features
@@ -30,13 +30,13 @@ that profile. See the [hardware research](docs/research/s300/README.md) for deta
 ## Quick start
 
 The server requires Linux, Python 3.12+, SQLite 3.37+, `uv`, BlueZ and system D-Bus.
-The TUI also requires Rust/Cargo. The server's Bluetooth controller must be accessible
+The native CLI and TUI also require Rust/Cargo. The server's Bluetooth controller must be accessible
 to its service account. Clients can run on a different machine without Bluetooth access.
 
 From a checkout of this repository:
 
 ```bash
-uv sync --locked --extra server --extra cli
+uv sync --locked --extra server
 cp .env.example .env
 ```
 
@@ -52,18 +52,19 @@ uv run mypowersd check-config
 uv run mypowersd
 ```
 
-In another terminal, build and install the native TUI into the project's environment:
+In another terminal, build and install both native clients into the project's environment:
 
 ```bash
 cargo build --release --locked --manifest-path frontends/tui/Cargo.toml
+install -m 755 frontends/tui/target/release/mypowers .venv/bin/mypowers
 install -m 755 frontends/tui/target/release/mypowers-tui .venv/bin/mypowers-tui
 uv run mypowers-tui
 ```
 
-Both Python extras are included above: `server` supplies Bluetooth and API dependencies;
-`cli` supplies the command-line client. The TUI is a separate Rust executable and must
-be built explicitly. You can also install it on your Cargo path with
-`cargo install --locked --path frontends/tui`.
+The Python `server` extra supplies Bluetooth and API dependencies. CLI and TUI are
+native Rust executables built together, with a shared API client and dashboard renderer.
+They need no Python installation on a client machine. To install both on your Cargo
+path, run `cargo install --locked --path frontends/tui`.
 
 Server, CLI and TUI read `.env` from their current working directory. Use
 `--env-file PATH` to select another file. The example uses loopback port **8765**
@@ -129,6 +130,14 @@ See [alert configuration and delivery behavior](docs/configuration.md) for detai
 
 ## Command-line client
 
+![Native CLI one-shot status snapshot](docs/screenshots/cli-status.svg)
+
+`mypowers status` prints a one-shot dashboard with battery, power history and actual
+AC/DC/LIGHT states, then exits. It shares the TUI renderer but has no keyboard hints,
+interactive controls or selection highlight. `ON` is green and `OFF` is dimmed.
+The snapshot stays in terminal scrollback; it never enters the alternate screen.
+`--json` prints the original API response without graphics, colors or extra requests.
+
 ```bash
 uv run mypowers status
 uv run mypowers status --json
@@ -190,10 +199,10 @@ All images have the same **980 × 620** canvas. Click an image to open it at ful
 ## Development and verification
 
 ```bash
-uv sync --locked --extra server --extra cli --group dev
+uv sync --locked --extra server --group dev
 uv run ruff check src frontends tests
 uv run ruff format --check src frontends tests
-uv run mypy src frontends
+uv run mypy src
 uv run pytest -m 'not hardware'
 cargo test --locked --manifest-path frontends/tui/Cargo.toml
 cargo test --locked --manifest-path xtask/Cargo.toml

@@ -20,6 +20,7 @@ pub enum View {
 
 pub struct App {
     pub clock: Clock,
+    pub snapshot: bool,
     pub warning_count: u32,
     pub error_count: u32,
     pub status: Option<Status>,
@@ -88,6 +89,7 @@ impl App {
             clock,
             warning_count: 0,
             error_count: 0,
+            snapshot: false,
             status: None,
             connected: false,
             received: Instant::now(),

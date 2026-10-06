@@ -57,6 +57,29 @@ pub enum Intent {
     Debug(bool),
 }
 
+#[derive(Debug)]
+pub struct ApiError {
+    pub code: String,
+    pub message: String,
+    pub status: u16,
+}
+
+impl From<&str> for ApiError {
+    fn from(message: &str) -> Self {
+        Self {
+            code: "incompatible_response".into(),
+            message: message.into(),
+            status: 0,
+        }
+    }
+}
+
+impl std::fmt::Display for ApiError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.message)
+    }
+}
+
 pub struct Api {
     http: reqwest::Client,
     origin: reqwest::Url,
@@ -121,6 +144,18 @@ impl Api {
         body: Option<Value>,
         key: Option<&str>,
     ) -> Result<Value, String> {
+        self.request_detailed(method, path, body, key)
+            .await
+            .map_err(|e| e.to_string())
+    }
+
+    pub async fn request_detailed(
+        &self,
+        method: reqwest::Method,
+        path: &str,
+        body: Option<Value>,
+        key: Option<&str>,
+    ) -> Result<Value, ApiError> {
         let url = self
             .origin
             .join(&format!("/api/v1{path}"))
@@ -132,10 +167,11 @@ impl Api {
         if let Some(key) = key {
             request = request.header("Idempotency-Key", key);
         }
-        let mut response = request
-            .send()
-            .await
-            .map_err(|_| "Cannot reach daemon or verify TLS.")?;
+        let mut response = request.send().await.map_err(|_| ApiError {
+            code: "server_unreachable".into(),
+            message: "Cannot reach daemon or verify TLS.".into(),
+            status: 0,
+        })?;
         let status = response.status();
         if status.is_redirection() {
             return Err("Daemon redirect refused.".into());
@@ -156,7 +192,11 @@ impl Api {
         if !status.is_success() {
             // Show only the API error code; never echo a response body or secret-bearing URL.
             let code = data["error"]["code"].as_str().unwrap_or("http_error");
-            return Err(format!("API {}: {}", status.as_u16(), safe(code)));
+            return Err(ApiError {
+                code: safe(code).into_owned(),
+                message: format!("API {}: {}", status.as_u16(), safe(code)),
+                status: status.as_u16(),
+            });
         }
         if !data.is_object() {
             return Err("Invalid API response object.".into());
@@ -392,7 +432,7 @@ impl Api {
         }
     }
 
-    async fn history(
+    pub async fn history(
         &self,
         request: &crate::history::Request,
     ) -> Result<Vec<crate::history::Point>, String> {
@@ -533,6 +573,23 @@ impl Api {
     }
 
     async fn stream_once(&self, logs: bool, events: &mpsc::Sender<Event>) -> Result<(), String> {
+        self.stream_query(logs, None, events).await
+    }
+
+    pub async fn follow_logs(
+        &self,
+        query: &str,
+        events: &mpsc::Sender<Event>,
+    ) -> Result<(), String> {
+        self.stream_query(true, Some(query), events).await
+    }
+
+    async fn stream_query(
+        &self,
+        logs: bool,
+        query: Option<&str>,
+        events: &mpsc::Sender<Event>,
+    ) -> Result<(), String> {
         let mut url = self.origin.clone();
         let scheme = if url.scheme() == "https" { "wss" } else { "ws" };
         url.set_scheme(scheme)
@@ -543,7 +600,7 @@ impl Api {
             "/api/v1/events"
         });
         if logs {
-            url.set_query(Some("min_level=DEBUG"));
+            url.set_query(Some(query.unwrap_or("min_level=DEBUG")));
         }
         let mut request = url
             .as_str()

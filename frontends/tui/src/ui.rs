@@ -79,13 +79,17 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
     if app.view == View::Dashboard {
         app.title = Rect::new(area.x + (area.width - 10) / 2 + 1, area.y, 8, 1);
     }
-    let footer = outer_footer(
-        app.view,
-        area.width,
-        app.graph.resolution.label(),
-        app.graph.visualization,
-        app.settings_tab,
-    );
+    let footer = if app.snapshot {
+        String::new()
+    } else {
+        outer_footer(
+            app.view,
+            area.width,
+            app.graph.resolution.label(),
+            app.graph.visualization,
+            app.settings_tab,
+        )
+    };
     let outer = Block::default()
         .borders(Borders::ALL)
         .border_type(BorderType::Rounded)
@@ -613,7 +617,7 @@ fn dashboard(frame: &mut Frame, content: Rect, app: &mut App) {
     for (index, label) in ["AC", "DC", "LIGHT"].iter().enumerate() {
         let rect = controls[index];
         app.controls[index] = rect;
-        let active = app.hovered == Some(index) || app.selected == Some(index);
+        let active = !app.snapshot && (app.hovered == Some(index) || app.selected == Some(index));
         let enabled = sample.map(|s| [s.ac_enabled, s.dc_enabled, s.light_enabled][index]);
         let pending_label = app
             .pending

@@ -19,7 +19,7 @@ jobs:
         with:
           python-version: ${{ matrix.python }}
           enable-cache: true
-      - run: uv sync --locked --python ${{ matrix.python }} --extra server --extra cli --group dev
+      - run: uv sync --locked --python ${{ matrix.python }} --extra server --group dev
       - run: cargo build --locked --manifest-path frontends/tui/Cargo.toml
       - run: cargo fmt --check --manifest-path frontends/tui/Cargo.toml
       - run: cargo clippy --locked --manifest-path frontends/tui/Cargo.toml --all-targets -- -D warnings
@@ -30,7 +30,7 @@ jobs:
       - run: cargo xtask ui-snapshots --check
       - run: uv run ruff check src frontends tests
       - run: uv run ruff format --check src frontends tests
-      - run: uv run mypy src frontends
+      - run: uv run mypy src
       - run: uv run pytest -m 'not hardware' --cov --cov-report=term --cov-report=json:coverage.json
       - name: Coverage requirements
         run: uv run python tests/check_coverage.py coverage.json
