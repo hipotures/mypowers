@@ -60,7 +60,7 @@ pub enum NotifyState {
     Failed,
 }
 
-/// Additional views for publication; all use the same 120x30 terminal canvas.
+/// Additional views for publication; the gallery exporter supplies one shared canvas size.
 pub const GALLERY: &[(&str, Scene, u16, u16)] = &[
     (
         "dashboard-live-30s.svg",

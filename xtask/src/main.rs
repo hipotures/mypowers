@@ -14,6 +14,7 @@ fn snapshots(output: &Path, check: bool, gallery: bool) -> Result<Vec<&'static s
             [].iter()
         })
         .map(|&(name, scene, width, height)| {
+            let (width, height) = if gallery { (98, 31) } else { (width, height) };
             let buffer =
                 scenes::render(scene, width, height).map_err(|error| format!("{name}: {error}"))?;
             let svg = svg::export(&buffer).map_err(|error| format!("{name}: {error}"))?;
@@ -103,7 +104,7 @@ mod tests {
             let image = fs::read_to_string(output.join(name)).unwrap();
             assert!(
                 image.starts_with(
-                    "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"1200\" height=\"600\""
+                    "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"980\" height=\"620\""
                 ),
                 "{name}"
             );

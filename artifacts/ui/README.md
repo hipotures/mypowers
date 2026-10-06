@@ -20,7 +20,8 @@ cargo xtask ui-snapshots --gallery --output /tmp/scr
 cargo xtask ui-snapshots --gallery --output /tmp/scr --check
 ```
 
-Gallery mode uses 120x30 terminal cells (1200x600 SVG pixels), omits the smaller-terminal
+Gallery mode uses 98x31 terminal cells (980x620 SVG pixels), leaving two columns at each
+side and one row above and below the 94x29 application. It omits the smaller-terminal
 variants, and adds every settings value picker, contextual help, log filters, 30-second graphs,
 Debug/Pause states and Telegram test outcomes. It requires an explicit output directory to keep
 the canonical regression images unchanged. All data is deterministic and no messages are sent.
