@@ -300,7 +300,7 @@ impl App {
                     },
                 ));
             }
-            Event::Exit => {}
+            Event::Exit | Event::ClipboardTerminal(_, _) => {}
         }
     }
 

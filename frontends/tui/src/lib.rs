@@ -1,6 +1,7 @@
 pub mod app;
 pub mod cli;
 pub mod client_ui;
+pub mod clipboard;
 pub mod clock;
 pub mod config;
 pub mod feedback;

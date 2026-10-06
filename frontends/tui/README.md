@@ -93,7 +93,7 @@ uv run mypowers tui
 | Up/Down, Enter or click in Settings | Select a field, open its value list and confirm a value |
 | Change a setting | Autosave on the server after 5 seconds without another change; closing Settings saves immediately |
 | Send test message in Notify | Ask the server to send a Telegram test; does not change alert cooldown |
-| Double-click MYPOWERS | Copy current rendered API snapshot through Wayland `wl-copy` |
+| Double-click MYPOWERS | Copy current rendered API snapshot to the local terminal clipboard (OSC 52 over SSH) |
 | Double-click LOGS title | Copy every currently loaded log record, including rows outside the viewport |
 
 Only q, Ctrl-Q, and Esc are global. Other shortcuts belong to the active view;
@@ -191,8 +191,11 @@ the window. Sparklines scale independently; the shared chart uses one maximum
 for INPUT and OUTPUT. The current range appears above each plot. Positive
 sparkline averages occupy at least one eighth-cell tick; zero stays empty. Malformed, unordered, mismatched or oversized responses are rejected
 as a complete request rather than partially displayed.
-Clipboard support is optional and
-requires `wl-copy` and an accessible Wayland session.
+Clipboard uses OSC 52 over SSH so the local terminal can update the desktop
+clipboard. Locally it tries `wl-copy`, then falls back to OSC 52. The terminal
+must allow OSC 52 clipboard writes. OSC 52 has no delivery acknowledgment;
+success reports that the sequence was written, not that the terminal accepted it.
+Protocol: [xterm selection controls](https://invisible-island.net/xterm/ctlseqs/ctlseqs.html).
 Log copies are plain text with timestamps in the selected timezone, levels, and
 complete messages, without terminal width clipping. Pages not yet loaded are not
 included. Copy results appear in the status strip.

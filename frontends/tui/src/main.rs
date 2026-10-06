@@ -3,7 +3,7 @@ mod terminal;
 use crossterm::event::{self, Event as TerminalEvent, KeyEventKind};
 use mypowers_tui::{
     app::{App, Effect},
-    config, feedback, model, network, ui,
+    clipboard, config, feedback, model, network, ui,
 };
 use network::{Api, ClipboardTarget, Event};
 use ratatui::{Terminal, backend::CrosstermBackend};
@@ -75,6 +75,11 @@ fn run() -> Result<(), String> {
             for _ in 0..256 {
                 match incoming.try_recv() {
                     Ok(Event::Exit) => break 'ui,
+                    Ok(Event::ClipboardTerminal(text, target)) => {
+                        let success =
+                            clipboard::write_terminal(&mut io::stdout().lock(), &text).is_ok();
+                        app.update(Event::Copied(success, target));
+                    }
                     Ok(event) => {
                         if matches!(event, Event::Disconnected(_)) {
                             let _ = history_requests.send(None);
@@ -136,14 +141,7 @@ fn run() -> Result<(), String> {
                             let json =
                                 serde_json::to_string_pretty(status).map_err(io::Error::other)?;
                             let events = events.clone();
-                            runtime.spawn(async move {
-                                let _ = events
-                                    .send(Event::Copied(
-                                        copy_text(json).await,
-                                        ClipboardTarget::Snapshot,
-                                    ))
-                                    .await;
-                            });
+                            runtime.spawn(clipboard::copy(json, ClipboardTarget::Snapshot, events));
                         } else {
                             app.update(Event::Copied(false, ClipboardTarget::Snapshot));
                         }
@@ -151,11 +149,7 @@ fn run() -> Result<(), String> {
                     Effect::CopyLogs => {
                         let text = app.logs.clipboard_text();
                         let events = events.clone();
-                        runtime.spawn(async move {
-                            let _ = events
-                                .send(Event::Copied(copy_text(text).await, ClipboardTarget::Logs))
-                                .await;
-                        });
+                        runtime.spawn(clipboard::copy(text, ClipboardTarget::Logs, events));
                     }
                 }
             }
@@ -165,22 +159,4 @@ fn run() -> Result<(), String> {
     drop(session);
     runtime.shutdown_timeout(Duration::from_millis(200));
     result.map_err(|_| "TUI stopped after an I/O error; terminal settings restored.".into())
-}
-
-async fn copy_text(text: String) -> bool {
-    use tokio::io::AsyncWriteExt;
-    let copy = async {
-        let mut child = tokio::process::Command::new("wl-copy")
-            .args(["--type", "text/plain;charset=utf-8"])
-            .stdin(std::process::Stdio::piped())
-            .stdout(std::process::Stdio::null())
-            .stderr(std::process::Stdio::null())
-            .kill_on_drop(true)
-            .spawn()?;
-        let mut stdin = child.stdin.take().unwrap();
-        stdin.write_all(text.as_bytes()).await?;
-        drop(stdin);
-        child.wait().await
-    };
-    matches!(tokio::time::timeout(Duration::from_secs(2), copy).await, Ok(Ok(status)) if status.success())
 }

@@ -40,6 +40,7 @@ pub enum Event {
     Notice(String),
     Finished(Feedback),
     Copied(bool, ClipboardTarget),
+    ClipboardTerminal(String, ClipboardTarget),
     Exit,
 }
 
