@@ -13,7 +13,7 @@ use ratatui::{
     symbols::Marker,
     text::{Line, Span},
     widgets::{
-        Axis, Block, BorderType, Borders, Chart, Clear, Dataset, GraphType, Paragraph, Scrollbar,
+        Axis, Block, BorderType, Chart, Clear, Dataset, GraphType, Paragraph, Scrollbar,
         ScrollbarOrientation, ScrollbarState, Sparkline, SparklineBar, Widget,
     },
 };
@@ -25,22 +25,81 @@ pub const DASHBOARD_WIDTH: u16 = 94;
 pub const DASHBOARD_HEIGHT: u16 = 28;
 // Six numeric columns cover the largest power scale (102400), plus the Y axis.
 const CHART_AXIS_WIDTH: u16 = 7;
-const BACKGROUND: Color = Color::Rgb(16, 21, 27);
-const TEXT: Color = Color::Rgb(224, 232, 236);
-const MUTED: Color = Color::Rgb(119, 144, 153);
-const BORDER: Color = Color::Rgb(68, 94, 105);
-const DIM: Color = Color::Rgb(79, 93, 102);
-const TRACK: Color = Color::Rgb(34, 46, 54);
+// Semantic telemetry colors stay recognizable across themes; all surfaces and
+// interactive components use the same resolved client palette.
 const GREEN: Color = Color::Rgb(118, 203, 137);
 const CYAN: Color = Color::Rgb(92, 181, 204);
 const YELLOW: Color = Color::Rgb(220, 199, 111);
 const ORANGE: Color = Color::Rgb(227, 151, 91);
+#[cfg(test)]
+const TRACK: Color = Color::Rgb(34, 46, 54);
+#[cfg(test)]
 const RED: Color = Color::Rgb(229, 101, 111);
 
+#[derive(Clone)]
+struct Palette {
+    theme: ratcn::Theme,
+    dim: Color,
+}
+impl Palette {
+    fn new(preferences: &crate::client_ui::ClientPreferences) -> Self {
+        let theme = preferences.theme();
+        let dim = if preferences.theme == "MyPowers" && preferences.colors.is_empty() {
+            Color::Rgb(79, 93, 102)
+        } else {
+            theme.muted_foreground
+        };
+        Self { theme, dim }
+    }
+}
+
+fn action_button<'a>(
+    label: &'a str,
+    theme: &ratcn::Theme,
+    focused: bool,
+    disabled: bool,
+) -> ratcn::ButtonWidget<'a> {
+    ratcn::ButtonWidget::new(label)
+        .themed(theme)
+        .ghost()
+        .focused(focused)
+        .disabled(disabled)
+}
+
+fn panel<'a>(theme: &ratcn::Theme, title: impl Into<Line<'a>>) -> Block<'a> {
+    Block::bordered()
+        .border_type(BorderType::Rounded)
+        .border_style(Style::default().fg(theme.border))
+        .style(Style::default().bg(theme.background).fg(theme.foreground))
+        .title_top(
+            title.into().centered().style(
+                Style::default()
+                    .fg(theme.foreground)
+                    .add_modifier(Modifier::BOLD),
+            ),
+        )
+}
+
+fn themed_list<'a>(
+    items: &'a [ratatui::text::Text<'static>],
+    theme: &ratcn::Theme,
+) -> ratcn::ListWidget<'a> {
+    let mut style = ratcn::ListStyle::from_theme(theme);
+    style.background = theme.background;
+    style.focused_background = theme.background;
+    style.foreground = theme.foreground;
+    ratcn::ListWidget::new(items).style(style).focus_symbol("")
+}
+
 pub fn draw(frame: &mut Frame, app: &mut App) {
+    let palette = Palette::new(&app.client_preferences);
     let screen = frame.area();
     frame.render_widget(
-        Block::default().style(Style::default().bg(BACKGROUND).fg(TEXT)),
+        Block::default().style(
+            Style::default()
+                .bg(palette.theme.background)
+                .fg(palette.theme.foreground),
+        ),
         screen,
     );
     app.controls = [Rect::default(); 3];
@@ -56,7 +115,7 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
         frame.render_widget(
             Paragraph::new("Terminal too small\nNeed at least 60x19")
                 .alignment(Alignment::Center)
-                .style(Style::default().fg(MUTED)),
+                .style(Style::default().fg(palette.theme.muted_foreground)),
             centered(screen, screen.width, 2),
         );
         if app.no_color {
@@ -90,20 +149,11 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
             app.settings_tab,
         )
     };
-    let outer = Block::default()
-        .borders(Borders::ALL)
-        .border_type(BorderType::Rounded)
-        .border_style(Style::default().fg(BORDER))
-        .title_top(
-            Line::from(" MYPOWERS ")
-                .style(Style::default().fg(TEXT).add_modifier(Modifier::BOLD))
-                .centered(),
-        )
-        .title_bottom(
-            Line::from(footer.as_str())
-                .style(Style::default().fg(MUTED))
-                .centered(),
-        );
+    let outer = panel(&palette.theme, " MYPOWERS ").title_bottom(
+        Line::from(footer.as_str())
+            .style(Style::default().fg(palette.theme.muted_foreground))
+            .centered(),
+    );
     let inner = outer.inner(area);
     frame.render_widget(outer, area);
     let content = Rect {
@@ -115,7 +165,7 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
         View::Dashboard => dashboard(frame, content, app),
         View::Logs => {
             dashboard(frame, content, app);
-            dim_background(frame);
+            dim_background(frame, &palette);
             app.controls = [Rect::default(); 3];
             app.title = Rect::default();
             let modal = centered(
@@ -125,50 +175,30 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
             );
             frame.render_widget(Clear, modal);
             app.logs.title = Rect::new(modal.x + (modal.width - 6) / 2 + 1, modal.y, 4, 1);
-            let block = Block::default()
-                .borders(Borders::ALL)
-                .border_type(BorderType::Rounded)
-                .border_style(Style::default().fg(BORDER))
-                .style(Style::default().bg(BACKGROUND).fg(TEXT))
-                .title_top(
-                    Line::from(" LOGS ")
-                        .centered()
-                        .style(Style::default().fg(TEXT).add_modifier(Modifier::BOLD)),
-                )
-                .title_bottom(
-                    Line::from(logs_footer(modal.width))
-                        .centered()
-                        .style(Style::default().fg(MUTED)),
-                );
+            let block = panel(&palette.theme, " LOGS ").title_bottom(
+                Line::from(logs_footer(modal.width))
+                    .centered()
+                    .style(Style::default().fg(palette.theme.muted_foreground)),
+            );
             let inner = block.inner(modal);
             frame.render_widget(block, modal);
             logs(frame, inner, app);
         }
         View::Help | View::Settings => {
             dashboard(frame, content, app);
-            dim_background(frame);
+            dim_background(frame, &palette);
             app.controls = [Rect::default(); 3];
             let modal = centered(area, area.width - 4, area.height - 4);
             frame.render_widget(Clear, modal);
             let theme = app.client_preferences.theme();
-            let block = Block::default()
-                .borders(Borders::ALL)
-                .border_type(BorderType::Rounded)
-                .border_style(Style::default().fg(theme.border))
-                .style(Style::default().bg(theme.background).fg(theme.foreground))
-                .title_top(
-                    Line::from(if app.view == View::Help {
-                        " HELP "
-                    } else {
-                        " SETTINGS "
-                    })
-                    .centered()
-                    .style(
-                        Style::default()
-                            .fg(theme.foreground)
-                            .add_modifier(Modifier::BOLD),
-                    ),
-                );
+            let block = panel(
+                &theme,
+                if app.view == View::Help {
+                    " HELP "
+                } else {
+                    " SETTINGS "
+                },
+            );
             let inner = block.inner(modal);
             frame.render_widget(block, modal);
             let inner = Rect {
@@ -184,7 +214,7 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
         }
         View::Quit => {
             dashboard(frame, content, app);
-            dim_background(frame);
+            dim_background(frame, &palette);
             app.controls = [Rect::default(); 3];
             app.title = Rect::default();
             quit_modal(frame, screen, app);
@@ -193,7 +223,11 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
     if app.view != View::Dashboard {
         // The footer belongs to the active context, so it stays readable over a dimmed dashboard.
         frame.render_widget(
-            Paragraph::new(footer.as_str()).style(Style::default().fg(MUTED).bg(BACKGROUND)),
+            Paragraph::new(footer.as_str()).style(
+                Style::default()
+                    .fg(palette.theme.muted_foreground)
+                    .bg(palette.theme.background),
+            ),
             centered(
                 Rect::new(area.x, area.bottom() - 1, area.width, 1),
                 Span::raw(footer.as_str()).width() as u16,
@@ -201,15 +235,16 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
             ),
         );
     }
-    status_line(
+    themed_status_line(
         frame,
         status_area,
         app.feedback.as_ref(),
-        context_status(app),
+        context_status(app, &palette),
         app.feedback
             .as_ref()
             .map(|feedback| app.clock.feedback_elapsed(feedback.started))
             .unwrap_or_default(),
+        &palette,
     );
     if app.no_color {
         for cell in &mut frame.buffer_mut().content {
@@ -257,17 +292,17 @@ fn logs_footer(width: u16) -> &'static str {
     }
 }
 
-fn context_status(app: &App) -> Line<'static> {
+fn context_status(app: &App, palette: &Palette) -> Line<'static> {
     let mut spans = Vec::new();
     if app.view == View::Logs {
         spans.push(Span::styled(
             logging_status(app),
-            Style::default().fg(MUTED),
+            Style::default().fg(palette.theme.muted_foreground),
         ));
     }
     for (count, name, color) in [
-        (app.warning_count, "warn", YELLOW),
-        (app.error_count, "err", RED),
+        (app.warning_count, "warn", palette.theme.warning),
+        (app.error_count, "err", palette.theme.destructive),
     ] {
         if count > 0 {
             if !spans.is_empty() {
@@ -309,12 +344,31 @@ fn logging_status(app: &App) -> String {
     text
 }
 
+#[cfg(test)]
 pub(crate) fn status_line(
     frame: &mut Frame,
     area: Rect,
     feedback: Option<&Feedback>,
     indicators: Line<'_>,
+    elapsed: std::time::Duration,
+) {
+    themed_status_line(
+        frame,
+        area,
+        feedback,
+        indicators,
+        elapsed,
+        &Palette::new(&crate::client_ui::ClientPreferences::default()),
+    );
+}
+
+fn themed_status_line(
+    frame: &mut Frame,
+    area: Rect,
+    feedback: Option<&Feedback>,
+    indicators: Line<'_>,
     feedback_elapsed: std::time::Duration,
+    palette: &Palette,
 ) {
     let right_width = indicators.width().min(usize::from(area.width)) as u16;
     let left_width = area
@@ -325,25 +379,27 @@ pub(crate) fn status_line(
     {
         let color = match feedback.severity {
             Severity::Success => GREEN,
-            Severity::Info => MUTED,
-            Severity::Warning => YELLOW,
-            Severity::Error => RED,
-        };
-        let Color::Rgb(r, g, b) = color else {
-            unreachable!()
+            Severity::Info => palette.theme.muted_foreground,
+            Severity::Warning => palette.theme.warning,
+            Severity::Error => palette.theme.destructive,
         };
         let intensity = [1.0, 0.8, 0.45, 0.2][usize::from(stage)];
-        let fade = |channel: u8, background: u8| {
-            (f64::from(background) + (f64::from(channel) - f64::from(background)) * intensity)
-                .round() as u8
+        let faded = match (color, palette.theme.background) {
+            (Color::Rgb(r, g, b), Color::Rgb(br, bg, bb)) => {
+                let fade = |channel: u8, background: u8| {
+                    (f64::from(background)
+                        + (f64::from(channel) - f64::from(background)) * intensity)
+                        .round() as u8
+                };
+                Color::Rgb(fade(r, br), fade(g, bg), fade(b, bb))
+            }
+            _ => color,
         };
-        let style = Style::default()
-            .fg(Color::Rgb(fade(r, 16), fade(g, 21), fade(b, 27)))
-            .add_modifier(match stage {
-                0 => Modifier::BOLD,
-                2 | 3 => Modifier::DIM,
-                _ => Modifier::empty(),
-            });
+        let style = Style::default().fg(faded).add_modifier(match stage {
+            0 => Modifier::BOLD,
+            2 | 3 => Modifier::DIM,
+            _ => Modifier::empty(),
+        });
         frame.render_widget(
             Paragraph::new(ellipsize(&feedback.message, left_width)).style(style),
             Rect {
@@ -381,14 +437,15 @@ fn ellipsize(message: &str, width: u16) -> Cow<'_, str> {
     Cow::Owned(result)
 }
 
-fn dim_background(frame: &mut Frame) {
+fn dim_background(frame: &mut Frame, palette: &Palette) {
     for cell in &mut frame.buffer_mut().content {
-        cell.set_fg(DIM).set_bg(BACKGROUND);
+        cell.set_fg(palette.dim).set_bg(palette.theme.background);
         cell.set_style(Style::default().remove_modifier(Modifier::BOLD));
     }
 }
 
 fn dashboard(frame: &mut Frame, content: Rect, app: &mut App) {
+    let palette = Palette::new(&app.client_preferences);
     let live = app.live();
     let chart = app.graph.visualization == Visualization::Chart;
     let graph_height = app
@@ -424,11 +481,11 @@ fn dashboard(frame: &mut Frame, content: Rect, app: &mut App) {
         .map(safe)
         .unwrap_or_else(|| "Waiting for station".into());
     frame.render_widget(
-        Paragraph::new(station).style(Style::default().fg(MUTED)),
+        Paragraph::new(station).style(Style::default().fg(palette.theme.muted_foreground)),
         header[0],
     );
     let (label, color) = if !app.connected {
-        ("DAEMON OFFLINE", RED)
+        ("DAEMON OFFLINE", palette.theme.destructive)
     } else if live {
         ("CONNECTED", GREEN)
     } else if app
@@ -436,9 +493,9 @@ fn dashboard(frame: &mut Frame, content: Rect, app: &mut App) {
         .as_ref()
         .is_some_and(|s| s.telemetry.sample.is_some())
     {
-        ("LAST KNOWN", YELLOW)
+        ("LAST KNOWN", palette.theme.warning)
     } else {
-        ("NO TELEMETRY", RED)
+        ("NO TELEMETRY", palette.theme.destructive)
     };
     frame.render_widget(
         Paragraph::new(Line::from(vec![
@@ -470,13 +527,18 @@ fn dashboard(frame: &mut Frame, content: Rect, app: &mut App) {
                 .unwrap_or_else(|| "--%".into()),
         )
         .alignment(Alignment::Center)
-        .style(Style::default().fg(TEXT).add_modifier(Modifier::BOLD)),
+        .style(
+            Style::default()
+                .fg(palette.theme.foreground)
+                .add_modifier(Modifier::BOLD),
+        ),
         rows[2],
     );
     frame.render_widget(
         Battery {
             percent: sample.map_or(0, |s| s.battery_percent),
             no_color: app.no_color,
+            track: palette.theme.field,
         },
         centered(rows[3], (content.width * 3 / 4).min(54), 1),
     );
@@ -493,7 +555,7 @@ fn dashboard(frame: &mut Frame, content: Rect, app: &mut App) {
                 .unwrap_or_else(|| "--h --m".into()),
         )
         .alignment(Alignment::Center)
-        .style(Style::default().fg(MUTED)),
+        .style(Style::default().fg(palette.theme.muted_foreground)),
         rows[4],
     );
     for (rect, label, value, output) in [
@@ -513,14 +575,16 @@ fn dashboard(frame: &mut Frame, content: Rect, app: &mut App) {
                     Style::default().fg(if chart && live {
                         if output { CYAN } else { GREEN }
                     } else {
-                        MUTED
+                        palette.theme.muted_foreground
                     }),
                 ),
                 Span::styled(
                     value.map(|v| v.to_string()).unwrap_or_else(|| "--".into()),
-                    Style::default().fg(TEXT).add_modifier(Modifier::BOLD),
+                    Style::default()
+                        .fg(palette.theme.foreground)
+                        .add_modifier(Modifier::BOLD),
                 ),
-                Span::styled(" W", Style::default().fg(MUTED)),
+                Span::styled(" W", Style::default().fg(palette.theme.muted_foreground)),
             ]))
             .alignment(Alignment::Center),
             parts[0],
@@ -533,6 +597,7 @@ fn dashboard(frame: &mut Frame, content: Rect, app: &mut App) {
                 frame,
                 parts[2],
                 app.clock.animation_elapsed(app.animation_started),
+                &palette,
             );
             continue;
         }
@@ -550,7 +615,7 @@ fn dashboard(frame: &mut Frame, content: Rect, app: &mut App) {
         frame.render_widget(
             Paragraph::new(format!("0–{maximum} W"))
                 .alignment(Alignment::Right)
-                .style(Style::default().fg(DIM)),
+                .style(Style::default().fg(palette.dim)),
             parts[1],
         );
         // Sparkline floors to eighth-cell ticks; keep positive readings visible at the selected scale.
@@ -568,7 +633,7 @@ fn dashboard(frame: &mut Frame, content: Rect, app: &mut App) {
                 SparklineBar::from(visible).style(Style::default().fg(if live {
                     load_color(value, maximum)
                 } else {
-                    DIM
+                    palette.dim
                 }))
             });
         frame.render_widget(Sparkline::default().data(data).max(scale), parts[2]);
@@ -599,11 +664,14 @@ fn dashboard(frame: &mut Frame, content: Rect, app: &mut App) {
         power_chart(
             frame,
             area,
-            if idle { &[] } else { &input },
-            if idle { &[] } else { &output },
+            (
+                if idle { &[] } else { &input },
+                if idle { &[] } else { &output },
+            ),
             maximum,
             live,
             time_ticks,
+            &palette,
         );
         if idle {
             idle_graph(
@@ -615,13 +683,13 @@ fn dashboard(frame: &mut Frame, content: Rect, app: &mut App) {
                     area.height - 2,
                 ),
                 app.clock.animation_elapsed(app.animation_started),
+                &palette,
             );
         }
     }
     let controls = Layout::horizontal([Constraint::Ratio(1, 3); 3]).split(rows[8]);
     for (index, label) in ["AC", "DC", "LIGHT"].iter().enumerate() {
         let rect = controls[index];
-        app.controls[index] = rect;
         let active = !app.snapshot && (app.hovered == Some(index) || app.selected == Some(index));
         let enabled = sample.map(|s| [s.ac_enabled, s.dc_enabled, s.light_enabled][index]);
         let pending_label = app
@@ -629,28 +697,39 @@ fn dashboard(frame: &mut Frame, content: Rect, app: &mut App) {
             .as_ref()
             .filter(|pending| pending.starts_with(["AC", "DC", "LIGHT"][index]));
         let title = pending_label.map(String::as_str).unwrap_or(label);
+        let button = centered(
+            rect,
+            ratcn::ButtonWidget::new(title).width().min(rect.width),
+            rect.height,
+        );
+        app.controls[index] = button;
         let state = enabled
             .map(|on| if on { "ON" } else { "OFF" })
             .unwrap_or("--");
         let color = if enabled == Some(true) && live {
             GREEN
         } else {
-            DIM
+            palette.dim
         };
         frame.render_widget(
-            Paragraph::new(vec![
-                Line::from(title).style(Style::default().fg(if active { TEXT } else { MUTED })),
-                Line::from(state).style(Style::default().fg(color).add_modifier(
-                    if enabled == Some(true) {
+            action_button(title, &palette.theme, active, false),
+            Rect {
+                height: 1,
+                ..button
+            },
+        );
+        frame.render_widget(
+            Paragraph::new(state).alignment(Alignment::Center).style(
+                Style::default()
+                    .fg(color)
+                    .bg(palette.theme.background)
+                    .add_modifier(if enabled == Some(true) {
                         Modifier::BOLD
                     } else {
                         Modifier::empty()
-                    },
-                )),
-            ])
-            .style(Style::default().bg(if active { TRACK } else { BACKGROUND }))
-            .alignment(Alignment::Center),
-            rect,
+                    }),
+            ),
+            Rect::new(rect.x, rect.y + 1, rect.width, 1),
         );
     }
 }
@@ -675,12 +754,13 @@ pub(crate) fn chart_runs(columns: &[Option<f64>]) -> Vec<Vec<(f64, f64)>> {
 fn power_chart(
     frame: &mut Frame,
     area: Rect,
-    input: &[Option<f64>],
-    output: &[Option<f64>],
+    series: (&[Option<f64>], &[Option<f64>]),
     maximum: u64,
     live: bool,
     time_ticks: Vec<(u16, String)>,
+    palette: &Palette,
 ) {
+    let (input, output) = series;
     let input_runs = chart_runs(input);
     let output_runs = chart_runs(output);
     let input_datasets = input_runs
@@ -689,7 +769,7 @@ fn power_chart(
             Dataset::default()
                 .marker(Marker::Braille)
                 .graph_type(GraphType::Line)
-                .style(Style::default().fg(if live { GREEN } else { DIM }))
+                .style(Style::default().fg(if live { GREEN } else { palette.dim }))
                 .data(run)
         })
         .collect();
@@ -699,7 +779,7 @@ fn power_chart(
             Dataset::default()
                 .marker(Marker::Braille)
                 .graph_type(GraphType::Line)
-                .style(Style::default().fg(if live { CYAN } else { DIM }))
+                .style(Style::default().fg(if live { CYAN } else { palette.dim }))
                 .data(run)
         })
         .collect();
@@ -714,7 +794,7 @@ fn power_chart(
                     ])
                     // Reserve a label row; time ticks have actual timestamp positions.
                     .labels([Line::from("")])
-                    .style(Style::default().fg(BORDER)),
+                    .style(Style::default().fg(palette.theme.border)),
             )
             .y_axis(
                 Axis::default()
@@ -727,12 +807,14 @@ fn power_chart(
                             Line::from(format!("{:>6}", maximum / 2)),
                             Line::from(format!("{maximum:>6}")),
                         ]
-                        .map(|label| label.style(Style::default().fg(MUTED))),
+                        .map(|label| {
+                            label.style(Style::default().fg(palette.theme.muted_foreground))
+                        }),
                     )
                     .labels_alignment(Alignment::Right)
-                    .style(Style::default().fg(BORDER)),
+                    .style(Style::default().fg(palette.theme.border)),
             )
-            .style(Style::default().bg(BACKGROUND))
+            .style(Style::default().bg(palette.theme.background))
     };
     frame.render_widget(chart(input_datasets), area);
     // Chart layers replace whole Braille cells. Merge patterns rather than erasing a series.
@@ -747,7 +829,11 @@ fn power_chart(
         let target = &mut frame.buffer_mut()[(x, y)];
         if let Some(input) = braille_pattern(target.symbol()) {
             target.set_char(char::from_u32(0x2800 + (input | output)).unwrap());
-            target.set_fg(if live { TEXT } else { DIM });
+            target.set_fg(if live {
+                palette.theme.foreground
+            } else {
+                palette.dim
+            });
         } else {
             *target = cell.clone();
         }
@@ -755,7 +841,7 @@ fn power_chart(
     frame.render_widget(
         Paragraph::new("0")
             .alignment(Alignment::Right)
-            .style(Style::default().fg(MUTED)),
+            .style(Style::default().fg(palette.theme.muted_foreground)),
         Rect::new(area.x, area.bottom() - 2, CHART_AXIS_WIDTH - 1, 1),
     );
     let plot_x = area.x + CHART_AXIS_WIDTH;
@@ -763,13 +849,13 @@ fn power_chart(
     for (column, label) in time_ticks {
         frame.buffer_mut()[(plot_x + column, area.bottom() - 2)]
             .set_symbol("┬")
-            .set_fg(BORDER);
+            .set_fg(palette.theme.border);
         let label_width = label.len() as u16;
         let label_x = column
             .saturating_sub(label_width / 2)
             .min(plot_width.saturating_sub(label_width));
         frame.render_widget(
-            Paragraph::new(label).style(Style::default().fg(MUTED)),
+            Paragraph::new(label).style(Style::default().fg(palette.theme.muted_foreground)),
             Rect::new(plot_x + label_x, area.bottom() - 1, label_width, 1),
         );
     }
@@ -830,7 +916,7 @@ pub(crate) fn chart_time_ticks(
     ticks
 }
 
-fn idle_graph(frame: &mut Frame, area: Rect, elapsed: std::time::Duration) {
+fn idle_graph(frame: &mut Frame, area: Rect, elapsed: std::time::Duration, palette: &Palette) {
     // One cell every two seconds, reversing at either end of an eleven-cell track.
     let step = (elapsed.as_secs() / 2 % 20) as usize;
     let position = step.min(20 - step);
@@ -839,7 +925,11 @@ fn idle_graph(frame: &mut Frame, area: Rect, elapsed: std::time::Duration) {
             .map(|index| {
                 Span::styled(
                     if index == position { "○" } else { "·" },
-                    Style::default().fg(if index == position { DIM } else { TRACK }),
+                    Style::default().fg(if index == position {
+                        palette.dim
+                    } else {
+                        palette.theme.field
+                    }),
                 )
             })
             .collect::<Vec<_>>(),
@@ -851,6 +941,7 @@ fn idle_graph(frame: &mut Frame, area: Rect, elapsed: std::time::Duration) {
 }
 
 fn logs(frame: &mut Frame, area: Rect, app: &mut App) {
+    let palette = Palette::new(&app.client_preferences);
     let parts = Layout::vertical([
         Constraint::Length(2),
         Constraint::Fill(1),
@@ -868,13 +959,20 @@ fn logs(frame: &mut Frame, area: Rect, app: &mut App) {
         ..parts[0]
     });
     app.logs.buttons = [header[0], header[2]];
-    for (rect, text) in [(header[0], "[ prev ]"), (header[2], "[ next ]")] {
-        frame.render_widget(Paragraph::new(text).style(Style::default().fg(MUTED)), rect);
+    for (rect, text) in [(header[0], "prev"), (header[2], "next")] {
+        frame.render_widget(
+            action_button(text, &palette.theme, false, app.logs.loading),
+            rect,
+        );
     }
     frame.render_widget(
         Paragraph::new(app.logs.day.to_string())
             .alignment(Alignment::Center)
-            .style(Style::default().fg(TEXT).add_modifier(Modifier::BOLD)),
+            .style(
+                Style::default()
+                    .fg(palette.theme.foreground)
+                    .add_modifier(Modifier::BOLD),
+            ),
         header[1],
     );
     let mode = if app.logs.follow { "LIVE" } else { "ARCHIVE" };
@@ -885,7 +983,11 @@ fn logs(frame: &mut Frame, area: Rect, app: &mut App) {
             crate::logs::LEVELS[app.logs.level],
             app.logs.page_size
         ))
-        .style(Style::default().fg(if app.logs.follow { GREEN } else { MUTED })),
+        .style(Style::default().fg(if app.logs.follow {
+            GREEN
+        } else {
+            palette.theme.muted_foreground
+        })),
         Rect {
             y: parts[0].y + 1,
             height: 1,
@@ -920,14 +1022,14 @@ fn logs(frame: &mut Frame, area: Rect, app: &mut App) {
                 .unwrap_or_else(|_| "--:--:--".into());
             let level = log["level"].as_str().unwrap_or("--");
             let color = match level {
-                "ERROR" => RED,
-                "WARNING" => YELLOW,
-                _ => MUTED,
+                "ERROR" => palette.theme.destructive,
+                "WARNING" => palette.theme.warning,
+                _ => palette.theme.muted_foreground,
             };
             Line::from(vec![
-                Span::styled(format!("{time} "), Style::default().fg(DIM)),
+                Span::styled(format!("{time} "), Style::default().fg(palette.dim)),
                 Span::styled(format!("{:<7} ", safe(level)), Style::default().fg(color)),
-                Span::raw(safe(log["message"].as_str().unwrap_or(""))),
+                Span::raw(safe(log["message"].as_str().unwrap_or("")).into_owned()),
             ])
         })
         .collect();
@@ -935,21 +1037,20 @@ fn logs(frame: &mut Frame, area: Rect, app: &mut App) {
     if max_scroll > 0 {
         text_area.width = text_area.width.saturating_sub(2);
     }
-    frame.render_widget(
-        Paragraph::new(if lines.is_empty() {
-            vec![
-                Line::from(if app.logs.loading {
-                    "Loading logs..."
-                } else {
-                    "No records for this day and filter."
-                })
-                .style(Style::default().fg(DIM)),
-            ]
-        } else {
-            lines
-        }),
-        text_area,
-    );
+    let items: Vec<ratatui::text::Text<'static>> = if lines.is_empty() {
+        vec![
+            Line::from(if app.logs.loading {
+                "Loading logs..."
+            } else {
+                "No records for this day and filter."
+            })
+            .style(Style::default().fg(palette.dim))
+            .into(),
+        ]
+    } else {
+        lines.into_iter().map(Into::into).collect()
+    };
+    frame.render_widget(themed_list(&items, &palette.theme), text_area);
     if max_scroll > 0 {
         let mut state = ScrollbarState::new(max_scroll + 1)
             .position(start)
@@ -959,9 +1060,9 @@ fn logs(frame: &mut Frame, area: Rect, app: &mut App) {
                 .begin_symbol(None)
                 .end_symbol(None)
                 .track_symbol(Some("│"))
-                .track_style(Style::default().fg(TRACK))
+                .track_style(Style::default().fg(palette.theme.field))
                 .thumb_symbol("█")
-                .thumb_style(Style::default().fg(MUTED)),
+                .thumb_style(Style::default().fg(palette.theme.muted_foreground)),
             parts[1],
             &mut state,
         );
@@ -985,29 +1086,20 @@ fn logs(frame: &mut Frame, area: Rect, app: &mut App) {
                 String::new()
             }
         )))
-        .style(Style::default().fg(MUTED)),
+        .style(Style::default().fg(palette.theme.muted_foreground)),
         parts[2],
     );
 }
 
 fn quit_modal(frame: &mut Frame, screen: Rect, app: &mut App) {
+    let palette = Palette::new(&app.client_preferences);
     let area = centered(screen, 50, 8);
     frame.render_widget(Clear, area);
-    let block = Block::default()
-        .borders(Borders::ALL)
-        .border_type(BorderType::Rounded)
-        .border_style(Style::default().fg(BORDER))
-        .style(Style::default().bg(BACKGROUND))
-        .title_top(
-            Line::from(" QUIT ")
-                .centered()
-                .style(Style::default().fg(TEXT)),
-        )
-        .title_bottom(
-            Line::from(" Enter select  Esc cancel ")
-                .centered()
-                .style(Style::default().fg(MUTED)),
-        );
+    let block = panel(&palette.theme, " QUIT ").title_bottom(
+        Line::from(" Enter select  Esc cancel ")
+            .centered()
+            .style(Style::default().fg(palette.theme.muted_foreground)),
+    );
     let inner = block.inner(area);
     frame.render_widget(block, area);
     let rows = Layout::vertical([
@@ -1020,7 +1112,7 @@ fn quit_modal(frame: &mut Frame, screen: Rect, app: &mut App) {
     frame.render_widget(
         Paragraph::new("Quit MyPowers?\nThe daemon will keep running.")
             .alignment(Alignment::Center)
-            .style(Style::default().fg(TEXT)),
+            .style(Style::default().fg(palette.theme.foreground)),
         rows[1],
     );
     let buttons = Layout::horizontal([
@@ -1034,19 +1126,7 @@ fn quit_modal(frame: &mut Frame, screen: Rect, app: &mut App) {
     app.quit_buttons = [buttons[1], buttons[3]];
     for (index, label) in ["[ Yes ]", "[ Cancel ]"].into_iter().enumerate() {
         frame.render_widget(
-            Paragraph::new(label).alignment(Alignment::Center).style(
-                Style::default()
-                    .fg(if app.quit_yes == (index == 0) {
-                        TEXT
-                    } else {
-                        DIM
-                    })
-                    .add_modifier(if app.quit_yes == (index == 0) {
-                        Modifier::BOLD
-                    } else {
-                        Modifier::empty()
-                    }),
-            ),
+            action_button(label, &palette.theme, app.quit_yes == (index == 0), false),
             app.quit_buttons[index],
         );
     }
@@ -1249,7 +1329,18 @@ fn settings(frame: &mut Frame, area: Rect, app: &mut App) {
     } else {
         rows[2]
     };
-    frame.render_widget(Paragraph::new(lines), body);
+    frame.render_widget(Paragraph::new(lines.clone()), body);
+    for (index, (rect, _field)) in app.settings_fields.iter().enumerate() {
+        let mut line = lines[index + 1].clone();
+        line.style.bg = None;
+        let items = [ratatui::text::Text::from(line)];
+        frame.render_widget(
+            themed_list(&items, &theme)
+                .focused(app.settings_selected == index)
+                .focused_item(Some(0)),
+            *rect,
+        );
+    }
     if matches!(
         app.settings_tab,
         SettingsTab::Preferences | SettingsTab::Charts | SettingsTab::Alerts
@@ -1272,11 +1363,12 @@ fn settings(frame: &mut Frame, area: Rect, app: &mut App) {
             "[ Save changes ]"
         };
         frame.render_widget(
-            ratcn::ButtonWidget::new(label)
-                .themed(&theme)
-                .ghost()
-                .focused(app.settings_selected == count as usize)
-                .disabled(app.settings.is_none() || app.pending.is_some()),
+            action_button(
+                label,
+                &theme,
+                app.settings_selected == count as usize,
+                app.settings.is_none() || app.pending.is_some(),
+            ),
             app.settings_save,
         );
     } else if app.settings_tab == SettingsTab::Notify {
@@ -1290,11 +1382,7 @@ fn settings(frame: &mut Frame, area: Rect, app: &mut App) {
             .width
             .min(ratcn::ButtonWidget::new(label).width());
         frame.render_widget(
-            ratcn::ButtonWidget::new(label)
-                .themed(&theme)
-                .ghost()
-                .focused(true)
-                .disabled(!app.connected || app.pending.is_some()),
+            action_button(label, &theme, true, !app.connected || app.pending.is_some()),
             app.settings_actions[0],
         );
     } else if app.settings_tab == SettingsTab::Debug {
@@ -1341,11 +1429,12 @@ fn settings(frame: &mut Frame, area: Rect, app: &mut App) {
             };
             app.settings_actions[index] = button;
             frame.render_widget(
-                ratcn::ButtonWidget::new(&label)
-                    .themed(&theme)
-                    .ghost()
-                    .focused(app.settings_selected == index)
-                    .disabled(!app.connected || app.pending.is_some()),
+                action_button(
+                    &label,
+                    &theme,
+                    app.settings_selected == index,
+                    !app.connected || app.pending.is_some(),
+                ),
                 button,
             );
         }
@@ -1355,12 +1444,10 @@ fn settings(frame: &mut Frame, area: Rect, app: &mut App) {
         let height = (options.len() as u16 + 4).min(area.height).max(4);
         let popup = centered(area, area.width.min(48), height);
         frame.render_widget(Clear, popup);
-        let block = Block::bordered()
-            .border_type(BorderType::Rounded)
-            .border_style(Style::default().fg(theme.primary))
-            .style(Style::default().bg(theme.background))
-            .title(format!(" {} ", picker.field.label()))
-            .title_bottom(" Enter select  Esc cancel ");
+        let block = panel(&theme, format!(" {} ", picker.field.label())).title_bottom(
+            Line::from(" Enter select  Esc cancel ")
+                .style(Style::default().fg(theme.muted_foreground)),
+        );
         let inner = block.inner(popup);
         frame.render_widget(block, popup);
         frame.render_widget(
@@ -1467,6 +1554,7 @@ fn load_color(value: f64, maximum: u64) -> Color {
 struct Battery {
     percent: u16,
     no_color: bool,
+    track: Color,
 }
 
 impl Widget for Battery {
@@ -1491,10 +1579,10 @@ impl Widget for Battery {
             }
             match remaining {
                 0 => {
-                    cell.set_symbol(" ").set_fg(TRACK).set_bg(TRACK);
+                    cell.set_symbol(" ").set_fg(self.track).set_bg(self.track);
                 }
                 1 => {
-                    cell.set_symbol("▌").set_fg(color).set_bg(TRACK);
+                    cell.set_symbol("▌").set_fg(color).set_bg(self.track);
                 }
                 _ => {
                     cell.set_symbol(" ").set_fg(color).set_bg(color);
@@ -1538,6 +1626,7 @@ mod tests {
                 Battery {
                     percent,
                     no_color: false,
+                    track: TRACK,
                 }
                 .render(area, &mut buffer);
                 let mut fill = 0;
@@ -1582,6 +1671,7 @@ mod tests {
             Battery {
                 percent: 50,
                 no_color: false,
+                track: TRACK,
             }
             .render(area, &mut buffer);
             assert_eq!(buffer, original);
@@ -1595,6 +1685,7 @@ mod tests {
         Battery {
             percent: 100,
             no_color: false,
+            track: TRACK,
         }
         .render(area, &mut buffer);
         assert_eq!(
@@ -1609,6 +1700,7 @@ mod tests {
         Battery {
             percent: u16::MAX,
             no_color: false,
+            track: TRACK,
         }
         .render(area, &mut buffer);
         assert_eq!(buffer, full);
@@ -1624,6 +1716,7 @@ mod tests {
             Battery {
                 percent,
                 no_color: true,
+                track: TRACK,
             }
             .render(area, &mut buffer);
             assert_eq!(

@@ -315,8 +315,9 @@ to a broken pipe. It does not connect to a daemon or render a separate UI.
 
 ## Local appearance and shortcuts
 
-Settings uses Ratcn 0.0.5 paint widgets for its tab buttons, action buttons and
-value lists. MyPowers retains its event loop, focus/mouse routing, command
+All views share Ratcn 0.0.5 action buttons and lists, a common dialog frame and
+a single client theme. Settings tabs, output controls, log navigation and quit
+actions use the same button painter. MyPowers retains its event loop, focus/mouse routing, command
 admission and daemon API. The dependency is pinned because Ratcn is a preview API.
 
 The default configuration file is `$XDG_CONFIG_HOME/mypowers/client.toml`,
@@ -339,8 +340,9 @@ k = "up"
 ```
 
 Available themes: MyPowers, Catppuccin, Nord, Gruvbox, Tokyo Night, Solarized,
-Terminal. Theme and color overrides affect Settings and its value popups;
-dashboard and chart palettes are preserved. `--no-color` / `NO_COLOR` still
+Terminal. Theme and color overrides affect the entire TUI, including chart axes,
+logs, dialogs, status messages and the dimmed background behind popups.
+Battery gradients and green input / cyan output keep their telemetry meaning. `--no-color` / `NO_COLOR` still
 remove all foreground/background colors.
 
 Choosing **Preferences → Theme (local)** applies and atomically saves the

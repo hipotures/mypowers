@@ -2959,29 +2959,143 @@ fn local_theme_choice_works_offline_without_changing_server_settings() {
 }
 
 #[test]
-fn settings_themes_leave_dashboard_unchanged_and_no_color_removes_styles() {
-    let mut app = app();
-    app.feedback = None;
-    let dashboard = render(&mut app, 94, 29);
+fn every_theme_applies_to_every_view_and_the_background_behind_modals() {
+    use crate::history::Visualization;
+    use ratatui::style::Color;
     for name in crate::client_ui::THEMES {
+        let mut app = fixed_graph_app();
         app.client_preferences.theme = name.into();
-        assert_eq!(dashboard, render(&mut app, 94, 29));
-        app.view = View::Settings;
-        for (width, height) in [(60, 19), (94, 29)] {
-            let buffer = render(&mut app, width, height);
-            assert!(text(&buffer).contains(name));
-            assert!(app.settings_tabs.iter().all(|rect| !rect.is_empty()));
-            app.no_color = true;
-            let buffer = render(&mut app, width, height);
+        app.settings = Some(crate::settings::Settings::default());
+        app.settings_draft = app.settings.clone().unwrap();
+        app.feedback = None;
+        let theme = app.client_preferences.theme();
+        for (width, height) in [(60, 19), (94, 29), (120, 30), (50, 14)] {
+            let mut terminal = Terminal::new(TestBackend::new(width, height)).unwrap();
+            for view in [
+                View::Dashboard,
+                View::Logs,
+                View::Settings,
+                View::Help,
+                View::Quit,
+                View::Dashboard,
+            ] {
+                app.view = view;
+                for visualization in [Visualization::Sparkline, Visualization::Chart] {
+                    app.graph.visualization = visualization;
+                    terminal.draw(|frame| ui::draw(frame, &mut app)).unwrap();
+                    let buffer = terminal.backend().buffer();
+                    assert_eq!(
+                        buffer[(0, 0)].bg,
+                        theme.background,
+                        "{name} {view:?} {visualization:?}"
+                    );
+                    assert_eq!(
+                        *buffer,
+                        render(&mut app, width, height),
+                        "theme transition must clear previous colors"
+                    );
+                    if width >= 60 && view == View::Settings {
+                        assert!(text(buffer).contains(name));
+                        assert!(app.settings_tabs.iter().all(|rect| !rect.is_empty()));
+                    }
+                    app.no_color = true;
+                    let plain = render(&mut app, width, height);
+                    assert!(
+                        plain
+                            .content
+                            .iter()
+                            .all(|cell| cell.fg == Color::Reset && cell.bg == Color::Reset)
+                    );
+                    app.no_color = false;
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn custom_palette_reaches_all_chrome_and_changes_immediately_on_a_reused_terminal() {
+    use ratatui::style::Color;
+    let mut app = fixed_graph_app();
+    let mut terminal = Terminal::new(TestBackend::new(120, 30)).unwrap();
+    for view in [
+        View::Dashboard,
+        View::Logs,
+        View::Settings,
+        View::Help,
+        View::Quit,
+    ] {
+        app.view = view;
+        app.client_preferences = Default::default();
+        terminal.draw(|frame| ui::draw(frame, &mut app)).unwrap();
+        app.client_preferences.colors = std::collections::BTreeMap::from([
+            ("background".into(), "#112233".into()),
+            ("foreground".into(), "#aabbcc".into()),
+            ("border".into(), "#778899".into()),
+            ("muted".into(), "#8899aa".into()),
+            ("focus".into(), "#334455".into()),
+        ]);
+        terminal.draw(|frame| ui::draw(frame, &mut app)).unwrap();
+        let buffer = terminal.backend().buffer();
+        assert_eq!(buffer[(0, 0)].bg, Color::Rgb(0x11, 0x22, 0x33));
+        for old in [
+            Color::Rgb(16, 21, 27),
+            Color::Rgb(224, 232, 236),
+            Color::Rgb(119, 144, 153),
+            Color::Rgb(68, 94, 105),
+            Color::Rgb(79, 93, 102),
+            Color::Rgb(34, 46, 54),
+        ] {
             assert!(
                 buffer
                     .content
                     .iter()
-                    .all(|cell| cell.fg == ratatui::style::Color::Reset
-                        && cell.bg == ratatui::style::Color::Reset)
+                    .all(|cell| cell.bg != old && cell.fg != old),
+                "old chrome remains in {view:?}: {old:?}"
             );
-            app.no_color = false;
         }
-        app.view = View::Dashboard;
+        assert_eq!(*buffer, render(&mut app, 120, 30));
+    }
+}
+
+#[test]
+fn all_settings_tabs_and_value_dialogs_share_the_active_theme() {
+    use crate::settings::{Field, Picker, Settings, SettingsTab};
+    for name in crate::client_ui::THEMES {
+        let mut app = fixed_graph_app();
+        app.client_preferences.theme = name.into();
+        app.settings = Some(Settings::default());
+        app.settings_draft = Settings::default();
+        app.view = View::Settings;
+        let theme = app.client_preferences.theme();
+        for tab in SettingsTab::ALL {
+            app.settings_tab = tab;
+            for (width, height) in [(60, 19), (120, 30)] {
+                let buffer = render(&mut app, width, height);
+                assert_eq!(buffer[(0, 0)].bg, theme.background);
+                let title_cell = buffer
+                    .content
+                    .iter()
+                    .find(|cell| cell.symbol() == "S" && cell.fg == theme.foreground);
+                assert!(title_cell.is_some(), "Settings title uses theme foreground");
+            }
+        }
+        for field in Field::PREFERENCES
+            .into_iter()
+            .chain(Field::CHARTS)
+            .chain(Field::ALERTS)
+        {
+            app.settings_picker = Some(Picker {
+                field,
+                selected: 0,
+                query: String::new(),
+            });
+            for (width, height) in [(60, 19), (120, 30)] {
+                let buffer = render(&mut app, width, height);
+                assert_eq!(buffer[(0, 0)].bg, theme.background);
+                assert!(text(&buffer).contains("Enter select"));
+                assert!(!app.settings_choices.is_empty());
+            }
+        }
     }
 }

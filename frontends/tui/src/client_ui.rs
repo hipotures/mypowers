@@ -189,6 +189,12 @@ impl ClientPreferences {
             if let Some(color) = parse_color(value) {
                 match role.as_str() {
                     "background" => {
+                        if theme.primary_foreground == theme.background {
+                            theme.primary_foreground = color;
+                        }
+                        if theme.destructive_foreground == theme.background {
+                            theme.destructive_foreground = color;
+                        }
                         theme.background = color;
                         theme.surface = color;
                     }

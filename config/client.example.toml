@@ -9,7 +9,7 @@ theme = "MyPowers"
 # ca_file = "/path/to/private-ca.pem"
 # timezone = "Europe/Warsaw"
 
-# Optional Settings color overrides. Colors are #RRGGBB.
+# Optional application-wide color overrides. Colors are #RRGGBB.
 # Supported roles: background, foreground, muted, border, focus, accent, error, warning.
 [colors]
 # accent = "#76cb89"

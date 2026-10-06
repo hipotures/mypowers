@@ -91,7 +91,7 @@ see [deployment](deploy/README.md).
 Settings contains **Preferences**, **Charts**, **Alerts**, **Notify** and **Debug**.
 The Settings controls use Ratcn. Choose **Preferences → Theme (local)** to switch
 between MyPowers, Catppuccin, Nord, Gruvbox, Tokyo Night, Solarized and Terminal.
-Themes currently style Settings; the dashboard and charts retain their original design.
+Themes apply throughout the TUI: dashboard, charts, logs, Settings, dialogs and their backgrounds.
 Local styles and navigation shortcuts live in `~/.config/mypowers/client.toml`;
 see the [example client configuration](config/client.example.toml).
 
@@ -203,19 +203,19 @@ All images have the same **980 × 620** canvas. Click an image to open it at ful
 </details>
 
 <details>
-<summary>Settings themes</summary>
+<summary>Application themes</summary>
 
 | Catppuccin | Nord |
 | --- | --- |
-| [![Catppuccin](docs/screenshots/settings-theme-catppuccin.svg)](docs/screenshots/settings-theme-catppuccin.svg) | [![Nord](docs/screenshots/settings-theme-nord.svg)](docs/screenshots/settings-theme-nord.svg) |
+| [![Catppuccin](docs/screenshots/theme-catppuccin-chart.svg)](docs/screenshots/theme-catppuccin-chart.svg) | [![Nord](docs/screenshots/theme-nord-chart.svg)](docs/screenshots/theme-nord-chart.svg) |
 
 | Gruvbox | Tokyo Night |
 | --- | --- |
-| [![Gruvbox](docs/screenshots/settings-theme-gruvbox.svg)](docs/screenshots/settings-theme-gruvbox.svg) | [![Tokyo Night](docs/screenshots/settings-theme-tokyo-night.svg)](docs/screenshots/settings-theme-tokyo-night.svg) |
+| [![Gruvbox](docs/screenshots/theme-gruvbox-chart.svg)](docs/screenshots/theme-gruvbox-chart.svg) | [![Tokyo Night](docs/screenshots/theme-tokyo-night-chart.svg)](docs/screenshots/theme-tokyo-night-chart.svg) |
 
 | Solarized | Terminal |
 | --- | --- |
-| [![Solarized](docs/screenshots/settings-theme-solarized.svg)](docs/screenshots/settings-theme-solarized.svg) | [![Terminal](docs/screenshots/settings-theme-terminal.svg)](docs/screenshots/settings-theme-terminal.svg) |
+| [![Solarized](docs/screenshots/theme-solarized-chart.svg)](docs/screenshots/theme-solarized-chart.svg) | [![Terminal](docs/screenshots/theme-terminal-chart.svg)](docs/screenshots/theme-terminal-chart.svg) |
 
 </details>
 

@@ -2101,12 +2101,10 @@
 <svg x="790" y="40" width="10" height="20" overflow="hidden"><text x="0" y="16" fill="#4f5d66" transform="scale(0.833333 1)" font-size="20">│</text></svg>
 <svg x="0" y="60" width="10" height="20" overflow="hidden"><text x="0" y="16" fill="#4f5d66" transform="scale(0.833333 1)" font-size="20">│</text></svg>
 <svg x="20" y="60" width="10" height="20" overflow="hidden"><text x="0" y="16" fill="#445e69" transform="scale(0.833333 1)" font-size="20">│</text></svg>
-<svg x="30" y="60" width="10" height="20" overflow="hidden"><text x="0" y="16" fill="#779099" transform="scale(0.9 1)">[</text></svg>
-<svg x="50" y="60" width="10" height="20" overflow="hidden"><text x="0" y="16" fill="#779099" transform="scale(0.9 1)">p</text></svg>
-<svg x="60" y="60" width="10" height="20" overflow="hidden"><text x="0" y="16" fill="#779099" transform="scale(0.9 1)">r</text></svg>
-<svg x="70" y="60" width="10" height="20" overflow="hidden"><text x="0" y="16" fill="#779099" transform="scale(0.9 1)">e</text></svg>
-<svg x="80" y="60" width="10" height="20" overflow="hidden"><text x="0" y="16" fill="#779099" transform="scale(0.9 1)">v</text></svg>
-<svg x="100" y="60" width="10" height="20" overflow="hidden"><text x="0" y="16" fill="#779099" transform="scale(0.9 1)">]</text></svg>
+<svg x="50" y="60" width="10" height="20" overflow="hidden"><text x="0" y="16" fill="#e0e8ec" transform="scale(0.9 1)">p</text></svg>
+<svg x="60" y="60" width="10" height="20" overflow="hidden"><text x="0" y="16" fill="#e0e8ec" transform="scale(0.9 1)">r</text></svg>
+<svg x="70" y="60" width="10" height="20" overflow="hidden"><text x="0" y="16" fill="#e0e8ec" transform="scale(0.9 1)">e</text></svg>
+<svg x="80" y="60" width="10" height="20" overflow="hidden"><text x="0" y="16" fill="#e0e8ec" transform="scale(0.9 1)">v</text></svg>
 <svg x="130" y="60" width="10" height="20" overflow="hidden"><text x="0" y="16" fill="#e0e8ec" transform="scale(0.9 1)" font-weight="bold">2</text></svg>
 <svg x="140" y="60" width="10" height="20" overflow="hidden"><text x="0" y="16" fill="#e0e8ec" transform="scale(0.9 1)" font-weight="bold">0</text></svg>
 <svg x="150" y="60" width="10" height="20" overflow="hidden"><text x="0" y="16" fill="#e0e8ec" transform="scale(0.9 1)" font-weight="bold">2</text></svg>
@@ -2117,12 +2115,10 @@
 <svg x="200" y="60" width="10" height="20" overflow="hidden"><text x="0" y="16" fill="#e0e8ec" transform="scale(0.9 1)" font-weight="bold">-</text></svg>
 <svg x="210" y="60" width="10" height="20" overflow="hidden"><text x="0" y="16" fill="#e0e8ec" transform="scale(0.9 1)" font-weight="bold">0</text></svg>
 <svg x="220" y="60" width="10" height="20" overflow="hidden"><text x="0" y="16" fill="#e0e8ec" transform="scale(0.9 1)" font-weight="bold">5</text></svg>
-<svg x="250" y="60" width="10" height="20" overflow="hidden"><text x="0" y="16" fill="#779099" transform="scale(0.9 1)">[</text></svg>
-<svg x="270" y="60" width="10" height="20" overflow="hidden"><text x="0" y="16" fill="#779099" transform="scale(0.9 1)">n</text></svg>
-<svg x="280" y="60" width="10" height="20" overflow="hidden"><text x="0" y="16" fill="#779099" transform="scale(0.9 1)">e</text></svg>
-<svg x="290" y="60" width="10" height="20" overflow="hidden"><text x="0" y="16" fill="#779099" transform="scale(0.9 1)">x</text></svg>
-<svg x="300" y="60" width="10" height="20" overflow="hidden"><text x="0" y="16" fill="#779099" transform="scale(0.9 1)">t</text></svg>
-<svg x="320" y="60" width="10" height="20" overflow="hidden"><text x="0" y="16" fill="#779099" transform="scale(0.9 1)">]</text></svg>
+<svg x="270" y="60" width="10" height="20" overflow="hidden"><text x="0" y="16" fill="#e0e8ec" transform="scale(0.9 1)">n</text></svg>
+<svg x="280" y="60" width="10" height="20" overflow="hidden"><text x="0" y="16" fill="#e0e8ec" transform="scale(0.9 1)">e</text></svg>
+<svg x="290" y="60" width="10" height="20" overflow="hidden"><text x="0" y="16" fill="#e0e8ec" transform="scale(0.9 1)">x</text></svg>
+<svg x="300" y="60" width="10" height="20" overflow="hidden"><text x="0" y="16" fill="#e0e8ec" transform="scale(0.9 1)">t</text></svg>
 <svg x="770" y="60" width="10" height="20" overflow="hidden"><text x="0" y="16" fill="#445e69" transform="scale(0.833333 1)" font-size="20">│</text></svg>
 <svg x="790" y="60" width="10" height="20" overflow="hidden"><text x="0" y="16" fill="#4f5d66" transform="scale(0.833333 1)" font-size="20">│</text></svg>
 <svg x="0" y="80" width="10" height="20" overflow="hidden"><text x="0" y="16" fill="#4f5d66" transform="scale(0.833333 1)" font-size="20">│</text></svg>

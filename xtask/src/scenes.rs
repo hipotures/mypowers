@@ -15,6 +15,7 @@ use std::time::Duration;
 
 #[derive(Clone, Copy)]
 pub enum Scene {
+    Themed(ThemeView, &'static str),
     Snapshot,
     Live,
     LiveMinute,
@@ -52,6 +53,16 @@ pub enum Scene {
     LogsLevel(usize),
     ThirtySeconds(bool),
     DebugState(bool),
+}
+
+#[derive(Clone, Copy)]
+pub enum ThemeView {
+    Dashboard,
+    Chart,
+    Logs,
+    Help,
+    Quit,
+    Small,
 }
 
 #[derive(Clone, Copy)]
@@ -184,6 +195,258 @@ pub const GALLERY: &[(&str, Scene, u16, u16)] = &[
 ];
 
 pub const SCENES: &[(&str, Scene, u16, u16)] = &[
+    (
+        "theme-mypowers-dashboard.svg",
+        Scene::Themed(ThemeView::Dashboard, "MyPowers"),
+        120,
+        30,
+    ),
+    (
+        "theme-mypowers-chart.svg",
+        Scene::Themed(ThemeView::Chart, "MyPowers"),
+        120,
+        30,
+    ),
+    (
+        "theme-mypowers-logs.svg",
+        Scene::Themed(ThemeView::Logs, "MyPowers"),
+        120,
+        30,
+    ),
+    (
+        "theme-mypowers-help.svg",
+        Scene::Themed(ThemeView::Help, "MyPowers"),
+        120,
+        30,
+    ),
+    (
+        "theme-mypowers-quit.svg",
+        Scene::Themed(ThemeView::Quit, "MyPowers"),
+        120,
+        30,
+    ),
+    (
+        "theme-mypowers-small.svg",
+        Scene::Themed(ThemeView::Small, "MyPowers"),
+        50,
+        14,
+    ),
+    (
+        "theme-catppuccin-dashboard.svg",
+        Scene::Themed(ThemeView::Dashboard, "Catppuccin"),
+        120,
+        30,
+    ),
+    (
+        "theme-catppuccin-chart.svg",
+        Scene::Themed(ThemeView::Chart, "Catppuccin"),
+        120,
+        30,
+    ),
+    (
+        "theme-catppuccin-logs.svg",
+        Scene::Themed(ThemeView::Logs, "Catppuccin"),
+        120,
+        30,
+    ),
+    (
+        "theme-catppuccin-help.svg",
+        Scene::Themed(ThemeView::Help, "Catppuccin"),
+        120,
+        30,
+    ),
+    (
+        "theme-catppuccin-quit.svg",
+        Scene::Themed(ThemeView::Quit, "Catppuccin"),
+        120,
+        30,
+    ),
+    (
+        "theme-catppuccin-small.svg",
+        Scene::Themed(ThemeView::Small, "Catppuccin"),
+        50,
+        14,
+    ),
+    (
+        "theme-nord-dashboard.svg",
+        Scene::Themed(ThemeView::Dashboard, "Nord"),
+        120,
+        30,
+    ),
+    (
+        "theme-nord-chart.svg",
+        Scene::Themed(ThemeView::Chart, "Nord"),
+        120,
+        30,
+    ),
+    (
+        "theme-nord-logs.svg",
+        Scene::Themed(ThemeView::Logs, "Nord"),
+        120,
+        30,
+    ),
+    (
+        "theme-nord-help.svg",
+        Scene::Themed(ThemeView::Help, "Nord"),
+        120,
+        30,
+    ),
+    (
+        "theme-nord-quit.svg",
+        Scene::Themed(ThemeView::Quit, "Nord"),
+        120,
+        30,
+    ),
+    (
+        "theme-nord-small.svg",
+        Scene::Themed(ThemeView::Small, "Nord"),
+        50,
+        14,
+    ),
+    (
+        "theme-gruvbox-dashboard.svg",
+        Scene::Themed(ThemeView::Dashboard, "Gruvbox"),
+        120,
+        30,
+    ),
+    (
+        "theme-gruvbox-chart.svg",
+        Scene::Themed(ThemeView::Chart, "Gruvbox"),
+        120,
+        30,
+    ),
+    (
+        "theme-gruvbox-logs.svg",
+        Scene::Themed(ThemeView::Logs, "Gruvbox"),
+        120,
+        30,
+    ),
+    (
+        "theme-gruvbox-help.svg",
+        Scene::Themed(ThemeView::Help, "Gruvbox"),
+        120,
+        30,
+    ),
+    (
+        "theme-gruvbox-quit.svg",
+        Scene::Themed(ThemeView::Quit, "Gruvbox"),
+        120,
+        30,
+    ),
+    (
+        "theme-gruvbox-small.svg",
+        Scene::Themed(ThemeView::Small, "Gruvbox"),
+        50,
+        14,
+    ),
+    (
+        "theme-tokyo-night-dashboard.svg",
+        Scene::Themed(ThemeView::Dashboard, "Tokyo Night"),
+        120,
+        30,
+    ),
+    (
+        "theme-tokyo-night-chart.svg",
+        Scene::Themed(ThemeView::Chart, "Tokyo Night"),
+        120,
+        30,
+    ),
+    (
+        "theme-tokyo-night-logs.svg",
+        Scene::Themed(ThemeView::Logs, "Tokyo Night"),
+        120,
+        30,
+    ),
+    (
+        "theme-tokyo-night-help.svg",
+        Scene::Themed(ThemeView::Help, "Tokyo Night"),
+        120,
+        30,
+    ),
+    (
+        "theme-tokyo-night-quit.svg",
+        Scene::Themed(ThemeView::Quit, "Tokyo Night"),
+        120,
+        30,
+    ),
+    (
+        "theme-tokyo-night-small.svg",
+        Scene::Themed(ThemeView::Small, "Tokyo Night"),
+        50,
+        14,
+    ),
+    (
+        "theme-solarized-dashboard.svg",
+        Scene::Themed(ThemeView::Dashboard, "Solarized"),
+        120,
+        30,
+    ),
+    (
+        "theme-solarized-chart.svg",
+        Scene::Themed(ThemeView::Chart, "Solarized"),
+        120,
+        30,
+    ),
+    (
+        "theme-solarized-logs.svg",
+        Scene::Themed(ThemeView::Logs, "Solarized"),
+        120,
+        30,
+    ),
+    (
+        "theme-solarized-help.svg",
+        Scene::Themed(ThemeView::Help, "Solarized"),
+        120,
+        30,
+    ),
+    (
+        "theme-solarized-quit.svg",
+        Scene::Themed(ThemeView::Quit, "Solarized"),
+        120,
+        30,
+    ),
+    (
+        "theme-solarized-small.svg",
+        Scene::Themed(ThemeView::Small, "Solarized"),
+        50,
+        14,
+    ),
+    (
+        "theme-terminal-dashboard.svg",
+        Scene::Themed(ThemeView::Dashboard, "Terminal"),
+        120,
+        30,
+    ),
+    (
+        "theme-terminal-chart.svg",
+        Scene::Themed(ThemeView::Chart, "Terminal"),
+        120,
+        30,
+    ),
+    (
+        "theme-terminal-logs.svg",
+        Scene::Themed(ThemeView::Logs, "Terminal"),
+        120,
+        30,
+    ),
+    (
+        "theme-terminal-help.svg",
+        Scene::Themed(ThemeView::Help, "Terminal"),
+        120,
+        30,
+    ),
+    (
+        "theme-terminal-quit.svg",
+        Scene::Themed(ThemeView::Quit, "Terminal"),
+        120,
+        30,
+    ),
+    (
+        "theme-terminal-small.svg",
+        Scene::Themed(ThemeView::Small, "Terminal"),
+        50,
+        14,
+    ),
     ("cli-status.svg", Scene::Snapshot, 120, 30),
     ("dashboard-live.svg", Scene::Live, 120, 30),
     ("dashboard-live-60s.svg", Scene::LiveMinute, 120, 30),
@@ -319,6 +582,19 @@ fn fixed_status(now: DateTime<Utc>) -> Result<Status, String> {
 }
 
 fn app(scene: Scene) -> Result<App, String> {
+    if let Scene::Themed(view, name) = scene {
+        let base = match view {
+            ThemeView::Dashboard | ThemeView::Small => Scene::Live,
+            ThemeView::Chart => Scene::Chart,
+            ThemeView::Logs => Scene::Logs,
+            ThemeView::Help => Scene::Help,
+            ThemeView::Quit => Scene::Quit,
+        };
+        let mut app = app(base)?;
+        app.client_preferences.theme = name.into();
+        return Ok(app);
+    }
+
     let now: DateTime<Utc> = "2026-10-05T12:00:00Z"
         .parse()
         .map_err(|error: chrono::ParseError| error.to_string())?;
@@ -338,6 +614,7 @@ fn app(scene: Scene) -> Result<App, String> {
     app.selected = None;
     app.feedback = Some(Feedback::new("AC ON confirmed", Severity::Success));
     match scene {
+        Scene::Themed(_, _) => unreachable!("handled before constructing the fixture"),
         Scene::Snapshot => {
             app.snapshot = true;
             app.feedback = None;
@@ -706,7 +983,12 @@ pub fn render_captured(
     };
     app.timezone = settings.timezone.parse().ok();
     app.graph_base_scale_w = settings.graph_base_scale_w;
-    app.graph.resolution = match scene {
+    let graph_scene = match scene {
+        Scene::Themed(ThemeView::Dashboard | ThemeView::Small, _) => Scene::Live,
+        Scene::Themed(ThemeView::Chart, _) => Scene::Chart,
+        _ => scene,
+    };
+    app.graph.resolution = match graph_scene {
         Scene::Live | Scene::Chart => Resolution::TenSeconds,
         Scene::LiveMinute | Scene::ChartMinute => Resolution::Minute,
         Scene::LiveHour | Scene::ChartHour => Resolution::Hour,
@@ -714,7 +996,7 @@ pub fn render_captured(
         _ => settings.resolution().ok_or("Invalid graph interval")?,
     };
     app.graph.visualization = if matches!(
-        scene,
+        graph_scene,
         Scene::Live | Scene::LiveMinute | Scene::LiveHour | Scene::ThirtySeconds(false)
     ) {
         Visualization::Sparkline

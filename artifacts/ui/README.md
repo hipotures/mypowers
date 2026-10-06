@@ -64,7 +64,10 @@ Fixtures use UTC `2026-10-05T12:00:00Z`, battery 71%, fixed history arrays,
 fixed telemetry age, fixed feedback age, and a fixed idle animation frame.
 Normal scenes use 120x30 terminal cells with the production dashboard's 94x29
 limit. Additional scenes cover 80x24, 60x19, contextual Help, quit confirmation,
-and an undersized 50x14 terminal. Reconnecting/device-offline scenes deliberately
+and an undersized 50x14 terminal. A seven-theme matrix covers dashboard,
+Chart, Logs, Help, Quit and undersized windows; Settings has its own theme
+scenes. The production renderer supplies all theme colors, including the
+background visible behind dialogs. Reconnecting/device-offline scenes deliberately
 have no telemetry sample; daemon-offline retains explicitly unavailable readings.
 `dashboard-low-load.svg` covers INPUT 35 W / OUTPUT 3 W. The production Sparkline
 starts each channel at 0–100 W and doubles its maximum to fit visible averages

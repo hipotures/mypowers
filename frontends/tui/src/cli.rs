@@ -545,6 +545,7 @@ async fn snapshot(
             feedback_elapsed: Duration::ZERO,
         },
     );
+    app.client_preferences = config.client_preferences.clone();
     app.snapshot = true;
     app.selected = None;
     app.feedback = None;
