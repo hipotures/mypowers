@@ -3,10 +3,16 @@ mod svg;
 
 use std::{env, fs, path::Path};
 
-fn snapshots(output: &Path, check: bool) -> Result<Vec<&'static str>, String> {
+fn snapshots(output: &Path, check: bool, gallery: bool) -> Result<Vec<&'static str>, String> {
     // Render and export every scene before touching output or reporting any success.
     let images = scenes::SCENES
         .iter()
+        .filter(|&&(_, _, width, height)| !gallery || (width == 120 && height == 30))
+        .chain(if gallery {
+            scenes::GALLERY.iter()
+        } else {
+            [].iter()
+        })
         .map(|&(name, scene, width, height)| {
             let buffer =
                 scenes::render(scene, width, height).map_err(|error| format!("{name}: {error}"))?;
@@ -37,22 +43,39 @@ fn snapshots(output: &Path, check: bool) -> Result<Vec<&'static str>, String> {
 
 fn run() -> Result<(), String> {
     let args: Vec<_> = env::args().skip(1).collect();
-    let check = match args.as_slice() {
-        [command] if command == "ui-snapshots" => false,
-        [command, flag] if command == "ui-snapshots" && flag == "--check" => true,
-        _ => return Err("Usage: cargo xtask ui-snapshots [--check]".into()),
-    };
+    let usage = "Usage: cargo xtask ui-snapshots [--check] [--gallery] [--output PATH]";
+    if args.first().map(String::as_str) != Some("ui-snapshots") {
+        return Err(usage.into());
+    }
+    let mut check = false;
+    let mut gallery = false;
+    let mut selected_output = None;
+    let mut remaining = args.iter().skip(1);
+    while let Some(flag) = remaining.next() {
+        match flag.as_str() {
+            "--check" => check = true,
+            "--gallery" => gallery = true,
+            "--output" => selected_output = Some(remaining.next().ok_or(usage)?),
+            _ => return Err(usage.into()),
+        }
+    }
     let root = Path::new(env!("CARGO_MANIFEST_DIR"))
         .parent()
         .ok_or("Cannot locate repository root")?;
-    let names = snapshots(&root.join("artifacts/ui"), check)?;
+    if gallery && selected_output.is_none() {
+        return Err("Gallery requires --output PATH to preserve canonical snapshots.".into());
+    }
+    let output = selected_output
+        .map(std::path::PathBuf::from)
+        .unwrap_or_else(|| root.join("artifacts/ui"));
+    let names = snapshots(&output, check, gallery)?;
     println!(
         "{} {} UI snapshots:",
         if check { "Verified" } else { "Generated" },
         names.len()
     );
     for name in names {
-        println!("  artifacts/ui/{name}");
+        println!("  {}", output.join(name).display());
     }
     Ok(())
 }
@@ -69,19 +92,41 @@ mod tests {
     use super::*;
 
     #[test]
+    fn gallery_has_unique_names_uniform_size_and_no_resize_variants() {
+        let output = env::temp_dir().join(format!("mypowers-ui-gallery-{}", std::process::id()));
+        let names = snapshots(&output, false, true).unwrap();
+        let unique: std::collections::HashSet<_> = names.iter().collect();
+        assert_eq!(names.len(), unique.len());
+        assert!(names.contains(&"settings-alert-threshold-picker.svg"));
+        assert!(names.contains(&"settings-notify-sent.svg"));
+        for name in names {
+            let image = fs::read_to_string(output.join(name)).unwrap();
+            assert!(
+                image.starts_with(
+                    "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"1200\" height=\"600\""
+                ),
+                "{name}"
+            );
+            assert!(!name.contains("80x24") && !name.contains("60x19"));
+        }
+        snapshots(&output, true, true).unwrap();
+        fs::remove_dir_all(output).unwrap();
+    }
+
+    #[test]
     fn generation_creates_directory_overwrites_files_and_propagates_io_errors() {
         let root = env::temp_dir().join(format!("mypowers-ui-snapshots-{}", std::process::id()));
         let _ = fs::remove_dir_all(&root);
         let output = root.join("ui");
-        let names = snapshots(&output, false).unwrap();
+        let names = snapshots(&output, false, false).unwrap();
         let path = output.join(names[0]);
         let expected = fs::read(&path).unwrap();
         fs::write(&path, "obsolete").unwrap();
-        assert_eq!(snapshots(&output, false).unwrap(), names);
+        assert_eq!(snapshots(&output, false, false).unwrap(), names);
         assert_eq!(fs::read(path).unwrap(), expected);
         let blocked = root.join("file");
         fs::write(&blocked, "not a directory").unwrap();
-        assert!(snapshots(&blocked, false).is_err());
+        assert!(snapshots(&blocked, false, false).is_err());
         fs::remove_dir_all(root).unwrap();
     }
 
@@ -89,20 +134,20 @@ mod tests {
     fn check_detects_changed_and_missing_snapshots_without_writing_any_files() {
         let root = env::temp_dir().join(format!("mypowers-ui-check-{}", std::process::id()));
         let _ = fs::remove_dir_all(&root);
-        assert!(snapshots(&root, true).is_err());
+        assert!(snapshots(&root, true, false).is_err());
         assert!(
             !root.exists(),
             "checking must not create the output directory"
         );
-        let names = snapshots(&root, false).unwrap();
-        assert_eq!(snapshots(&root, true).unwrap(), names);
+        let names = snapshots(&root, false, false).unwrap();
+        assert_eq!(snapshots(&root, true, false).unwrap(), names);
         let changed = root.join(names[0]);
         let missing = root.join(names[1]);
         let untouched = root.join(names[2]);
         let expected = fs::read(&untouched).unwrap();
         fs::write(&changed, "changed snapshot").unwrap();
         fs::remove_file(&missing).unwrap();
-        let error = snapshots(&root, true).unwrap_err();
+        let error = snapshots(&root, true, false).unwrap_err();
         assert!(error.contains(names[0]) && error.contains(names[1]));
         assert_eq!(fs::read(&changed).unwrap(), b"changed snapshot");
         assert!(!missing.exists());

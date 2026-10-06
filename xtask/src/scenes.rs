@@ -6,7 +6,7 @@ use mypowers_tui::{
     feedback::{Feedback, Severity},
     history::{Point, Resolution, Visualization},
     model::Status,
-    settings::{Settings, SettingsTab},
+    settings::{Field, Settings, SettingsTab},
     ui,
 };
 use ratatui::{Terminal, backend::TestBackend, buffer::Buffer};
@@ -44,7 +44,142 @@ pub enum Scene {
     Help,
     LogsHelp,
     Quit,
+    Picker(Field),
+    SettingsHelpTab(SettingsTab),
+    NotifyState(NotifyState),
+    LogsLevel(usize),
+    ThirtySeconds(bool),
+    DebugState(bool),
 }
+
+#[derive(Clone, Copy)]
+pub enum NotifyState {
+    Configured,
+    Sending,
+    Sent,
+    Failed,
+}
+
+/// Additional views for publication; all use the same 120x30 terminal canvas.
+pub const GALLERY: &[(&str, Scene, u16, u16)] = &[
+    (
+        "dashboard-live-30s.svg",
+        Scene::ThirtySeconds(false),
+        120,
+        30,
+    ),
+    (
+        "dashboard-chart-30s.svg",
+        Scene::ThirtySeconds(true),
+        120,
+        30,
+    ),
+    ("logs-info.svg", Scene::LogsLevel(1), 120, 30),
+    ("logs-warning.svg", Scene::LogsLevel(2), 120, 30),
+    ("logs-error.svg", Scene::LogsLevel(3), 120, 30),
+    (
+        "settings-debug-enabled.svg",
+        Scene::DebugState(false),
+        120,
+        30,
+    ),
+    (
+        "settings-debug-paused.svg",
+        Scene::DebugState(true),
+        120,
+        30,
+    ),
+    (
+        "settings-timezone-picker.svg",
+        Scene::Picker(Field::Timezone),
+        120,
+        30,
+    ),
+    (
+        "settings-page-size-picker.svg",
+        Scene::Picker(Field::PageSize),
+        120,
+        30,
+    ),
+    (
+        "settings-scale-picker.svg",
+        Scene::Picker(Field::Scale),
+        120,
+        30,
+    ),
+    (
+        "settings-alert-enabled-picker.svg",
+        Scene::Picker(Field::AlertEnabled),
+        120,
+        30,
+    ),
+    (
+        "settings-alert-threshold-picker.svg",
+        Scene::Picker(Field::AlertThreshold),
+        120,
+        30,
+    ),
+    (
+        "settings-alert-hysteresis-picker.svg",
+        Scene::Picker(Field::AlertHysteresis),
+        120,
+        30,
+    ),
+    (
+        "settings-alert-cooldown-picker.svg",
+        Scene::Picker(Field::AlertCooldown),
+        120,
+        30,
+    ),
+    (
+        "help-preferences.svg",
+        Scene::SettingsHelpTab(SettingsTab::Preferences),
+        120,
+        30,
+    ),
+    (
+        "help-charts.svg",
+        Scene::SettingsHelpTab(SettingsTab::Charts),
+        120,
+        30,
+    ),
+    (
+        "help-alerts.svg",
+        Scene::SettingsHelpTab(SettingsTab::Alerts),
+        120,
+        30,
+    ),
+    (
+        "help-notify.svg",
+        Scene::SettingsHelpTab(SettingsTab::Notify),
+        120,
+        30,
+    ),
+    (
+        "settings-notify-configured.svg",
+        Scene::NotifyState(NotifyState::Configured),
+        120,
+        30,
+    ),
+    (
+        "settings-notify-sending.svg",
+        Scene::NotifyState(NotifyState::Sending),
+        120,
+        30,
+    ),
+    (
+        "settings-notify-sent.svg",
+        Scene::NotifyState(NotifyState::Sent),
+        120,
+        30,
+    ),
+    (
+        "settings-notify-failed.svg",
+        Scene::NotifyState(NotifyState::Failed),
+        120,
+        30,
+    ),
+];
 
 pub const SCENES: &[(&str, Scene, u16, u16)] = &[
     ("dashboard-live.svg", Scene::Live, 120, 30),
@@ -231,7 +366,7 @@ fn app(scene: Scene) -> Result<App, String> {
                 Severity::Info,
             ));
         }
-        Scene::Logs => {
+        Scene::Logs | Scene::LogsLevel(_) => {
             app.view = View::Logs;
             app.logs.offset = 5;
             app.logs.unseen = 7;
@@ -259,6 +394,16 @@ fn app(scene: Scene) -> Result<App, String> {
             status.logging =
                 json!({"effective_level":"DEBUG", "override_expires_at":"2026-10-05T12:15:00Z"});
             app.feedback = Some(Feedback::new("Logs loaded", Severity::Info));
+            if let Scene::LogsLevel(level) = scene {
+                app.logs.level = level;
+                app.logs.records.retain(|record| {
+                    mypowers_tui::logs::LEVELS
+                        .iter()
+                        .position(|value| Some(*value) == record["level"].as_str())
+                        .is_some_and(|index| index >= level)
+                });
+                app.logs.offset = 0;
+            }
         }
         Scene::Settings
         | Scene::SettingsCharts
@@ -267,7 +412,11 @@ fn app(scene: Scene) -> Result<App, String> {
         | Scene::SettingsAlerts
         | Scene::SettingsNotify
         | Scene::SettingsDebug
-        | Scene::SettingsHelp => {
+        | Scene::SettingsHelp
+        | Scene::Picker(_)
+        | Scene::SettingsHelpTab(_)
+        | Scene::NotifyState(_)
+        | Scene::DebugState(_) => {
             app.view = View::Settings;
             app.settings = Some(Settings {
                 schema_version: 1,
@@ -279,10 +428,22 @@ fn app(scene: Scene) -> Result<App, String> {
             app.settings_tab = match scene {
                 Scene::SettingsCharts
                 | Scene::SettingsIntervalPicker
-                | Scene::SettingsVisualizationPicker => SettingsTab::Charts,
-                Scene::SettingsAlerts => SettingsTab::Alerts,
-                Scene::SettingsNotify => SettingsTab::Notify,
-                Scene::SettingsDebug | Scene::SettingsHelp => SettingsTab::Debug,
+                | Scene::SettingsVisualizationPicker
+                | Scene::Picker(Field::Scale | Field::Visualization | Field::Interval) => {
+                    SettingsTab::Charts
+                }
+                Scene::SettingsAlerts
+                | Scene::Picker(
+                    Field::AlertEnabled
+                    | Field::AlertThreshold
+                    | Field::AlertHysteresis
+                    | Field::AlertCooldown,
+                ) => SettingsTab::Alerts,
+                Scene::SettingsNotify | Scene::NotifyState(_) => SettingsTab::Notify,
+                Scene::SettingsDebug | Scene::SettingsHelp | Scene::DebugState(_) => {
+                    SettingsTab::Debug
+                }
+                Scene::SettingsHelpTab(tab) => tab,
                 _ => SettingsTab::Preferences,
             };
             if matches!(
@@ -305,6 +466,55 @@ fn app(scene: Scene) -> Result<App, String> {
             }
             app.warning_count = 1;
             app.feedback = Some(Feedback::new("Settings saved", Severity::Success));
+            if let Scene::Picker(field) = scene {
+                let selected = field
+                    .choices()
+                    .iter()
+                    .position(|value| *value == app.settings_draft.value(field))
+                    .unwrap_or(0);
+                app.settings_picker = Some(mypowers_tui::settings::Picker {
+                    field,
+                    selected,
+                    query: String::new(),
+                });
+            }
+            if let Scene::SettingsHelpTab(_) = scene {
+                app.view = View::Help;
+                app.help_context = View::Settings;
+            }
+            if let Scene::NotifyState(state) = scene {
+                app.settings.as_mut().unwrap().telegram_configured = true;
+                app.settings_draft.telegram_configured = true;
+                app.warning_count = 0;
+                app.feedback = match state {
+                    NotifyState::Configured => None,
+                    NotifyState::Sending => {
+                        app.pending = Some("telegram test".into());
+                        Some(Feedback::new("Sending Telegram test...", Severity::Info))
+                    }
+                    NotifyState::Sent => {
+                        Some(Feedback::new("Telegram test sent", Severity::Success))
+                    }
+                    NotifyState::Failed => Some(Feedback::new(
+                        "Telegram test failed; see server logs/configuration",
+                        Severity::Error,
+                    )),
+                };
+            }
+            if let Scene::DebugState(paused) = scene {
+                app.feedback = None;
+                app.warning_count = 0;
+                if paused {
+                    status.connection.desired = "paused".into();
+                    status.connection.phase = "paused".into();
+                    status.connection.link_connected = false;
+                    status.telemetry.state = "stale".into();
+                    status.telemetry.age_seconds = Some(45.0);
+                    status.controls.allowed = false;
+                } else {
+                    status.logging = json!({"effective_level":"DEBUG", "override_expires_at":"2026-10-05T12:15:00Z"});
+                }
+            }
         }
         Scene::Help | Scene::LogsHelp => {
             app.view = View::Help;
@@ -322,6 +532,12 @@ fn app(scene: Scene) -> Result<App, String> {
         Scene::Live | Scene::Chart | Scene::ChartGaps => {}
         Scene::LiveMinute | Scene::ChartMinute => app.graph.resolution = Resolution::Minute,
         Scene::LiveHour | Scene::ChartHour => app.graph.resolution = Resolution::Hour,
+        Scene::ThirtySeconds(chart) => {
+            app.graph.resolution = Resolution::ThirtySeconds;
+            if chart {
+                app.graph.visualization = Visualization::Chart;
+            }
+        }
     }
     if matches!(
         scene,
@@ -410,7 +626,7 @@ mod tests {
 
     #[test]
     fn every_scene_is_byte_identical_across_fresh_states_and_has_no_zero_counters() {
-        for &(name, scene, width, height) in SCENES {
+        for &(name, scene, width, height) in SCENES.iter().chain(GALLERY.iter()) {
             let first = render(scene, width, height).unwrap();
             let second = render(scene, width, height).unwrap();
             assert_eq!(svg::export(&first), svg::export(&second), "{name}");
@@ -488,12 +704,12 @@ mod tests {
             .find(|row| row.contains("Enter choose"))
             .unwrap();
         assert!(footer.starts_with('╰') && footer.ends_with('╯'));
+        let alerts = text(&render(Scene::SettingsAlerts, 60, 19).unwrap());
         assert!(
-            text(&render(Scene::SettingsAlerts, 60, 19).unwrap()).contains("not available yet")
+            alerts.contains("Low threshold") && alerts.contains("20%") && alerts.contains("5 pp")
         );
         assert!(
-            text(&render(Scene::SettingsNotify, 60, 19).unwrap())
-                .contains("No notification connectors")
+            text(&render(Scene::SettingsNotify, 60, 19).unwrap()).contains("Send test message")
         );
         let help = text(&render(Scene::Help, 120, 30).unwrap());
         assert!(help.contains(" HELP ") && help.contains("AP S300 V2.0"));

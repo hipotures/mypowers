@@ -13,6 +13,18 @@ layout, HTML/CSS mockup, daemon, BLE, HTTP, terminal session, or clipboard acces
 The command reports generated files only after every scene has rendered and all
 files have been written successfully; errors return a nonzero exit status.
 
+For reviewing all views at one size or preparing a gallery:
+
+```sh
+cargo xtask ui-snapshots --gallery --output /tmp/scr
+cargo xtask ui-snapshots --gallery --output /tmp/scr --check
+```
+
+Gallery mode uses 120x30 terminal cells (1200x600 SVG pixels), omits the smaller-terminal
+variants, and adds every settings value picker, contextual help, log filters, 30-second graphs,
+Debug/Pause states and Telegram test outcomes. It requires an explicit output directory to keep
+the canonical regression images unchanged. All data is deterministic and no messages are sent.
+
 To verify the current renderer against the saved images without overwriting them:
 
 ```sh
