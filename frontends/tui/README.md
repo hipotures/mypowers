@@ -349,7 +349,7 @@ logs, dialogs, status messages and the dimmed background behind popups.
 Battery gradients and green input / cyan output keep their telemetry meaning. `--no-color` / `NO_COLOR` still
 remove all foreground/background colors.
 
-Choosing **Preferences → Theme (local)** applies and atomically saves the
+Choosing **Preferences → Theme** applies and atomically saves the
 theme immediately, including when the daemon is offline. This rewrites the
 TOML while retaining its other values; comments are not retained. No request
 is sent to the server. **Save changes** continues to save chart/log preferences

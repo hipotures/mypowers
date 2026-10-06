@@ -89,7 +89,7 @@ see [deployment](deploy/README.md).
 | `Ctrl+Q` | Quit immediately |
 
 Settings contains **Preferences**, **Charts**, **Alerts**, **Notify** and **Debug**.
-The Settings controls use Ratcn. Choose **Preferences → Theme (local)** to switch
+The Settings controls use Ratcn. Choose **Preferences → Theme** to switch
 between MyPowers, Catppuccin, Nord, Gruvbox, Tokyo Night, Solarized and Terminal.
 Themes apply throughout the TUI: dashboard, charts, logs, Settings, dialogs and their backgrounds.
 Local styles and navigation shortcuts live in `~/.config/mypowers/client.toml`;

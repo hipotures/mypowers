@@ -1449,7 +1449,10 @@ fn settings(frame: &mut Frame, area: Rect, app: &mut App) {
     }
     if let Some(picker) = &app.settings_picker {
         let options = picker.options();
-        let height = (options.len() as u16 + 4).min(area.height).max(4);
+        let search_rows = u16::from(picker.field == Field::Timezone);
+        let height = (options.len() as u16 + 2 + search_rows)
+            .min(area.height)
+            .max(3 + search_rows);
         let popup = centered(area, area.width.min(48), height);
         frame.render_widget(Clear, popup);
         let block = panel(&theme, format!(" {} ", picker.field.label())).title_bottom(
@@ -1458,23 +1461,21 @@ fn settings(frame: &mut Frame, area: Rect, app: &mut App) {
         );
         let inner = block.inner(popup);
         frame.render_widget(block, popup);
-        frame.render_widget(
-            Paragraph::new(if picker.field == Field::Timezone {
-                format!("Search: {}", picker.query)
-            } else {
-                "Available values".into()
-            })
-            .style(Style::default().fg(theme.muted_foreground)),
-            Rect::new(inner.x, inner.y, inner.width, 1),
-        );
+        if search_rows > 0 {
+            frame.render_widget(
+                Paragraph::new(format!("Search: {}", picker.query))
+                    .style(Style::default().fg(theme.muted_foreground)),
+                Rect::new(inner.x, inner.y, inner.width, 1),
+            );
+        }
         if options.is_empty() {
             frame.render_widget(
                 Paragraph::new("No matching values")
                     .style(Style::default().fg(theme.muted_foreground)),
-                Rect::new(inner.x, inner.y + 1, inner.width, 1),
+                Rect::new(inner.x, inner.y + search_rows, inner.width, 1),
             );
         }
-        let viewport = inner.height.saturating_sub(1) as usize;
+        let viewport = inner.height.saturating_sub(search_rows) as usize;
         let start = picker.selected.saturating_sub(viewport.saturating_sub(1));
         let visible: Vec<_> = options
             .iter()
@@ -1483,7 +1484,12 @@ fn settings(frame: &mut Frame, area: Rect, app: &mut App) {
             .map(|(_, value)| ratatui::text::Text::from(value.clone()))
             .collect();
         for (offset, (index, _)) in options.iter().skip(start).take(viewport).enumerate() {
-            let rect = Rect::new(inner.x, inner.y + offset as u16 + 1, inner.width, 1);
+            let rect = Rect::new(
+                inner.x,
+                inner.y + offset as u16 + search_rows,
+                inner.width,
+                1,
+            );
             app.settings_choices.push((rect, *index));
         }
         frame.render_widget(
@@ -1494,9 +1500,9 @@ fn settings(frame: &mut Frame, area: Rect, app: &mut App) {
                 .focus_symbol("› "),
             Rect::new(
                 inner.x,
-                inner.y + 1,
+                inner.y + search_rows,
                 inner.width,
-                inner.height.saturating_sub(1),
+                inner.height.saturating_sub(search_rows),
             ),
         );
     }

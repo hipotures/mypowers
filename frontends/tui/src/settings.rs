@@ -192,7 +192,7 @@ impl Field {
     ];
     pub fn label(self) -> &'static str {
         match self {
-            Self::Theme => "Theme (local)",
+            Self::Theme => "Theme",
             Self::Visualization => "Visualization",
             Self::Interval => "Interval per bar",
             Self::Scale => "Base scale",
