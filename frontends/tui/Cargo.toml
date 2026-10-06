@@ -27,6 +27,9 @@ unicode-width = "0.2"
 uuid = { version = "1", features = ["v4"] }
 chrono = "0.4"
 chrono-tz = "0.10"
+ratcn = "=0.0.5"
+config = { version = "0.15", default-features = false, features = ["toml"] }
+toml = { version = "1", features = ["serde"] }
 
 [profile.release]
 lto = "thin"

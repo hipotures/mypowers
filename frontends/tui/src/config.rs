@@ -3,6 +3,7 @@ use std::{
 };
 
 pub struct Config {
+    pub client_preferences: crate::client_ui::ClientPreferences,
     pub server: reqwest::Url,
     pub token: Option<String>,
     pub ca: Option<PathBuf>,
@@ -38,7 +39,7 @@ impl Config {
             match argument.as_str() {
                 "--help" | "-h" => {
                     println!(
-                        "MyPowers Ratatui client\n\nUsage: mypowers-tui [options]\n\n  --env-file PATH   Read PATH instead of .env in the current directory\n  --server URL      HTTP(S) daemon origin\n  --token-file PATH Private API token file\n  --ca-file PATH    PEM CA bundle for HTTPS and WSS\n  --timeout SECS    Request timeout (0 < SECS <= 120)\n  --timezone ZONE   IANA timezone for log days/timestamps\n  --utc             UTC log timestamps\n  --no-color        Disable colors\n  --no-mouse        Disable mouse capture\n\nDashboard: a/d/l outputs; Tab, Enter focus/activate; F3 logs; s settings; t interval; g graph view\nLogs: Left/Right day; +/- page size; f filter; b runtime DEBUG\nLogs: Home day beginning; End fetch today/live\nSettings: Tab/Shift-Tab selects a tab; Up/Down selects a field or button\nEnter or click: open choices, confirm a value, Save changes\nDebug: Retry, Pause/Resume and Debug ON/OFF buttons\nF1 / ?: contextual help from dashboard, logs, or settings\nGlobal: Esc close modal; q confirm quit\nDouble-click MYPOWERS / LOGS to copy the API snapshot / loaded logs (wl-copy)."
+                        "MyPowers Ratatui client\n\nUsage: mypowers-tui [options]\n\n  --client-config PATH  Local client TOML (theme and shortcuts)\n  --env-file PATH   Read PATH instead of .env in the current directory\n  --server URL      HTTP(S) daemon origin\n  --token-file PATH Private API token file\n  --ca-file PATH    PEM CA bundle for HTTPS and WSS\n  --timeout SECS    Request timeout (0 < SECS <= 120)\n  --timezone ZONE   IANA timezone for log days/timestamps\n  --utc             UTC log timestamps\n  --no-color        Disable colors\n  --no-mouse        Disable mouse capture\n\nDashboard: a/d/l outputs; Tab, Enter focus/activate; F3 logs; s settings; t interval; g graph view\nLogs: Left/Right day; +/- page size; f filter; b runtime DEBUG\nLogs: Home day beginning; End fetch today/live\nSettings: Tab/Shift-Tab selects a tab; Up/Down selects a field or button\nEnter or click: open choices, confirm a value, Save changes\nDebug: Retry, Pause/Resume and Debug ON/OFF buttons\nF1 / ?: contextual help from dashboard, logs, or settings\nGlobal: Esc close modal; q confirm quit\nDouble-click MYPOWERS / LOGS to copy the API snapshot / loaded logs (wl-copy)."
                     );
                     return Ok(None);
                 }
@@ -46,7 +47,7 @@ impl Config {
                 "--no-mouse" => no_mouse = true,
                 "--utc" => utc = true,
                 "--env-file" | "--server" | "--token-file" | "--ca-file" | "--timeout"
-                | "--timezone" => {
+                | "--timezone" | "--client-config" => {
                     let value = arguments
                         .next()
                         .ok_or_else(|| error("Missing option value. Use --help."))?;
@@ -57,7 +58,49 @@ impl Config {
         }
         let explicit = options.get("--env-file");
         let path = PathBuf::from(explicit.map(String::as_str).unwrap_or(".env"));
+        let explicit_client = options
+            .get("--client-config")
+            .cloned()
+            .or_else(|| env::var("MYPOWERS_CLIENT_CONFIG").ok());
+        let default_dir = env::var_os("XDG_CONFIG_HOME")
+            .map(PathBuf::from)
+            .or_else(|| env::var_os("HOME").map(|home| PathBuf::from(home).join(".config")))
+            .ok_or_else(|| error("Cannot find client configuration directory."))?;
+        let client_path = explicit_client
+            .as_ref()
+            .map(PathBuf::from)
+            .unwrap_or_else(|| default_dir.join("mypowers/client.toml"));
+        let client_path = if client_path.is_absolute() {
+            client_path
+        } else {
+            env::current_dir()?.join(client_path)
+        };
+        let client_preferences =
+            crate::client_ui::ClientPreferences::load(client_path, explicit_client.is_some())?;
         let mut values = HashMap::new();
+        for (key, value) in [
+            ("MYPOWERS_SERVER_URL", &client_preferences.server_url),
+            ("MYPOWERS_API_TOKEN_FILE", &client_preferences.token_file),
+            ("MYPOWERS_CA_FILE", &client_preferences.ca_file),
+            ("MYPOWERS_TIMEZONE", &client_preferences.timezone),
+        ] {
+            if let Some(value) = value {
+                let value = if matches!(key, "MYPOWERS_API_TOKEN_FILE" | "MYPOWERS_CA_FILE") {
+                    client_preferences
+                        .path
+                        .as_ref()
+                        .unwrap()
+                        .parent()
+                        .unwrap()
+                        .join(value)
+                        .to_string_lossy()
+                        .into_owned()
+                } else {
+                    value.clone()
+                };
+                values.insert(key.to_owned(), value);
+            }
+        }
         if explicit.is_some() || path.exists() {
             let path =
                 fs::canonicalize(path).map_err(|_| error("Cannot read selected env file."))?;
@@ -167,6 +210,7 @@ impl Config {
             .or(values.get("MYPOWERS_CA_FILE"))
             .map(PathBuf::from);
         Ok(Some(Self {
+            client_preferences,
             server,
             token,
             ca,

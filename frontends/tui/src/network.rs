@@ -774,6 +774,7 @@ mod tests {
 
     fn api_for(listener: &tokio::net::TcpListener) -> Api {
         Api::new(&Config {
+            client_preferences: crate::client_ui::ClientPreferences::default(),
             server: format!("http://{}", listener.local_addr().unwrap())
                 .parse()
                 .unwrap(),

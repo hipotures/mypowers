@@ -41,6 +41,7 @@ pub enum Scene {
     SettingsAlerts,
     SettingsNotify,
     SettingsDebug,
+    SettingsTheme(&'static str),
     SettingsHelp,
     Help,
     LogsHelp,
@@ -223,6 +224,48 @@ pub const SCENES: &[(&str, Scene, u16, u16)] = &[
     ("logs-modal.svg", Scene::Logs, 120, 30),
     ("logs-modal-80x24.svg", Scene::Logs, 80, 24),
     ("settings-modal.svg", Scene::Settings, 120, 30),
+    (
+        "settings-theme-catppuccin.svg",
+        Scene::SettingsTheme("Catppuccin"),
+        120,
+        30,
+    ),
+    (
+        "settings-theme-nord.svg",
+        Scene::SettingsTheme("Nord"),
+        120,
+        30,
+    ),
+    (
+        "settings-theme-gruvbox.svg",
+        Scene::SettingsTheme("Gruvbox"),
+        120,
+        30,
+    ),
+    (
+        "settings-theme-tokyo-night.svg",
+        Scene::SettingsTheme("Tokyo Night"),
+        120,
+        30,
+    ),
+    (
+        "settings-theme-solarized.svg",
+        Scene::SettingsTheme("Solarized"),
+        120,
+        30,
+    ),
+    (
+        "settings-theme-terminal.svg",
+        Scene::SettingsTheme("Terminal"),
+        120,
+        30,
+    ),
+    (
+        "settings-theme-picker.svg",
+        Scene::Picker(Field::Theme),
+        120,
+        30,
+    ),
     ("settings-charts.svg", Scene::SettingsCharts, 120, 30),
     (
         "settings-interval-picker.svg",
@@ -423,6 +466,7 @@ fn app(scene: Scene) -> Result<App, String> {
         | Scene::SettingsAlerts
         | Scene::SettingsNotify
         | Scene::SettingsDebug
+        | Scene::SettingsTheme(_)
         | Scene::SettingsHelp
         | Scene::Picker(_)
         | Scene::SettingsHelpTab(_)
@@ -436,6 +480,9 @@ fn app(scene: Scene) -> Result<App, String> {
                 ..Settings::default()
             });
             app.settings_draft = app.settings.as_ref().unwrap().clone();
+            if let Scene::SettingsTheme(name) = scene {
+                app.client_preferences.theme = name.into();
+            }
             app.settings_tab = match scene {
                 Scene::SettingsCharts
                 | Scene::SettingsIntervalPicker

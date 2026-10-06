@@ -114,6 +114,7 @@ impl Settings {
 
     pub fn value(&self, field: Field) -> String {
         match field {
+            Field::Theme => "MyPowers".into(),
             Field::Visualization => self.graph_visualization.label().into(),
             Field::Interval => self.resolution().unwrap_or_default().label().into(),
             Field::Scale => format!("0–{} W (auto)", self.graph_base_scale_w),
@@ -142,6 +143,7 @@ impl Settings {
 
     pub fn choose(&mut self, field: Field, index: usize) {
         match field {
+            Field::Theme => {}
             Field::Visualization => {
                 self.graph_visualization = [Visualization::Sparkline, Visualization::Chart][index]
             }
@@ -167,6 +169,7 @@ impl Settings {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Field {
+    Theme,
     Visualization,
     Interval,
     Scale,
@@ -180,7 +183,7 @@ pub enum Field {
 
 impl Field {
     pub const CHARTS: [Self; 3] = [Self::Visualization, Self::Interval, Self::Scale];
-    pub const PREFERENCES: [Self; 2] = [Self::Timezone, Self::PageSize];
+    pub const PREFERENCES: [Self; 3] = [Self::Timezone, Self::PageSize, Self::Theme];
     pub const ALERTS: [Self; 4] = [
         Self::AlertEnabled,
         Self::AlertThreshold,
@@ -189,6 +192,7 @@ impl Field {
     ];
     pub fn label(self) -> &'static str {
         match self {
+            Self::Theme => "Theme (local)",
             Self::Visualization => "Visualization",
             Self::Interval => "Interval per bar",
             Self::Scale => "Base scale",
@@ -202,6 +206,7 @@ impl Field {
     }
     pub fn choices(self) -> Vec<String> {
         match self {
+            Self::Theme => crate::client_ui::THEMES.map(String::from).to_vec(),
             Self::Visualization => vec!["Sparkline".into(), "Chart".into()],
             Self::Interval => ["10s", "30s", "60s", "1h"].map(String::from).to_vec(),
             Self::Scale => ["0–100 W (auto)", "0–300 W (auto)"]

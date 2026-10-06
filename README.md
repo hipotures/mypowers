@@ -89,7 +89,13 @@ see [deployment](deploy/README.md).
 | `Ctrl+Q` | Quit immediately |
 
 Settings contains **Preferences**, **Charts**, **Alerts**, **Notify** and **Debug**.
-Save changes to persist preferences and the battery rule on the server. Notify sends
+The Settings controls use Ratcn. Choose **Preferences → Theme (local)** to switch
+between MyPowers, Catppuccin, Nord, Gruvbox, Tokyo Night, Solarized and Terminal.
+Themes currently style Settings; the dashboard and charts retain their original design.
+Local styles and navigation shortcuts live in `~/.config/mypowers/client.toml`;
+see the [example client configuration](config/client.example.toml).
+
+Save changes to persist chart/log preferences and the battery rule on the server. Notify sends
 a test message; Debug shows connection details and offers retry, pause/resume and
 runtime debug logging. Output controls require current telemetry and daemon permission.
 
@@ -195,6 +201,24 @@ All images have the same **980 × 620** canvas. Click an image to open it at ful
 [![Visualization value selection](docs/screenshots/settings-visualization-picker.svg)](docs/screenshots/settings-visualization-picker.svg)
 
 </details>
+
+<details>
+<summary>Settings themes</summary>
+
+| Catppuccin | Nord |
+| --- | --- |
+| [![Catppuccin](docs/screenshots/settings-theme-catppuccin.svg)](docs/screenshots/settings-theme-catppuccin.svg) | [![Nord](docs/screenshots/settings-theme-nord.svg)](docs/screenshots/settings-theme-nord.svg) |
+
+| Gruvbox | Tokyo Night |
+| --- | --- |
+| [![Gruvbox](docs/screenshots/settings-theme-gruvbox.svg)](docs/screenshots/settings-theme-gruvbox.svg) | [![Tokyo Night](docs/screenshots/settings-theme-tokyo-night.svg)](docs/screenshots/settings-theme-tokyo-night.svg) |
+
+| Solarized | Terminal |
+| --- | --- |
+| [![Solarized](docs/screenshots/settings-theme-solarized.svg)](docs/screenshots/settings-theme-solarized.svg) | [![Terminal](docs/screenshots/settings-theme-terminal.svg)](docs/screenshots/settings-theme-terminal.svg) |
+
+</details>
+
 
 ## Development and verification
 

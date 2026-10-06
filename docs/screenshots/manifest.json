@@ -14,12 +14,31 @@
     "logs-modal.svg",
     "help-modal.svg",
     "settings-visualization-picker.svg",
-    "cli-status.svg"
+    "cli-status.svg",
+    "settings-theme-picker.svg",
+    "settings-theme-terminal.svg",
+    "settings-theme-solarized.svg",
+    "settings-theme-tokyo-night.svg",
+    "settings-theme-gruvbox.svg",
+    "settings-theme-nord.svg",
+    "settings-theme-catppuccin.svg"
   ],
   "source": "daemon telemetry and database history",
   "width": 980,
   "capture_times": {
     "cli-status.svg": "2026-10-06T10:25:35.059Z",
-    "settings-debug.svg": "2026-10-06T15:08:55.798Z"
+    "settings-debug.svg": "2026-10-06T15:57:47.406Z",
+    "settings-modal.svg": "2026-10-06T15:57:47.406Z",
+    "settings-charts.svg": "2026-10-06T15:57:47.406Z",
+    "settings-alerts.svg": "2026-10-06T15:57:47.406Z",
+    "settings-notify.svg": "2026-10-06T15:57:47.406Z",
+    "settings-visualization-picker.svg": "2026-10-06T15:57:47.406Z",
+    "settings-theme-picker.svg": "2026-10-06T15:57:47.406Z",
+    "settings-theme-terminal.svg": "2026-10-06T15:57:47.406Z",
+    "settings-theme-solarized.svg": "2026-10-06T15:57:47.406Z",
+    "settings-theme-tokyo-night.svg": "2026-10-06T15:57:47.406Z",
+    "settings-theme-gruvbox.svg": "2026-10-06T15:57:47.406Z",
+    "settings-theme-nord.svg": "2026-10-06T15:57:47.406Z",
+    "settings-theme-catppuccin.svg": "2026-10-06T15:57:47.406Z"
   }
 }

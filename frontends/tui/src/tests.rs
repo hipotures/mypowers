@@ -98,7 +98,11 @@ fn settings_tabs_wrap_route_contextual_keys_and_mouse_without_dashboard_actions(
     for tab in SettingsTab::ALL {
         assert_eq!(app.settings_tab, tab);
         let screen = text(&render(&mut app, 60, 19));
-        assert!(screen.contains("Preferences · Charts · Alerts · Notify · Debug"));
+        assert!(
+            SettingsTab::ALL
+                .iter()
+                .all(|tab| screen.contains(tab.title()))
+        );
         assert!(app.controls.iter().all(|rect| rect.width == 0));
         for key in ['a', 'l'] {
             assert!(matches!(
@@ -2449,7 +2453,7 @@ fn settings_and_help_are_bounded_modal_overlays_with_inactive_dashboard_hitboxes
         assert!(screen.contains("https://mypowers.lxc.efez.net"));
         assert!(screen.contains("A8:3B:76:E6:D4:A0") && screen.contains("Runtime logging"));
         assert!(app.settings_actions.iter().all(|rect| !rect.is_empty()));
-        assert_eq!(app.settings_actions.map(|rect| rect.width), [9, 9, 13]);
+        assert_eq!(app.settings_actions.map(|rect| rect.width), [13, 13, 17]);
         let buttons_y = app.settings_actions[0].y;
         assert!(app.settings_actions.iter().all(|rect| rect.y == buttons_y));
         assert_eq!(buttons_y, height - 5);
@@ -2916,4 +2920,68 @@ fn shared_chart_unions_braille_patterns_when_input_crosses_a_cell_boundary() {
         shared > 30,
         "Exercise the actual 27/29 W versus 25 W collision"
     );
+}
+
+#[test]
+fn local_theme_choice_works_offline_without_changing_server_settings() {
+    let path = std::env::temp_dir().join(format!("mypowers-theme-{}.toml", uuid::Uuid::new_v4()));
+    let mut app = app();
+    app.client_preferences.path = Some(path.clone());
+    app.view = View::Settings;
+    app.settings_tab = SettingsTab::Preferences;
+    app.settings_selected = 2;
+    app.connected = false;
+    app.settings = None;
+    let server_settings = app.settings_draft.clone();
+    assert!(matches!(
+        app.key(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE)),
+        Effect::None
+    ));
+    assert_eq!(
+        app.settings_picker.as_ref().unwrap().field,
+        crate::settings::Field::Theme
+    );
+    app.key(KeyEvent::new(KeyCode::Down, KeyModifiers::NONE));
+    assert!(matches!(
+        app.key(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE)),
+        Effect::None
+    ));
+    assert_eq!(app.client_preferences.theme, "Catppuccin");
+    assert_eq!(app.settings_draft, server_settings);
+    assert!(app.pending.is_none());
+    assert_eq!(
+        crate::client_ui::ClientPreferences::load(path.clone(), true)
+            .unwrap()
+            .theme,
+        "Catppuccin"
+    );
+    std::fs::remove_file(path).unwrap();
+}
+
+#[test]
+fn settings_themes_leave_dashboard_unchanged_and_no_color_removes_styles() {
+    let mut app = app();
+    app.feedback = None;
+    let dashboard = render(&mut app, 94, 29);
+    for name in crate::client_ui::THEMES {
+        app.client_preferences.theme = name.into();
+        assert_eq!(dashboard, render(&mut app, 94, 29));
+        app.view = View::Settings;
+        for (width, height) in [(60, 19), (94, 29)] {
+            let buffer = render(&mut app, width, height);
+            assert!(text(&buffer).contains(name));
+            assert!(app.settings_tabs.iter().all(|rect| !rect.is_empty()));
+            app.no_color = true;
+            let buffer = render(&mut app, width, height);
+            assert!(
+                buffer
+                    .content
+                    .iter()
+                    .all(|cell| cell.fg == ratatui::style::Color::Reset
+                        && cell.bg == ratatui::style::Color::Reset)
+            );
+            app.no_color = false;
+        }
+        app.view = View::Dashboard;
+    }
 }

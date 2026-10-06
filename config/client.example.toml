@@ -1,0 +1,28 @@
+# Copy to ~/.config/mypowers/client.toml (or $XDG_CONFIG_HOME/mypowers/client.toml).
+# Settings -> Preferences -> Theme saves the theme locally, immediately.
+theme = "MyPowers"
+
+# Optional connection defaults, shared by CLI and TUI.
+# Dotenv, process environment and command-line flags override these defaults.
+# server_url = "https://mypowers.lxc.efez.net"
+# token_file = "/path/to/private-api-token"
+# ca_file = "/path/to/private-ca.pem"
+# timezone = "Europe/Warsaw"
+
+# Optional Settings color overrides. Colors are #RRGGBB.
+# Supported roles: background, foreground, muted, border, focus, accent, error, warning.
+[colors]
+# accent = "#76cb89"
+
+# Additional navigation shortcuts. Original shortcuts remain unless overridden here.
+# Escape and q are reserved. Bindings do not apply while typing in a value picker.
+[keybindings.dashboard]
+# h = "help"
+
+[keybindings.settings]
+# j = "down"
+# k = "up"
+
+[keybindings.logs]
+# j = "down"
+# k = "up"

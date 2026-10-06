@@ -312,3 +312,54 @@ are observational; they do not activate output controls.
 The `terminal_cleanup` example is a subprocess fixture for PTY tests of the
 production terminal guard: normal exit, main/worker/task panics, and setup writes
 to a broken pipe. It does not connect to a daemon or render a separate UI.
+
+## Local appearance and shortcuts
+
+Settings uses Ratcn 0.0.5 paint widgets for its tab buttons, action buttons and
+value lists. MyPowers retains its event loop, focus/mouse routing, command
+admission and daemon API. The dependency is pinned because Ratcn is a preview API.
+
+The default configuration file is `$XDG_CONFIG_HOME/mypowers/client.toml`,
+falling back to `~/.config/mypowers/client.toml`. A missing default file uses
+the MyPowers appearance and original shortcuts. Select another file with
+`--client-config PATH` or `MYPOWERS_CLIENT_CONFIG`; an explicitly selected
+missing file and malformed/unknown values are errors.
+
+Copy [the example](../../config/client.example.toml) to start:
+
+```toml
+theme = "Nord"
+
+[colors]
+accent = "#88c0d0"
+
+[keybindings.settings]
+j = "down"
+k = "up"
+```
+
+Available themes: MyPowers, Catppuccin, Nord, Gruvbox, Tokyo Night, Solarized,
+Terminal. Theme and color overrides affect Settings and its value popups;
+dashboard and chart palettes are preserved. `--no-color` / `NO_COLOR` still
+remove all foreground/background colors.
+
+Choosing **Preferences → Theme (local)** applies and atomically saves the
+theme immediately, including when the daemon is offline. This rewrites the
+TOML while retaining its other values; comments are not retained. No request
+is sent to the server. **Save changes** continues to save chart/log preferences
+and battery alerts on the server.
+
+Keybindings are scoped to `dashboard`, `settings` or `logs`. A configured key
+maps to a named navigation action; unconfigured keys keep their original behavior.
+Actions are `help`, `logs`, `settings`, `quit`, `close`, `up`, `down`,
+`left`, `right`, `activate`, `next_tab`, `previous_tab`, `cycle_interval`
+and `toggle_graph`, where supported by the selected screen.
+Use single characters or `Enter`, `Tab`, `Up`, `Down`, `Left`, `Right`,
+`Home`, `End`, `F1`, `F3`. Escape and q cannot be remapped; Ctrl/Alt chords
+and typed picker searches bypass custom bindings. Existing contextual help lists
+the original shortcuts.
+
+Optional TOML connection defaults (`server_url`, `token_file`, `ca_file`,
+`timezone`) are shared by CLI and TUI. Token/CA paths are relative to the
+TOML file. Precedence: built-in defaults < TOML < dotenv < process environment
+< command-line options. Secrets remain in private token files.

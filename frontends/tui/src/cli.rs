@@ -136,6 +136,7 @@ fn help_text(command: Option<&str>, color: bool) -> String {
         &[
             ("--server URL", "HTTP(S) daemon origin"),
             ("--env-file PATH", "Use another dotenv file"),
+            ("--client-config PATH", "Local client TOML"),
             ("--token-file PATH", "Private API token file"),
             ("--ca-file PATH", "TLS CA bundle"),
             ("--timeout SECS", "Request timeout"),
@@ -165,7 +166,7 @@ fn help_command(raw: &[String]) -> Option<&str> {
     while let Some(arg) = args.next() {
         match arg {
             "--env-file" | "--server" | "--token-file" | "--ca-file" | "--timeout"
-            | "--timezone" => {
+            | "--timezone" | "--client-config" => {
                 args.next();
             }
             value if value.starts_with('-') => {}
@@ -197,7 +198,7 @@ impl Arguments {
                 "--follow" => parsed.follow = true,
                 "--no-color" | "--utc" | "--no-mouse" => parsed.config.push(arg),
                 "--env-file" | "--server" | "--token-file" | "--ca-file" | "--timeout"
-                | "--timezone" => {
+                | "--timezone" | "--client-config" => {
                     let value = args.next().ok_or("Missing option value. Use --help.")?;
                     parsed.config.extend([arg, value]);
                 }
@@ -959,6 +960,7 @@ mod tests {
     #[test]
     fn durations_and_timezone_queries_keep_old_cli_semantics() {
         let config = Config {
+            client_preferences: crate::client_ui::ClientPreferences::default(),
             server: reqwest::Url::parse("http://localhost").unwrap(),
             token: None,
             ca: None,

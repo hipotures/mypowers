@@ -14,7 +14,7 @@ use ratatui::{
     text::{Line, Span},
     widgets::{
         Axis, Block, BorderType, Borders, Chart, Clear, Dataset, GraphType, Paragraph, Scrollbar,
-        ScrollbarOrientation, ScrollbarState, Sparkline, SparklineBar, Tabs, Widget,
+        ScrollbarOrientation, ScrollbarState, Sparkline, SparklineBar, Widget,
     },
 };
 use std::borrow::Cow;
@@ -150,11 +150,12 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
             app.controls = [Rect::default(); 3];
             let modal = centered(area, area.width - 4, area.height - 4);
             frame.render_widget(Clear, modal);
+            let theme = app.client_preferences.theme();
             let block = Block::default()
                 .borders(Borders::ALL)
                 .border_type(BorderType::Rounded)
-                .border_style(Style::default().fg(BORDER))
-                .style(Style::default().bg(BACKGROUND).fg(TEXT))
+                .border_style(Style::default().fg(theme.border))
+                .style(Style::default().bg(theme.background).fg(theme.foreground))
                 .title_top(
                     Line::from(if app.view == View::Help {
                         " HELP "
@@ -162,7 +163,11 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
                         " SETTINGS "
                     })
                     .centered()
-                    .style(Style::default().fg(TEXT).add_modifier(Modifier::BOLD)),
+                    .style(
+                        Style::default()
+                            .fg(theme.foreground)
+                            .add_modifier(Modifier::BOLD),
+                    ),
                 );
             let inner = block.inner(modal);
             frame.render_widget(block, modal);
@@ -172,7 +177,7 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
                 ..inner
             };
             if app.view == View::Help {
-                help(frame, inner, app.help_context, app.settings_tab);
+                help(frame, inner, app.help_context, app.settings_tab, &theme);
             } else {
                 settings(frame, inner, app);
             }
@@ -1048,43 +1053,57 @@ fn quit_modal(frame: &mut Frame, screen: Rect, app: &mut App) {
 }
 
 fn settings(frame: &mut Frame, area: Rect, app: &mut App) {
+    let theme = app.client_preferences.theme();
     let rows = Layout::vertical([
         Constraint::Length(1),
         Constraint::Length(1),
         Constraint::Fill(1),
     ])
     .split(area);
-    frame.render_widget(
-        Tabs::new(SettingsTab::ALL.map(SettingsTab::title))
-            .select(app.settings_tab as usize)
-            .divider(" · ")
-            .padding("", "")
-            .style(Style::default().fg(MUTED))
-            .highlight_style(
-                Style::default()
-                    .fg(GREEN)
-                    .bg(TRACK)
-                    .add_modifier(Modifier::BOLD),
-            ),
-        rows[0],
-    );
     let mut x = rows[0].x;
     for (index, tab) in SettingsTab::ALL.iter().enumerate() {
-        let width = tab.title().len() as u16;
-        app.settings_tabs[index] = Rect::new(x, rows[0].y, width, 1);
-        x += width + 3;
+        let width = tab.title().len() as u16 + 2;
+        let rect = Rect::new(
+            x,
+            rows[0].y,
+            width.min(rows[0].right().saturating_sub(x)),
+            1,
+        );
+        app.settings_tabs[index] = rect;
+        frame.render_widget(
+            ratcn::ButtonWidget::new(tab.title())
+                .themed(&theme)
+                .variant(if app.settings_tab as usize == index {
+                    ratcn::ButtonVariant::Default
+                } else {
+                    ratcn::ButtonVariant::Ghost
+                }),
+            rect,
+        );
+        x += width + 1;
     }
     let status = app.status.as_ref();
     let row = |label: &str, value: String| {
         Line::from(vec![
-            Span::styled(format!("{label:<20}"), Style::default().fg(MUTED)),
-            Span::styled(safe(&value).into_owned(), Style::default().fg(TEXT)),
+            Span::styled(
+                format!("{label:<20}"),
+                Style::default().fg(theme.muted_foreground),
+            ),
+            Span::styled(
+                safe(&value).into_owned(),
+                Style::default().fg(theme.foreground),
+            ),
         ])
     };
     let heading = |title: &'static str| {
-        Line::from(title).style(Style::default().fg(TEXT).add_modifier(Modifier::BOLD))
+        Line::from(title).style(
+            Style::default()
+                .fg(theme.foreground)
+                .add_modifier(Modifier::BOLD),
+        )
     };
-    let note = |text: &'static str| Line::from(text).style(Style::default().fg(DIM));
+    let note =
+        |text: &'static str| Line::from(text).style(Style::default().fg(theme.muted_foreground));
     let lines = match app.settings_tab {
         SettingsTab::Preferences | SettingsTab::Charts | SettingsTab::Alerts => {
             let fields: &[Field] = if app.settings_tab == SettingsTab::Charts {
@@ -1102,9 +1121,16 @@ fn settings(frame: &mut Frame, area: Rect, app: &mut App) {
                 "Preferences"
             })];
             for (index, field) in fields.iter().enumerate() {
-                let available = app.settings.is_some();
+                let available = *field == Field::Theme || app.settings.is_some();
                 let value = if available {
-                    format!("{} ▾", app.settings_draft.value(*field))
+                    format!(
+                        "{} ▾",
+                        if *field == Field::Theme {
+                            app.client_preferences.theme.clone()
+                        } else {
+                            app.settings_draft.value(*field)
+                        }
+                    )
                 } else if app.settings_error {
                     "Unavailable; retrying".into()
                 } else {
@@ -1112,9 +1138,9 @@ fn settings(frame: &mut Frame, area: Rect, app: &mut App) {
                 };
                 let line = row(field.label(), value).style(Style::default().bg(
                     if app.settings_selected == index {
-                        TRACK
+                        theme.field
                     } else {
-                        BACKGROUND
+                        theme.background
                     },
                 ));
                 app.settings_fields.push((
@@ -1125,7 +1151,11 @@ fn settings(frame: &mut Frame, area: Rect, app: &mut App) {
             }
             lines.push(Line::default());
             lines.push(note("Enter opens the list of available values."));
-            lines.push(note("Save applies choices now and on next start."));
+            lines.push(note(if app.settings_tab == SettingsTab::Preferences {
+                "Theme saves locally; other choices save on server."
+            } else {
+                "Save applies choices now and on next start."
+            }));
             lines
         }
         SettingsTab::Notify => vec![
@@ -1229,7 +1259,7 @@ fn settings(frame: &mut Frame, area: Rect, app: &mut App) {
         } else if app.settings_tab == SettingsTab::Alerts {
             4
         } else {
-            2
+            3
         };
         app.settings_save = Rect::new(rows[2].x, rows[2].y + count + 4, 20, 1);
         let label = if app.settings.is_none() {
@@ -1242,34 +1272,29 @@ fn settings(frame: &mut Frame, area: Rect, app: &mut App) {
             "[ Save changes ]"
         };
         frame.render_widget(
-            Paragraph::new(label).style(
-                Style::default()
-                    .fg(if app.settings.is_some() { GREEN } else { DIM })
-                    .bg(if app.settings_selected == count as usize {
-                        TRACK
-                    } else {
-                        BACKGROUND
-                    }),
-            ),
+            ratcn::ButtonWidget::new(label)
+                .themed(&theme)
+                .ghost()
+                .focused(app.settings_selected == count as usize)
+                .disabled(app.settings.is_none() || app.pending.is_some()),
             app.settings_save,
         );
     } else if app.settings_tab == SettingsTab::Notify {
         app.settings_actions[0] = Rect::new(rows[2].x, rows[2].y + 5, rows[2].width, 1);
+        let label = if app.pending.as_deref() == Some("telegram test") {
+            "[ Sending test... ]"
+        } else {
+            "[ Send test message ]"
+        };
+        app.settings_actions[0].width = app.settings_actions[0]
+            .width
+            .min(ratcn::ButtonWidget::new(label).width());
         frame.render_widget(
-            Paragraph::new(if app.pending.as_deref() == Some("telegram test") {
-                "[ Sending test... ]"
-            } else {
-                "[ Send test message ]"
-            })
-            .style(
-                Style::default()
-                    .fg(if app.connected && app.pending.is_none() {
-                        GREEN
-                    } else {
-                        DIM
-                    })
-                    .bg(TRACK),
-            ),
+            ratcn::ButtonWidget::new(label)
+                .themed(&theme)
+                .ghost()
+                .focused(true)
+                .disabled(!app.connected || app.pending.is_some()),
             app.settings_actions[0],
         );
     } else if app.settings_tab == SettingsTab::Debug {
@@ -1292,7 +1317,8 @@ fn settings(frame: &mut Frame, area: Rect, app: &mut App) {
             ),
         ];
         frame.render_widget(
-            Paragraph::new("─".repeat(rows[2].width as usize)).style(Style::default().fg(BORDER)),
+            Paragraph::new("─".repeat(rows[2].width as usize))
+                .style(Style::default().fg(theme.border)),
             Rect::new(
                 rows[2].x,
                 rows[2].bottom().saturating_sub(2),
@@ -1308,24 +1334,18 @@ fn settings(frame: &mut Frame, area: Rect, app: &mut App) {
         ));
         for (index, label) in labels.into_iter().enumerate() {
             let button = Rect {
-                width: buttons[index].width.min(label.len() as u16),
+                width: buttons[index]
+                    .width
+                    .min(ratcn::ButtonWidget::new(&label).width()),
                 ..buttons[index]
             };
             app.settings_actions[index] = button;
             frame.render_widget(
-                Paragraph::new(label).style(
-                    Style::default()
-                        .fg(if app.connected && app.pending.is_none() {
-                            TEXT
-                        } else {
-                            DIM
-                        })
-                        .bg(if app.settings_selected == index {
-                            TRACK
-                        } else {
-                            BACKGROUND
-                        }),
-                ),
+                ratcn::ButtonWidget::new(&label)
+                    .themed(&theme)
+                    .ghost()
+                    .focused(app.settings_selected == index)
+                    .disabled(!app.connected || app.pending.is_some()),
                 button,
             );
         }
@@ -1337,8 +1357,8 @@ fn settings(frame: &mut Frame, area: Rect, app: &mut App) {
         frame.render_widget(Clear, popup);
         let block = Block::bordered()
             .border_type(BorderType::Rounded)
-            .border_style(Style::default().fg(GREEN))
-            .style(Style::default().bg(BACKGROUND))
+            .border_style(Style::default().fg(theme.primary))
+            .style(Style::default().bg(theme.background))
             .title(format!(" {} ", picker.field.label()))
             .title_bottom(" Enter select  Esc cancel ");
         let inner = block.inner(popup);
@@ -1349,35 +1369,45 @@ fn settings(frame: &mut Frame, area: Rect, app: &mut App) {
             } else {
                 "Available values".into()
             })
-            .style(Style::default().fg(MUTED)),
+            .style(Style::default().fg(theme.muted_foreground)),
             Rect::new(inner.x, inner.y, inner.width, 1),
         );
         if options.is_empty() {
             frame.render_widget(
-                Paragraph::new("No matching values").style(Style::default().fg(DIM)),
+                Paragraph::new("No matching values")
+                    .style(Style::default().fg(theme.muted_foreground)),
                 Rect::new(inner.x, inner.y + 1, inner.width, 1),
             );
         }
         let viewport = inner.height.saturating_sub(1) as usize;
         let start = picker.selected.saturating_sub(viewport.saturating_sub(1));
-        for (offset, (index, value)) in options.iter().skip(start).take(viewport).enumerate() {
+        let visible: Vec<_> = options
+            .iter()
+            .skip(start)
+            .take(viewport)
+            .map(|(_, value)| ratatui::text::Text::from(value.clone()))
+            .collect();
+        for (offset, (index, _)) in options.iter().skip(start).take(viewport).enumerate() {
             let rect = Rect::new(inner.x, inner.y + offset as u16 + 1, inner.width, 1);
             app.settings_choices.push((rect, *index));
-            frame.render_widget(
-                Paragraph::new(format!(" {}", value)).style(Style::default().fg(TEXT).bg(
-                    if start + offset == picker.selected {
-                        TRACK
-                    } else {
-                        BACKGROUND
-                    },
-                )),
-                rect,
-            );
         }
+        frame.render_widget(
+            ratcn::ListWidget::new(&visible)
+                .themed(&theme)
+                .focused(true)
+                .focused_item(Some(picker.selected.saturating_sub(start)))
+                .focus_symbol("› "),
+            Rect::new(
+                inner.x,
+                inner.y + 1,
+                inner.width,
+                inner.height.saturating_sub(1),
+            ),
+        );
     }
 }
 
-fn help(frame: &mut Frame, area: Rect, context: View, tab: SettingsTab) {
+fn help(frame: &mut Frame, area: Rect, context: View, tab: SettingsTab, theme: &ratcn::Theme) {
     let text = if context == View::Settings {
         let actions = match tab {
             SettingsTab::Preferences | SettingsTab::Charts => {
@@ -1408,7 +1438,10 @@ Click     Activate a button"
     } else {
         "HELP — DASHBOARD\n\na / d / l                Request AC / DC / light ON/OFF\nTab / Shift-Tab          Focus output control\nEnter / Space            Activate focused output\nF3                       Open Logs\ns                        Open Settings / Diagnostics\nt                        Cycle average per bar: 10s / 60s / 1h\ng                        Switch Sparkline / Chart (session only)\nF1 / ?                   Help for the active window\nDouble-click MYPOWERS    Copy current API snapshot\n\nEsc close   q confirm quit".into()
     };
-    frame.render_widget(Paragraph::new(text).style(Style::default().fg(MUTED)), area);
+    frame.render_widget(
+        Paragraph::new(text).style(Style::default().fg(theme.muted_foreground)),
+        area,
+    );
 }
 
 fn centered(area: Rect, width: u16, height: u16) -> Rect {

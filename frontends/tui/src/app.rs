@@ -19,6 +19,7 @@ pub enum View {
 }
 
 pub struct App {
+    pub client_preferences: crate::client_ui::ClientPreferences,
     pub clock: Clock,
     pub snapshot: bool,
     pub warning_count: u32,
@@ -87,6 +88,7 @@ impl App {
 
     pub fn with_clock(no_color: bool, timezone: Option<chrono_tz::Tz>, clock: Clock) -> Self {
         Self {
+            client_preferences: crate::client_ui::ClientPreferences::default(),
             clock,
             warning_count: 0,
             error_count: 0,
@@ -518,6 +520,13 @@ impl App {
         if self.view == View::Settings && self.settings_picker.is_some() {
             return self.picker_key(key);
         }
+        let mode = match self.view {
+            View::Dashboard => "dashboard",
+            View::Logs => "logs",
+            View::Settings => "settings",
+            _ => "",
+        };
+        let key = self.client_preferences.key(mode, key);
         if key.code == KeyCode::Esc {
             if self.view != View::Dashboard {
                 self.view = View::Dashboard;
@@ -630,7 +639,7 @@ impl App {
 
     fn settings_count(&self) -> usize {
         match self.settings_tab {
-            SettingsTab::Preferences => 3,
+            SettingsTab::Preferences => 4,
             SettingsTab::Charts => 4,
             SettingsTab::Debug => 3,
             SettingsTab::Alerts => 5,
@@ -651,6 +660,18 @@ impl App {
                 self.feedback = Some(Feedback::new("Sending Telegram test...", Severity::Info));
                 return Effect::Request(Intent::TestTelegram);
             }
+            return Effect::None;
+        }
+        if self.settings_tab == SettingsTab::Preferences && self.settings_selected == 2 {
+            self.settings_picker = Some(Picker {
+                field: Field::Theme,
+                selected: crate::client_ui::THEMES
+                    .iter()
+                    .position(|name| *name == self.client_preferences.theme)
+                    .unwrap_or(0),
+                query: String::new(),
+            });
+            self.resize();
             return Effect::None;
         }
         if self.settings.is_none() || self.pending.is_some() {
@@ -729,6 +750,26 @@ impl App {
             }
             KeyCode::Enter => {
                 if let Some((index, _)) = options.get(picker.selected) {
+                    if picker.field == Field::Theme {
+                        let name = crate::client_ui::THEMES[*index];
+                        match self.client_preferences.save_theme(name) {
+                            Ok(()) => {
+                                self.feedback = Some(Feedback::new(
+                                    format!("Theme saved locally: {name}"),
+                                    Severity::Info,
+                                ));
+                                self.settings_picker = None;
+                                self.resize();
+                            }
+                            Err(_) => {
+                                self.feedback = Some(Feedback::new(
+                                    "Cannot save local client theme",
+                                    Severity::Error,
+                                ))
+                            }
+                        }
+                        return Effect::None;
+                    }
                     let mut candidate = self.settings_draft.clone();
                     candidate.choose(picker.field, *index);
                     if !candidate.valid() {
@@ -840,9 +881,12 @@ impl App {
                         .iter()
                         .find(|(rect, _)| rect.contains(position))
                 {
-                    self.settings_draft.choose(picker.field, *index);
-                    self.settings_picker = None;
-                    self.resize();
+                    picker.selected = picker
+                        .options()
+                        .iter()
+                        .position(|(value, _)| value == index)
+                        .unwrap_or(0);
+                    return self.picker_key(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE));
                 }
                 return Effect::None;
             }
