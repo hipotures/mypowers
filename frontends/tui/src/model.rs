@@ -24,6 +24,7 @@ pub struct Connection {
     pub session_id: Option<String>,
     pub message: String,
     pub adapter_id: Option<String>,
+    pub adapter_address: Option<String>,
 }
 
 impl Connection {

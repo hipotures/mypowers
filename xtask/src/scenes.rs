@@ -257,7 +257,8 @@ fn fixed_status(now: DateTime<Utc>) -> Result<Status, String> {
         "device": { "name": "AP S300 V2.0" },
         "connection": {
             "phase": "connected", "desired": "running", "link_connected": true,
-            "session_id": "fixed-session", "message": "Connected", "adapter_id": "hci2"
+            "session_id": "fixed-session", "message": "Connected", "adapter_id": "hci2",
+            "adapter_address": "F4:4E:FC:A1:CB:FF"
         },
         "telemetry": {
             "state": "live", "age_seconds": 0.4,
@@ -289,6 +290,7 @@ fn app(scene: Scene) -> Result<App, String> {
         },
     );
     let mut status = fixed_status(now)?;
+    app.server_url = "https://mypowers.lxc.efez.net".into();
     app.connected = true;
     app.selected = None;
     app.feedback = Some(Feedback::new("AC ON confirmed", Severity::Success));

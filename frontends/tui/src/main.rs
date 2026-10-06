@@ -50,6 +50,7 @@ fn run() -> Result<(), String> {
     let (log_requests, log_operations) = tokio::sync::watch::channel(None);
     let (history_requests, history_operations) = tokio::sync::watch::channel(None);
     let mut app = App::new(config.no_color, config.timezone);
+    app.server_url = config.server.as_str().trim_end_matches('/').to_owned();
     let session =
         terminal::Session::enter(!config.no_mouse).map_err(|_| "Cannot initialize terminal.")?;
     runtime.spawn(api.clone().stream(false, events.clone()));

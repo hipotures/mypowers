@@ -17,7 +17,7 @@ pub(crate) fn status() -> Status {
     serde_json::from_value(json!({
         "schema_version":1,"server_time":stamp,"server_instance_id":"88767477-2a2a-481f-843b-30d56a5e3f10","state_version":1,
         "device":{"name":"AP S300 V2.0"},
-        "connection":{"phase":"connected","desired":"running","link_connected":true,"session_id":"session","message":"Connected","adapter_id":"hci0"},
+        "connection":{"phase":"connected","desired":"running","link_connected":true,"session_id":"session","message":"Connected","adapter_id":"hci0","adapter_address":"A8:3B:76:E6:D4:A0"},
         "telemetry":{"state":"live","age_seconds":0.0,"sample":{
             "sequence":1,"received_at":stamp,"segment_id":"segment",
             "battery_percent":78,"input_power_w":63,"output_power_w":181,"remaining_minutes":2937,
@@ -2436,6 +2436,7 @@ fn frozen_clock_controls_freshness_history_animation_feedback_and_override_expir
 #[test]
 fn settings_and_help_are_bounded_modal_overlays_with_inactive_dashboard_hitboxes() {
     let mut app = app();
+    app.server_url = "https://mypowers.lxc.efez.net".into();
     let normal = render(&mut app, 94, 29);
     let station_color = normal[(2, 1)].fg;
     app.key(KeyEvent::new(KeyCode::Char('s'), KeyModifiers::NONE));
@@ -2444,6 +2445,13 @@ fn settings_and_help_are_bounded_modal_overlays_with_inactive_dashboard_hitboxes
     for (width, height) in [(60, 19), (80, 24), (94, 29)] {
         let screen = text(&render(&mut app, width, height));
         assert!(screen.contains("SETTINGS") && screen.contains("Debug / Diagnostics"));
+        assert!(screen.contains("Server") && screen.contains("API connection"));
+        assert!(screen.contains("https://mypowers.lxc.efez.net"));
+        assert!(screen.contains("A8:3B:76:E6:D4:A0") && screen.contains("Runtime logging"));
+        assert!(app.settings_actions.iter().all(|rect| !rect.is_empty()));
+        let buttons_y = app.settings_actions[0].y;
+        assert!(app.settings_actions.iter().all(|rect| rect.y == buttons_y));
+        assert_eq!(buttons_y, height - 5);
         assert!(app.controls.iter().all(|rect| rect.is_empty()) && app.title.is_empty());
     }
     let settings = render(&mut app, 94, 29);

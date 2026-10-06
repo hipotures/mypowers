@@ -1142,58 +1142,84 @@ fn settings(frame: &mut Frame, area: Rect, app: &mut App) {
             note("Credentials are configured on the server."),
             note("Alerts run even when this TUI is closed."),
         ],
-        SettingsTab::Debug => vec![
-            heading("Debug / Diagnostics"),
-            row(
-                "Daemon",
-                if app.connected {
-                    "Connected"
-                } else {
-                    "Offline"
-                }
-                .into(),
-            ),
-            row(
-                "Station phase",
-                status
-                    .map(|s| s.connection.phase.clone())
-                    .unwrap_or_else(|| "Unknown".into()),
-            ),
-            row(
-                "Station mode",
-                status
-                    .map(|s| s.connection.desired.clone())
-                    .unwrap_or_else(|| "Unknown".into()),
-            ),
-            row(
-                "BLE adapter",
-                status
-                    .and_then(|s| s.connection.adapter_id.clone())
-                    .unwrap_or_else(|| "--".into()),
-            ),
-            row(
-                "Telemetry",
-                status
-                    .map(|s| s.telemetry.state.clone())
-                    .unwrap_or_else(|| "unknown".into()),
-            ),
-            row(
-                "Sample age",
-                app.age()
-                    .map(|age| format!("{age:.1} s"))
-                    .unwrap_or_else(|| "--".into()),
-            ),
-            row(
-                "History",
-                status
-                    .and_then(|s| s.history["state"].as_str())
-                    .unwrap_or("unknown")
+        SettingsTab::Debug => {
+            let mut lines = vec![
+                heading("Debug / Diagnostics"),
+                row("Server", app.server_url.clone()),
+                row(
+                    "API connection",
+                    if app.connected {
+                        "Connected"
+                    } else {
+                        "Offline"
+                    }
                     .into(),
-            ),
-            row("Runtime logging", logging_status(app)),
-        ],
+                ),
+                row(
+                    "Station phase",
+                    status
+                        .map(|s| s.connection.phase.clone())
+                        .unwrap_or_else(|| "Unknown".into()),
+                ),
+                row(
+                    "BLE adapter",
+                    status
+                        .map(
+                            |s| match (&s.connection.adapter_id, &s.connection.adapter_address) {
+                                (Some(id), Some(address)) => format!("{id} · {address}"),
+                                (Some(id), None) => id.clone(),
+                                (_, Some(address)) => address.clone(),
+                                _ => "--".into(),
+                            },
+                        )
+                        .unwrap_or_else(|| "--".into()),
+                ),
+                row(
+                    "Telemetry",
+                    status
+                        .map(|s| s.telemetry.state.clone())
+                        .unwrap_or_else(|| "unknown".into()),
+                ),
+            ];
+            let capacity = rows[2].height.saturating_sub(2);
+            if capacity >= 8 {
+                lines.push(row(
+                    "History",
+                    status
+                        .and_then(|s| s.history["state"].as_str())
+                        .unwrap_or("unknown")
+                        .into(),
+                ));
+            }
+            if capacity >= 9 {
+                lines.push(row(
+                    "Sample age",
+                    app.age()
+                        .map(|age| format!("{age:.1} s"))
+                        .unwrap_or_else(|| "--".into()),
+                ));
+            }
+            if capacity >= 10 {
+                lines.push(row(
+                    "Station mode",
+                    status
+                        .map(|s| s.connection.desired.clone())
+                        .unwrap_or_else(|| "Unknown".into()),
+                ));
+            }
+            lines.push(row("Runtime logging", logging_status(app)));
+            lines
+        }
     };
-    frame.render_widget(Paragraph::new(lines), rows[2]);
+    let body = if app.settings_tab == SettingsTab::Debug {
+        Rect {
+            height: rows[2].height.saturating_sub(2),
+            ..rows[2]
+        }
+    } else {
+        rows[2]
+    };
+    frame.render_widget(Paragraph::new(lines), body);
     if matches!(
         app.settings_tab,
         SettingsTab::Preferences | SettingsTab::Charts | SettingsTab::Alerts
@@ -1265,9 +1291,18 @@ fn settings(frame: &mut Frame, area: Rect, app: &mut App) {
                 if logging == "DEBUG" { "ON" } else { "OFF" }
             ),
         ];
+        frame.render_widget(
+            Paragraph::new("─".repeat(rows[2].width as usize)).style(Style::default().fg(BORDER)),
+            Rect::new(
+                rows[2].x,
+                rows[2].bottom().saturating_sub(2),
+                rows[2].width,
+                1,
+            ),
+        );
         let buttons = Layout::horizontal([Constraint::Fill(1); 3]).split(Rect::new(
             rows[2].x,
-            rows[2].y + 9,
+            rows[2].bottom().saturating_sub(1),
             rows[2].width,
             1,
         ));
