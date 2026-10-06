@@ -554,7 +554,8 @@ impl App {
             self.view = View::Quit;
             self.quit_yes = true;
             self.resize();
-            return Effect::None;
+            self.settings_save_due = Some(self.clock.now());
+            return self.autosave();
         }
         match self.view {
             View::Dashboard => match key.code {
@@ -832,7 +833,8 @@ impl App {
             self.view = View::Quit;
             self.quit_yes = true;
             self.resize();
-            return Effect::None;
+            self.settings_save_due = Some(self.clock.now());
+            return self.autosave();
         }
         if key.code == KeyCode::Enter
             && self.pending.is_some()

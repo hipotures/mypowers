@@ -380,5 +380,5 @@ Longer value lists, including the four graph intervals, retain their picker.
 Settings autosave after five seconds from the last actual change. There is no save
 button or waiting message. The shared feedback line shows saving, success or error.
 Failed writes retain the draft and retry after five seconds, including after a
-reconnection. Closing Settings flushes changes immediately. Quitting waits for an
-outstanding settings save; a failed save keeps the application open.
+reconnection. Closing Settings flushes changes immediately. Pressing q flushes changes before quit confirmation; Ctrl-Q flushes them directly.
+Quitting waits for an outstanding settings save; a failed save keeps the application open.

@@ -3324,3 +3324,47 @@ fn reverting_settings_cancels_autosave_and_pending_write_blocks_picker_confirmat
     assert_eq!(app.settings_draft, draft);
     assert!(app.settings_picker.is_some());
 }
+
+#[test]
+fn quit_shortcuts_flush_settings_immediately_even_from_a_picker() {
+    for ctrl in [false, true] {
+        for picker in [false, true] {
+            let mut app = app();
+            app.update(Event::Settings(Settings::default()));
+            app.view = View::Settings;
+            app.settings_tab = SettingsTab::Charts;
+            app.key(KeyEvent::new(KeyCode::Right, KeyModifiers::NONE));
+            let expected = app.settings_draft.clone();
+            if picker {
+                app.settings_selected = 1;
+                app.key(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE));
+            }
+            let modifiers = if ctrl {
+                KeyModifiers::CONTROL
+            } else {
+                KeyModifiers::NONE
+            };
+            let Effect::Request(Intent::SaveSettings(draft)) =
+                app.key(KeyEvent::new(KeyCode::Char('q'), modifiers))
+            else {
+                panic!("Quit shortcut must flush the changed settings immediately");
+            };
+            assert_eq!(draft, expected);
+            assert_eq!(app.quit_after_settings, ctrl);
+            if !ctrl {
+                assert!(app.view == View::Quit);
+                assert!(matches!(
+                    app.key(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE)),
+                    Effect::None
+                ));
+                assert!(app.quit_after_settings);
+            }
+            app.update(Event::Settings(draft));
+            app.update(Event::Finished(Feedback::new(
+                "Settings saved",
+                Severity::Success,
+            )));
+            assert!(app.quit_after_settings && !app.settings_dirty() && app.pending.is_none());
+        }
+    }
+}
