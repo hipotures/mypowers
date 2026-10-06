@@ -107,6 +107,7 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
     app.quit_buttons = [Rect::default(); 2];
     app.settings_tabs = [Rect::default(); 5];
     app.settings_fields.clear();
+    app.settings_segments.clear();
     app.settings_choices.clear();
     app.settings_actions = [Rect::default(); 3];
     app.settings_save = Rect::default();
@@ -1210,7 +1211,9 @@ fn settings(frame: &mut Frame, area: Rect, app: &mut App) {
             })];
             for (index, field) in fields.iter().enumerate() {
                 let available = *field == Field::Theme || app.settings.is_some();
-                let value = if available {
+                let value = if field.is_segmented() {
+                    String::new()
+                } else if available {
                     format!(
                         "{} ▾",
                         if *field == Field::Theme {
@@ -1225,7 +1228,7 @@ fn settings(frame: &mut Frame, area: Rect, app: &mut App) {
                     "Loading...".into()
                 };
                 let line = row(field.label(), value).style(Style::default().bg(
-                    if app.settings_selected == index {
+                    if app.settings_selected == index && !field.is_segmented() {
                         theme.field
                     } else {
                         theme.background
@@ -1238,7 +1241,7 @@ fn settings(frame: &mut Frame, area: Rect, app: &mut App) {
                 lines.push(line);
             }
             lines.push(Line::default());
-            lines.push(note("Enter opens the list of available values."));
+            lines.push(note("←/→ changes segments; Enter opens lists."));
             lines.push(note(if app.settings_tab == SettingsTab::Preferences {
                 "Theme saves locally; other choices save on server."
             } else {
@@ -1338,16 +1341,89 @@ fn settings(frame: &mut Frame, area: Rect, app: &mut App) {
         rows[2]
     };
     frame.render_widget(Paragraph::new(lines.clone()), body);
-    for (index, (rect, _field)) in app.settings_fields.iter().enumerate() {
-        let mut line = lines[index + 1].clone();
-        line.style.bg = None;
-        let items = [ratatui::text::Text::from(line)];
-        frame.render_widget(
-            themed_list(&items, &theme)
-                .focused(app.settings_selected == index)
-                .focused_item(Some(0)),
-            *rect,
-        );
+    for (index, (rect, field)) in app.settings_fields.iter().enumerate() {
+        if field.is_segmented() {
+            frame.render_widget(
+                Paragraph::new(field.label()).style(
+                    Style::default()
+                        .fg(if app.settings_selected == index {
+                            theme.foreground
+                        } else {
+                            theme.muted_foreground
+                        })
+                        .add_modifier(if app.settings_selected == index {
+                            Modifier::BOLD
+                        } else {
+                            Modifier::empty()
+                        }),
+                ),
+                Rect { width: 20, ..*rect },
+            );
+            let choices = field.choices();
+            let selected = app
+                .settings
+                .is_some()
+                .then(|| {
+                    choices
+                        .iter()
+                        .position(|value| *value == app.settings_draft.value(*field))
+                })
+                .flatten();
+            let mut x = rect.x + 20;
+            frame.render_widget(Paragraph::new("["), Rect::new(x, rect.y, 1, 1));
+            x += 1;
+            for choice in 0..choices.len() {
+                if choice > 0 {
+                    frame.render_widget(
+                        Paragraph::new("|").style(Style::default().fg(theme.border)),
+                        Rect::new(x, rect.y, 1, 1),
+                    );
+                    x += 1;
+                }
+                let label = field.segment_label(choice);
+                let width = label.len() as u16 + 2;
+                let segment = Rect::new(x, rect.y, width.min(rect.right().saturating_sub(x)), 1);
+                frame.render_widget(
+                    ratcn::ButtonWidget::new(&label)
+                        .themed(&theme)
+                        .variant(if selected == Some(choice) {
+                            ratcn::ButtonVariant::Default
+                        } else {
+                            ratcn::ButtonVariant::Ghost
+                        })
+                        .focused(app.settings_selected == index && selected == Some(choice))
+                        .disabled(app.settings.is_none() || app.pending.is_some()),
+                    segment,
+                );
+                if selected == Some(choice) {
+                    for x in segment.x..segment.right() {
+                        let emphasis = Modifier::BOLD
+                            | if app.no_color {
+                                Modifier::REVERSED
+                            } else {
+                                Modifier::empty()
+                            };
+                        frame.buffer_mut()[(x, segment.y)]
+                            .set_style(Style::default().add_modifier(emphasis));
+                    }
+                }
+                app.settings_segments.push((segment, *field, choice));
+                x += width;
+            }
+            if x < rect.right() {
+                frame.render_widget(Paragraph::new("]"), Rect::new(x, rect.y, 1, 1));
+            }
+        } else {
+            let mut line = lines[index + 1].clone();
+            line.style.bg = None;
+            let items = [ratatui::text::Text::from(line)];
+            frame.render_widget(
+                themed_list(&items, &theme)
+                    .focused(app.settings_selected == index)
+                    .focused_item(Some(0)),
+                *rect,
+            );
+        }
     }
     if matches!(
         app.settings_tab,
@@ -1513,7 +1589,7 @@ fn help(frame: &mut Frame, area: Rect, context: View, tab: SettingsTab, theme: &
         let actions = match tab {
             SettingsTab::Preferences | SettingsTab::Charts => {
                 "Up/Down   Select a field or Save changes
-Enter     Open values / confirm / save
+Left/Right Change a segmented choice\nEnter     Cycle segment / open / confirm / save
 Click     Choose a field, value or Save changes
 Timezone list supports typing to search."
             }
@@ -1523,7 +1599,7 @@ Enter     Activate selected button
 Click     Activate a button"
             }
             SettingsTab::Alerts => {
-                "Enter edits the selected value; type to search.\nSave applies the server rule and persists it.\nALERT at battery <= threshold.\nRECOVERED at battery >= threshold + hysteresis.\nCooldown keeps only the latest state; no repeats.\nOnly fresh LIVE telemetry is evaluated."
+                "←/→ changes segments; Enter opens other values.\nSave applies the server rule and persists it.\nALERT at battery <= threshold.\nRECOVERED at battery >= threshold + hysteresis.\nCooldown keeps only the latest state; no repeats.\nOnly fresh LIVE telemetry is evaluated."
             }
             SettingsTab::Notify => {
                 "Enter / click sends a Telegram test message.\nThe server stores credentials and sends notifications.\nThe test does not change battery alert state or cooldown."

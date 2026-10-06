@@ -44,6 +44,7 @@ pub struct App {
     pub settings_draft: Settings,
     pub settings_selected: usize,
     pub settings_fields: Vec<(Rect, Field)>,
+    pub settings_segments: Vec<(Rect, Field, usize)>,
     pub settings_choices: Vec<(Rect, usize)>,
     pub settings_actions: [Rect; 3],
     pub settings_save: Rect,
@@ -113,6 +114,7 @@ impl App {
             settings_draft: Settings::default(),
             settings_selected: 0,
             settings_fields: Vec::new(),
+            settings_segments: Vec::new(),
             settings_choices: Vec::new(),
             settings_actions: [Rect::default(); 3],
             settings_save: Rect::default(),
@@ -597,6 +599,8 @@ impl App {
                             % count;
                     }
                 }
+                KeyCode::Left => return self.move_segment(false, false),
+                KeyCode::Right => return self.move_segment(true, false),
                 KeyCode::Enter | KeyCode::Char(' ') => return self.edit_setting(),
                 _ => {}
             },
@@ -647,6 +651,57 @@ impl App {
         }
     }
 
+    fn selected_setting_field(&self) -> Option<Field> {
+        let fields: &[Field] = match self.settings_tab {
+            SettingsTab::Preferences => &Field::PREFERENCES,
+            SettingsTab::Charts => &Field::CHARTS,
+            SettingsTab::Alerts => &Field::ALERTS,
+            _ => return None,
+        };
+        fields.get(self.settings_selected).copied()
+    }
+
+    fn choose_segment(&mut self, field: Field, index: usize) -> Effect {
+        if self.settings.is_none()
+            || self.pending.is_some()
+            || !field.is_segmented()
+            || index >= field.choices().len()
+        {
+            return Effect::None;
+        }
+        let mut candidate = self.settings_draft.clone();
+        candidate.choose(field, index);
+        if candidate.valid() {
+            self.settings_draft = candidate;
+            self.resize();
+        }
+        Effect::None
+    }
+
+    fn move_segment(&mut self, forward: bool, wrap: bool) -> Effect {
+        let Some(field) = self
+            .selected_setting_field()
+            .filter(|field| field.is_segmented())
+        else {
+            return Effect::None;
+        };
+        let choices = field.choices();
+        let current = choices
+            .iter()
+            .position(|value| *value == self.settings_draft.value(field))
+            .unwrap_or(0);
+        let index = if forward {
+            if wrap {
+                (current + 1) % choices.len()
+            } else {
+                (current + 1).min(choices.len() - 1)
+            }
+        } else {
+            current.saturating_sub(1)
+        };
+        self.choose_segment(field, index)
+    }
+
     fn edit_setting(&mut self) -> Effect {
         if self.settings_count() == 0 {
             return Effect::None;
@@ -686,6 +741,9 @@ impl App {
             SettingsTab::Alerts => Field::ALERTS[self.settings_selected],
             _ => return Effect::None,
         };
+        if field.is_segmented() {
+            return self.move_segment(true, true);
+        }
         let selected = field
             .choices()
             .iter()
@@ -838,6 +896,7 @@ impl App {
         self.quit_buttons = [Rect::default(); 2];
         self.settings_tabs = [Rect::default(); 5];
         self.settings_fields.clear();
+        self.settings_segments.clear();
         self.settings_choices.clear();
         self.settings_actions = [Rect::default(); 3];
         self.settings_save = Rect::default();
@@ -897,13 +956,29 @@ impl App {
                     .position(|rect| rect.contains(position))
                 {
                     self.select_settings_tab(SettingsTab::ALL[index]);
+                } else if let Some((_, field, choice)) = self
+                    .settings_segments
+                    .iter()
+                    .find(|(rect, _, _)| rect.contains(position))
+                    .copied()
+                {
+                    if let Some(index) = self
+                        .settings_fields
+                        .iter()
+                        .position(|(_, candidate)| *candidate == field)
+                    {
+                        self.settings_selected = index;
+                    }
+                    return self.choose_segment(field, choice);
                 } else if let Some(index) = self
                     .settings_fields
                     .iter()
                     .position(|(rect, _)| rect.contains(position))
                 {
                     self.settings_selected = index;
-                    return self.edit_setting();
+                    if !self.settings_fields[index].1.is_segmented() {
+                        return self.edit_setting();
+                    }
                 } else if self.settings_save.contains(position) {
                     self.settings_selected = self.settings_count() - 1;
                     self.settings_press = Some(3);

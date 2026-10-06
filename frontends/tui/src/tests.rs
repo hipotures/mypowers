@@ -219,8 +219,7 @@ fn settings_form_lists_values_saves_every_field_and_preserves_failed_drafts() {
     app.key(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE));
     let picker = text(&render(&mut app, 60, 19));
     assert!(picker.contains("Sparkline") && picker.contains("Chart"));
-    app.key(KeyEvent::new(KeyCode::Down, KeyModifiers::NONE));
-    app.key(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE));
+    assert!(app.settings_picker.is_none());
     assert_eq!(
         app.settings_draft.graph_visualization,
         crate::history::Visualization::Chart
@@ -3084,6 +3083,7 @@ fn all_settings_tabs_and_value_dialogs_share_the_active_theme() {
             .into_iter()
             .chain(Field::CHARTS)
             .chain(Field::ALERTS)
+            .filter(|field| !field.is_segmented())
         {
             app.settings_picker = Some(Picker {
                 field,
@@ -3098,4 +3098,121 @@ fn all_settings_tabs_and_value_dialogs_share_the_active_theme() {
             }
         }
     }
+}
+
+#[test]
+fn segmented_settings_preserve_saved_choices_and_support_keyboard_mouse_and_explicit_save() {
+    use crate::history::Visualization;
+    use crate::settings::{Field, SettingsTab};
+    for (field, tab, row) in [
+        (Field::Visualization, SettingsTab::Charts, 0),
+        (Field::Scale, SettingsTab::Charts, 2),
+        (Field::AlertEnabled, SettingsTab::Alerts, 0),
+    ] {
+        for theme in crate::client_ui::THEMES {
+            for (width, height) in [(60, 19), (120, 30)] {
+                let mut app = app();
+                let mut saved = Settings {
+                    graph_visualization: Visualization::Chart,
+                    graph_base_scale_w: 300,
+                    ..Settings::default()
+                };
+                saved.battery_alert.enabled = false;
+                app.update(Event::Settings(saved.clone()));
+                app.client_preferences.theme = theme.into();
+                app.view = View::Settings;
+                app.settings_tab = tab;
+                app.settings_selected = row;
+                let buffer = render(&mut app, width, height);
+                let segments: Vec<_> = app
+                    .settings_segments
+                    .iter()
+                    .filter(|(_, f, _)| *f == field)
+                    .copied()
+                    .collect();
+                assert_eq!(segments.len(), field.choices().len());
+                assert_eq!(app.settings_draft.value(field), field.choices()[1]);
+                assert_ne!(
+                    buffer[(segments[0].0.x, segments[0].0.y)].bg,
+                    buffer[(segments[1].0.x, segments[1].0.y)].bg
+                );
+                for (_, _, choice) in &segments {
+                    assert!(text(&buffer).contains(&field.segment_label(*choice)));
+                }
+                app.no_color = true;
+                let plain = render(&mut app, width, height);
+                assert!(
+                    plain[(segments[1].0.x, segments[1].0.y)]
+                        .modifier
+                        .contains(ratatui::style::Modifier::REVERSED)
+                );
+                assert!(
+                    !plain[(segments[0].0.x, segments[0].0.y)]
+                        .modifier
+                        .contains(ratatui::style::Modifier::REVERSED)
+                );
+                app.no_color = false;
+                assert!(matches!(
+                    app.key(KeyEvent::new(KeyCode::Left, KeyModifiers::NONE)),
+                    Effect::None
+                ));
+                assert_eq!(app.settings_draft.value(field), field.choices()[0]);
+                assert!(app.pending.is_none() && app.settings_picker.is_none());
+                assert_eq!(app.settings, Some(saved.clone()));
+                render(&mut app, width, height);
+                let rect = app
+                    .settings_segments
+                    .iter()
+                    .find(|(_, f, choice)| *f == field && *choice == 1)
+                    .unwrap()
+                    .0;
+                assert!(matches!(
+                    app.mouse(MouseEvent {
+                        kind: MouseEventKind::Down(MouseButton::Left),
+                        column: rect.x,
+                        row: rect.y,
+                        modifiers: KeyModifiers::NONE
+                    }),
+                    Effect::None
+                ));
+                assert_eq!(app.settings_draft.value(field), field.choices()[1]);
+                assert!(matches!(
+                    app.key(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE)),
+                    Effect::None
+                ));
+                assert_eq!(app.settings_draft.value(field), field.choices()[0]);
+                assert_eq!(app.settings, Some(saved.clone()));
+                app.settings_selected = if tab == SettingsTab::Charts { 3 } else { 4 };
+                assert!(matches!(
+                    app.key(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE)),
+                    Effect::Request(Intent::SaveSettings(_))
+                ));
+            }
+        }
+    }
+}
+
+#[test]
+fn segmented_fields_stay_disabled_when_settings_are_missing_or_an_operation_is_pending() {
+    let mut app = app();
+    app.view = View::Settings;
+    app.settings_tab = crate::settings::SettingsTab::Charts;
+    for pending in [false, true] {
+        app.settings = pending.then(Settings::default);
+        app.pending = pending.then(|| "settings request".into());
+        let draft = app.settings_draft.clone();
+        render(&mut app, 60, 19);
+        let rect = app.settings_segments[1].0;
+        app.mouse(MouseEvent {
+            kind: MouseEventKind::Down(MouseButton::Left),
+            column: rect.x,
+            row: rect.y,
+            modifiers: KeyModifiers::NONE,
+        });
+        app.key(KeyEvent::new(KeyCode::Right, KeyModifiers::NONE));
+        app.key(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE));
+        assert_eq!(app.settings_draft, draft);
+        assert!(app.settings_picker.is_none());
+    }
+    assert!(!crate::settings::Field::Interval.is_segmented());
 }

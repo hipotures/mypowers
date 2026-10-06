@@ -89,7 +89,8 @@ see [deployment](deploy/README.md).
 | `Ctrl+Q` | Quit immediately |
 
 Settings contains **Preferences**, **Charts**, **Alerts**, **Notify** and **Debug**.
-The Settings controls use Ratcn. Choose **Preferences → Theme** to switch
+The Settings controls use Ratcn. Fields with up to three values use inline segments;
+longer lists keep their dropdown. Choose **Preferences → Theme** to switch
 between MyPowers, Catppuccin, Nord, Gruvbox, Tokyo Night, Solarized and Terminal.
 Themes apply throughout the TUI: dashboard, charts, logs, Settings, dialogs and their backgrounds.
 Local styles and navigation shortcuts live in `~/.config/mypowers/client.toml`;
@@ -198,7 +199,7 @@ All images have the same **980 × 620** canvas. Click an image to open it at ful
 | --- | --- |
 | [![Sparkline dashboard](docs/screenshots/dashboard-live-30s.svg)](docs/screenshots/dashboard-live-30s.svg) | [![Dashboard help](docs/screenshots/help-modal.svg)](docs/screenshots/help-modal.svg) |
 
-[![Visualization value selection](docs/screenshots/settings-visualization-picker.svg)](docs/screenshots/settings-visualization-picker.svg)
+[![Visualization segments](docs/screenshots/settings-visualization-picker.svg)](docs/screenshots/settings-visualization-picker.svg)
 
 </details>
 

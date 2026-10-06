@@ -369,3 +369,10 @@ Optional TOML connection defaults (`server_url`, `token_file`, `ca_file`,
 `timezone`) are shared by CLI and TUI. Token/CA paths are relative to the
 TOML file. Precedence: built-in defaults < TOML < dotenv < process environment
 < command-line options. Secrets remain in private token files.
+
+Settings with up to three values use inline segments: Visualization, Base scale
+and Battery alert. The active value stays highlighted. Click a segment or use
+Left/Right on the selected row; Enter/Space cycles its values. Up/Down chooses
+rows and Tab/Shift-Tab switches Settings tabs. Changes remain in the draft until
+Save changes; no device controls or server requests are sent by choosing a segment.
+Longer value lists, including the four graph intervals, retain their picker.

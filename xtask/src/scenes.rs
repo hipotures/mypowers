@@ -808,16 +808,9 @@ fn app(scene: Scene) -> Result<App, String> {
                 Scene::SettingsHelpTab(tab) => tab,
                 _ => SettingsTab::Preferences,
             };
-            if matches!(
-                scene,
-                Scene::SettingsIntervalPicker | Scene::SettingsVisualizationPicker
-            ) {
+            if matches!(scene, Scene::SettingsIntervalPicker) {
                 app.settings_picker = Some(mypowers_tui::settings::Picker {
-                    field: if matches!(scene, Scene::SettingsIntervalPicker) {
-                        mypowers_tui::settings::Field::Interval
-                    } else {
-                        mypowers_tui::settings::Field::Visualization
-                    },
+                    field: mypowers_tui::settings::Field::Interval,
                     selected: 0,
                     query: String::new(),
                 });
@@ -829,16 +822,28 @@ fn app(scene: Scene) -> Result<App, String> {
             app.warning_count = 1;
             app.feedback = Some(Feedback::new("Settings saved", Severity::Success));
             if let Scene::Picker(field) = scene {
-                let selected = field
-                    .choices()
-                    .iter()
-                    .position(|value| *value == app.settings_draft.value(field))
-                    .unwrap_or(0);
-                app.settings_picker = Some(mypowers_tui::settings::Picker {
-                    field,
-                    selected,
-                    query: String::new(),
-                });
+                if field.is_segmented() {
+                    let fields: &[Field] = match app.settings_tab {
+                        SettingsTab::Charts => &Field::CHARTS,
+                        SettingsTab::Alerts => &Field::ALERTS,
+                        _ => &Field::PREFERENCES,
+                    };
+                    app.settings_selected = fields
+                        .iter()
+                        .position(|candidate| *candidate == field)
+                        .unwrap();
+                } else {
+                    let selected = field
+                        .choices()
+                        .iter()
+                        .position(|value| *value == app.settings_draft.value(field))
+                        .unwrap_or(0);
+                    app.settings_picker = Some(mypowers_tui::settings::Picker {
+                        field,
+                        selected,
+                        query: String::new(),
+                    });
+                }
             }
             if let Scene::SettingsHelpTab(_) = scene {
                 app.view = View::Help;

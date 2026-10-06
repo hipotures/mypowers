@@ -195,7 +195,7 @@ impl Field {
             Self::Theme => "Theme",
             Self::Visualization => "Visualization",
             Self::Interval => "Interval per bar",
-            Self::Scale => "Base scale",
+            Self::Scale => "Base scale (auto)",
             Self::Timezone => "Timezone",
             Self::PageSize => "Logs page size",
             Self::AlertEnabled => "Battery alert",
@@ -204,6 +204,18 @@ impl Field {
             Self::AlertCooldown => "Cooldown",
         }
     }
+    pub fn is_segmented(self) -> bool {
+        (1..=3).contains(&self.choices().len())
+    }
+
+    pub fn segment_label(self, index: usize) -> String {
+        if self == Self::Scale {
+            format!("{} W", [100, 300][index])
+        } else {
+            self.choices()[index].clone()
+        }
+    }
+
     pub fn choices(self) -> Vec<String> {
         match self {
             Self::Theme => crate::client_ui::THEMES.map(String::from).to_vec(),
