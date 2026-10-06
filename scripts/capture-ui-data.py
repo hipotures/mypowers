@@ -29,11 +29,21 @@ async def capture(output: Path) -> None:
                 },
             )
         logs = await client.request("GET", "/logs", params={"tail": 100, "min_level": "DEBUG"})
+        logs_oldest = await client.request(
+            "GET", "/logs", params={"direction": "forward", "min_level": "DEBUG", "limit": 1}
+        )
     await asyncio.to_thread(output.parent.mkdir, parents=True, exist_ok=True)
     await asyncio.to_thread(
         output.write_text,
         json.dumps(
-            {"status": status, "settings": settings, "history": history, "logs": logs}, indent=2
+            {
+                "status": status,
+                "settings": settings,
+                "history": history,
+                "logs": logs,
+                "logs_oldest": logs_oldest,
+            },
+            indent=2,
         )
         + "\n",
     )

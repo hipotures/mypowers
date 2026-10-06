@@ -29,6 +29,7 @@ pub struct Request {
     pub level: &'static str,
     pub limit: usize,
     pub cursor: Option<String>,
+    pub discover_oldest: bool,
 }
 
 #[derive(Debug, Deserialize)]
@@ -42,6 +43,10 @@ pub struct Page {
     pub source: String,
     pub gap: bool,
     pub skipped_lines: usize,
+    // Client-only metadata from an unfiltered, unbounded oldest-record query.
+    // None = not fetched; Some(None) = the server has no retained records.
+    #[serde(skip)]
+    pub oldest_record: Option<Option<DateTime<Utc>>>,
 }
 
 pub struct Logs {
@@ -71,6 +76,8 @@ pub struct Logs {
     pages: VecDeque<CachedPage>,
     title_click: Option<(Instant, Position)>,
     retry_after: Option<Instant>,
+    oldest_day: Option<NaiveDate>,
+    reload_boundary: bool,
 }
 
 struct CachedPage {
@@ -112,6 +119,8 @@ impl Logs {
             pages: VecDeque::new(),
             title_click: None,
             retry_after: None,
+            oldest_day: None,
+            reload_boundary: false,
         }
     }
 
@@ -183,6 +192,7 @@ impl Logs {
             level: LEVELS[self.level],
             limit: self.page_size,
             cursor,
+            discover_oldest: matches!(kind, Load::Latest | Load::Oldest),
         })
     }
 
@@ -200,6 +210,20 @@ impl Logs {
             }
         };
         self.retry_after = None;
+        if let Some(oldest) = page.oldest_record {
+            let oldest_day = oldest
+                .map(|stamp| local_date(stamp, self.timezone))
+                .unwrap_or_else(|| self.today());
+            self.oldest_day = Some(oldest_day);
+            if self.day < oldest_day {
+                self.day = oldest_day;
+                self.follow = false;
+                self.clear_cache();
+                self.reload_boundary = true;
+                self.message = "Oldest available log day; loading...".into();
+                return;
+            }
+        }
         self.initialized = true;
         let count = page.items.len();
         let boundary = CachedPage {
@@ -371,6 +395,10 @@ impl Logs {
     }
 
     pub fn maintenance(&mut self) -> Option<Request> {
+        if self.reload_boundary && !self.loading {
+            self.reload_boundary = false;
+            return self.load(Load::Oldest);
+        }
         if self.follow
             && !self.loading
             && self
@@ -442,15 +470,27 @@ impl Logs {
         text
     }
 
+    pub fn can_navigate(&self, next: bool) -> bool {
+        let day = if next {
+            self.day.checked_add_days(Days::new(1))
+        } else {
+            self.day.checked_sub_days(Days::new(1))
+        };
+        day.is_some_and(|day| {
+            day <= self.today() && self.oldest_day.is_none_or(|oldest| day >= oldest)
+        })
+    }
+
     pub fn navigate(&mut self, next: bool) -> Option<Request> {
+        if !self.can_navigate(next) {
+            return None;
+        }
         let day = if next {
             self.day.checked_add_days(Days::new(1))
         } else {
             self.day.checked_sub_days(Days::new(1))
         }?;
-        if day > self.today() {
-            return None;
-        }
+        self.reload_boundary = false;
         self.day = day;
         self.follow = false;
         self.clear_cache();
@@ -651,6 +691,123 @@ pub fn day_bounds(
 mod tests {
     use super::*;
 
+    fn page(oldest: Option<DateTime<Utc>>) -> Page {
+        Page {
+            schema_version: 1,
+            items: vec![],
+            previous_cursor: None,
+            next_cursor: None,
+            has_more_before: false,
+            has_more_after: false,
+            source: "files".into(),
+            gap: false,
+            skipped_lines: 0,
+            oldest_record: Some(oldest),
+        }
+    }
+
+    #[test]
+    fn oldest_day_blocks_keys_wheel_and_prev_without_requests_or_state_changes() {
+        let mut logs = Logs::new(Some(chrono_tz::UTC));
+        logs.day = "2026-10-03".parse().unwrap();
+        let request = logs.open().unwrap();
+        logs.accept(
+            &request,
+            Ok(page(Some("2026-10-03T12:00:00Z".parse().unwrap()))),
+        );
+        let generation = logs.generation();
+        let day = logs.day;
+        for key in [
+            KeyCode::Left,
+            KeyCode::Char('['),
+            KeyCode::Up,
+            KeyCode::PageUp,
+        ] {
+            assert!(logs.key(key).is_none());
+        }
+        logs.buttons[0] = Rect::new(2, 2, 8, 1);
+        for kind in [
+            MouseEventKind::ScrollUp,
+            MouseEventKind::Down(MouseButton::Left),
+        ] {
+            assert!(
+                logs.mouse(MouseEvent {
+                    kind,
+                    column: 3,
+                    row: 2,
+                    modifiers: crossterm::event::KeyModifiers::NONE
+                })
+                .is_none()
+            );
+        }
+        assert!(!logs.can_navigate(false));
+        assert_eq!(logs.day, day);
+        assert_eq!(logs.generation(), generation);
+        assert!(!logs.loading);
+        assert!(logs.navigate(true).is_some());
+    }
+
+    #[test]
+    fn empty_days_do_not_define_the_history_boundary_and_day_uses_client_timezone() {
+        let mut logs = Logs::new(Some(chrono_tz::Europe::Warsaw));
+        logs.day = "2026-10-05".parse().unwrap();
+        let request = logs.open().unwrap();
+        // UTC Oct 2 is already Oct 3 in Warsaw. Empty/filter-excluded Oct 5 remains navigable.
+        let oldest = Some("2026-10-02T23:30:00Z".parse().unwrap());
+        logs.accept(&request, Ok(page(oldest)));
+        assert!(logs.can_navigate(false));
+        let request = logs.navigate(false).unwrap();
+        logs.accept(&request, Ok(page(oldest)));
+        assert_eq!(logs.day.to_string(), "2026-10-04");
+        let request = logs.navigate(false).unwrap();
+        logs.accept(&request, Ok(page(oldest)));
+        assert_eq!(logs.day.to_string(), "2026-10-03");
+        assert!(!logs.can_navigate(false));
+    }
+
+    #[test]
+    fn retention_or_navigation_before_bounds_arrive_returns_to_oldest_available_day() {
+        let mut logs = Logs::new(Some(chrono_tz::UTC));
+        logs.day = "2026-10-01".parse().unwrap();
+        let old = logs.open().unwrap();
+        let current = logs.navigate(false).unwrap();
+        logs.accept(
+            &old,
+            Ok(page(Some("2026-09-29T12:00:00Z".parse().unwrap()))),
+        );
+        assert!(
+            logs.oldest_day.is_none(),
+            "stale responses cannot change bounds"
+        );
+        logs.accept(
+            &current,
+            Ok(page(Some("2026-10-03T12:00:00Z".parse().unwrap()))),
+        );
+        assert_eq!(logs.day.to_string(), "2026-10-03");
+        assert!(!logs.can_navigate(false));
+        let reload = logs.maintenance().unwrap();
+        assert_eq!(reload.kind, Load::Oldest);
+        assert!(reload.since.starts_with("2026-10-03"));
+        assert!(logs.maintenance().is_none());
+        logs.accept(
+            &reload,
+            Ok(page(Some("2026-10-03T12:00:00Z".parse().unwrap()))),
+        );
+        assert!(logs.maintenance().is_none());
+    }
+
+    #[test]
+    fn no_retained_logs_blocks_older_days_but_a_failed_fetch_does_not_invent_a_boundary() {
+        let mut logs = Logs::new(Some(chrono_tz::UTC));
+        let request = logs.open().unwrap();
+        logs.accept(&request, Err("Unavailable".into()));
+        assert!(logs.oldest_day.is_none());
+        let retry = logs.key(KeyCode::Home).unwrap();
+        logs.accept(&retry, Ok(page(None)));
+        assert_eq!(logs.oldest_day, Some(logs.today()));
+        assert!(!logs.can_navigate(false));
+    }
+
     #[test]
     fn automatic_refresh_resumes_after_delay_and_stale_errors_cannot_delay_it() {
         let mut logs = Logs::new(Some(chrono_tz::UTC));
@@ -679,6 +836,7 @@ mod tests {
                 source: "files".into(),
                 gap: false,
                 skipped_lines: 0,
+                oldest_record: None,
             }),
         );
         assert!(logs.retry_after.is_none());

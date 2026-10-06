@@ -35,6 +35,7 @@ pub enum Scene {
     DaemonOffline,
     CommandPending,
     Logs,
+    LogsOldest,
     Settings,
     SettingsCharts,
     SettingsIntervalPicker,
@@ -485,6 +486,7 @@ pub const SCENES: &[(&str, Scene, u16, u16)] = &[
         30,
     ),
     ("logs-modal.svg", Scene::Logs, 120, 30),
+    ("logs-oldest-day.svg", Scene::LogsOldest, 120, 30),
     ("logs-modal-80x24.svg", Scene::Logs, 80, 24),
     ("settings-modal.svg", Scene::Settings, 120, 30),
     (
@@ -582,6 +584,30 @@ fn fixed_status(now: DateTime<Utc>) -> Result<Status, String> {
 }
 
 fn app(scene: Scene) -> Result<App, String> {
+    if matches!(scene, Scene::LogsOldest) {
+        let mut app = app(Scene::Logs)?;
+        let items: Vec<_> = app.logs.records.iter().cloned().collect();
+        let oldest = chrono::DateTime::parse_from_rfc3339(items[0]["timestamp"].as_str().unwrap())
+            .unwrap()
+            .with_timezone(&Utc);
+        let request = app.logs.open().unwrap();
+        app.logs.accept(
+            &request,
+            Ok(mypowers_tui::logs::Page {
+                schema_version: 1,
+                items,
+                previous_cursor: None,
+                next_cursor: None,
+                has_more_before: false,
+                has_more_after: false,
+                source: "files".into(),
+                gap: false,
+                skipped_lines: 0,
+                oldest_record: Some(Some(oldest)),
+            }),
+        );
+        return Ok(app);
+    }
     if let Scene::Themed(view, name) = scene {
         let base = match view {
             ThemeView::Dashboard | ThemeView::Small => Scene::Live,
@@ -614,6 +640,7 @@ fn app(scene: Scene) -> Result<App, String> {
     app.selected = None;
     app.feedback = Some(Feedback::new("AC ON confirmed", Severity::Success));
     match scene {
+        Scene::LogsOldest => unreachable!("handled before constructing the fixture"),
         Scene::Themed(_, _) => unreachable!("handled before constructing the fixture"),
         Scene::Snapshot => {
             app.snapshot = true;
@@ -939,7 +966,8 @@ fn app(scene: Scene) -> Result<App, String> {
 pub fn live_gallery_scene(scene: Scene) -> bool {
     !matches!(
         scene,
-        Scene::ChartNearby
+        Scene::LogsOldest
+            | Scene::ChartNearby
             | Scene::ChartGaps
             | Scene::ChartIdle
             | Scene::ChartLowLoad
@@ -1033,6 +1061,35 @@ pub fn render_captured(
                 app.logs.records.push_back(record.clone());
             }
         }
+    }
+    if let Some(value) = data.get("logs_oldest") {
+        let boundary: mypowers_tui::logs::Page =
+            serde_json::from_value(value.clone()).map_err(|e| e.to_string())?;
+        if boundary.schema_version != 1 || boundary.items.len() > 1 {
+            return Err("Invalid captured oldest log page".into());
+        }
+        let oldest = boundary
+            .items
+            .first()
+            .map(|record| {
+                DateTime::parse_from_rfc3339(
+                    record["timestamp"]
+                        .as_str()
+                        .ok_or("Missing oldest log timestamp")?,
+                )
+                .map(|stamp| stamp.with_timezone(&Utc))
+                .map_err(|_| "Invalid oldest log timestamp")
+            })
+            .transpose()?;
+        let mut page: mypowers_tui::logs::Page =
+            serde_json::from_value(data["logs"].clone()).map_err(|e| e.to_string())?;
+        page.items = app.logs.records.iter().cloned().collect();
+        page.oldest_record = Some(oldest);
+        let request = app
+            .logs
+            .open()
+            .ok_or("Cannot initialize captured log bounds")?;
+        app.logs.accept(&request, Ok(page));
     }
     app.status = Some(status);
     draw_app(app, width, height)

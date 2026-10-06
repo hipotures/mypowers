@@ -255,7 +255,11 @@ A vertical scrollbar appears when the cached records exceed the visible rows.
 Click its track or drag the thumb; Up/Down, PageUp/PageDown and the mouse wheel
 also scroll. At the first/last cached row, another scroll loads the adjacent page;
 at a completed day's boundary, another scroll enters the previous/next day.
-Empty days are navigable. Future days are blocked.
+Empty days within the retained history are navigable. Days before the oldest
+retained log and future days are blocked for keyboard, mouse wheel and day buttons.
+The boundary comes from an unfiltered oldest-record API query and uses the client's
+timezone; an empty day or restrictive level filter does not move that boundary.
+If retention removes the selected day, the viewer returns to the oldest available day.
 
 Home loads the selected day's beginning. There is no refresh button or shortcut:
 the footer counts new stream records, and End fetches today's latest records and

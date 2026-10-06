@@ -532,7 +532,7 @@ impl Api {
                 None,
             )
             .await?;
-        let page: crate::logs::Page =
+        let mut page: crate::logs::Page =
             serde_json::from_value(value).map_err(|_| "Invalid log page response.")?;
         if page.schema_version != 1
             || page.items.len() > request.limit
@@ -541,6 +541,33 @@ impl Api {
             || page.items.iter().any(|record| !valid_log_record(record))
         {
             return Err("Invalid log page schema or pagination.".into());
+        }
+        if request.discover_oldest {
+            let value = self
+                .request(
+                    reqwest::Method::GET,
+                    "/logs?direction=forward&min_level=DEBUG&limit=1",
+                    None,
+                    None,
+                )
+                .await?;
+            let boundary: crate::logs::Page =
+                serde_json::from_value(value).map_err(|_| "Invalid oldest log response.")?;
+            if boundary.schema_version != 1
+                || boundary.items.len() > 1
+                || boundary.has_more_before
+                || boundary
+                    .items
+                    .iter()
+                    .any(|record| !valid_log_record(record))
+            {
+                return Err("Invalid oldest log response.".into());
+            }
+            page.oldest_record = Some(boundary.items.first().map(|record| {
+                chrono::DateTime::parse_from_rfc3339(record["timestamp"].as_str().unwrap())
+                    .unwrap()
+                    .with_timezone(&chrono::Utc)
+            }));
         }
         Ok(page)
     }
@@ -1410,6 +1437,51 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn oldest_log_query_is_global_and_unfiltered_even_when_selected_day_is_empty() {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let api = api_for(&listener);
+        let server = tokio::spawn(async move {
+            for step in 0..2 {
+                let (mut socket, headers) = accept_http_request(&listener).await;
+                if step == 0 {
+                    assert!(headers.contains("min_level=ERROR"));
+                    assert!(headers.contains("since="));
+                } else {
+                    assert!(headers.starts_with(
+                        "GET /api/v1/logs?direction=forward&min_level=DEBUG&limit=1 "
+                    ));
+                    assert!(
+                        !headers.contains("since=")
+                            && !headers.contains("until=")
+                            && !headers.contains("cursor=")
+                    );
+                }
+                let body = json!({
+                    "schema_version": 1, "items": if step == 0 { vec![] } else { vec![json!({
+                        "timestamp":"2026-10-03T23:30:00Z", "sequence":1,
+                        "server_instance_id":"88767477-2a2a-481f-843b-30d56a5e3f10",
+                        "level":"DEBUG", "message":"Oldest retained record"
+                    })] }, "previous_cursor":null, "next_cursor":null,
+                    "has_more_before":false, "has_more_after":false,
+                    "source":"files", "gap":false, "skipped_lines":0
+                })
+                .to_string();
+                socket.write_all(format!("HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",body.len()).as_bytes()).await.unwrap();
+            }
+        });
+        let mut logs = crate::logs::Logs::new(Some(chrono_tz::UTC));
+        logs.level = 3;
+        let request = logs.open().unwrap();
+        let page = api.log_page(&request).await.unwrap();
+        assert!(page.items.is_empty());
+        assert_eq!(
+            page.oldest_record.unwrap().unwrap().to_rfc3339(),
+            "2026-10-03T23:30:00+00:00"
+        );
+        server.await.unwrap();
+    }
+
+    #[tokio::test]
     async fn log_pages_require_text_levels_and_preserve_named_levels() {
         for level in [
             None,
@@ -1449,7 +1521,8 @@ mod tests {
                     body.len()
                 ).as_bytes()).await.unwrap();
             });
-            let request = crate::logs::Logs::new(Some(chrono_tz::UTC)).open().unwrap();
+            let mut request = crate::logs::Logs::new(Some(chrono_tz::UTC)).open().unwrap();
+            request.discover_oldest = false;
             let result = api.log_page(&request).await;
             if valid {
                 assert_eq!(result.unwrap().items, vec![record]);
@@ -1811,6 +1884,21 @@ mod tests {
         })
         .to_string();
         socket
+            .write_all(
+                format!(
+                    "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+                    body.len()
+                )
+                .as_bytes(),
+            )
+            .await
+            .unwrap();
+        let (mut boundary_socket, boundary_headers) = accept_http_request(&listener).await;
+        assert!(
+            boundary_headers
+                .starts_with("GET /api/v1/logs?direction=forward&min_level=DEBUG&limit=1 ")
+        );
+        boundary_socket
             .write_all(
                 format!(
                     "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",

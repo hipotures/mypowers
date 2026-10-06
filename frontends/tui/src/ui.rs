@@ -959,9 +959,17 @@ fn logs(frame: &mut Frame, area: Rect, app: &mut App) {
         ..parts[0]
     });
     app.logs.buttons = [header[0], header[2]];
-    for (rect, text) in [(header[0], "prev"), (header[2], "next")] {
+    for (index, (rect, text)) in [(header[0], "prev"), (header[2], "next")]
+        .into_iter()
+        .enumerate()
+    {
         frame.render_widget(
-            action_button(text, &palette.theme, false, app.logs.loading),
+            action_button(
+                text,
+                &palette.theme,
+                false,
+                app.logs.loading || !app.logs.can_navigate(index == 1),
+            ),
             rect,
         );
     }
