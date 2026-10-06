@@ -1343,19 +1343,7 @@ fn settings(frame: &mut Frame, area: Rect, app: &mut App) {
     for (index, (rect, field)) in app.settings_fields.iter().enumerate() {
         if field.is_segmented() {
             frame.render_widget(
-                Paragraph::new(field.label()).style(
-                    Style::default()
-                        .fg(if app.settings_selected == index {
-                            theme.foreground
-                        } else {
-                            theme.muted_foreground
-                        })
-                        .add_modifier(if app.settings_selected == index {
-                            Modifier::BOLD
-                        } else {
-                            Modifier::empty()
-                        }),
-                ),
+                Paragraph::new(field.label()).style(Style::default().fg(theme.muted_foreground)),
                 Rect { width: 20, ..*rect },
             );
             let choices = field.choices();

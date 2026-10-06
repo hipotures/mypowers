@@ -3368,3 +3368,33 @@ fn quit_shortcuts_flush_settings_immediately_even_from_a_picker() {
         }
     }
 }
+
+#[test]
+fn segmented_field_labels_keep_the_same_style_when_focused() {
+    for name in crate::client_ui::THEMES {
+        for (tab, row) in [
+            (SettingsTab::Charts, 0),
+            (SettingsTab::Charts, 2),
+            (SettingsTab::Alerts, 0),
+        ] {
+            let mut app = app();
+            app.update(Event::Settings(Settings::default()));
+            app.client_preferences.theme = name.into();
+            app.view = View::Settings;
+            app.settings_tab = tab;
+            for (width, height) in [(60, 19), (120, 30)] {
+                app.settings_selected = row;
+                let focused = render(&mut app, width, height);
+                let rect = app.settings_fields[row].0;
+                app.settings_selected = 1;
+                let unfocused = render(&mut app, width, height);
+                for x in rect.x..rect.x + 20 {
+                    let selected = &focused[(x, rect.y)];
+                    let other = &unfocused[(x, rect.y)];
+                    assert_eq!(selected, other, "Label changed with focus in {name}");
+                    assert!(!selected.modifier.contains(ratatui::style::Modifier::BOLD));
+                }
+            }
+        }
+    }
+}
