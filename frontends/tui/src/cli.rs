@@ -33,7 +33,147 @@ use std::{
 };
 use unicode_width::UnicodeWidthStr;
 
-const HELP: &str = "MyPowers native client\n\nUsage: mypowers [options] COMMAND [options]\n\nCommands:\n  status [--require-live]             One-shot dashboard snapshot\n  capabilities                       Device capabilities\n  ac|dc|light on|off                  Set an output and wait for confirmation\n  command UUID                       Query an admitted command\n  history [--since TIME] [--until TIME] [--limit N] [--cursor CURSOR]\n  logs [--tail N] [--level LEVEL] [--follow] [--since TIME] [--until TIME]\n  debug on|off [--duration 15m]       Temporary server DEBUG logging\n  connection pause|resume|retry       Manage the Bluetooth session\n  tui                                Start the interactive native TUI\n\nOptions (before or after command):\n  --json             Machine-readable JSON (no snapshot or ANSI)\n  --env-file PATH    Select dotenv instead of current-directory .env\n  --server URL       HTTP(S) daemon origin\n  --token-file PATH  Private API token file\n  --ca-file PATH     TLS CA bundle\n  --timeout SECS     Request timeout\n  --timezone ZONE    Display and naive query timestamp timezone\n  --utc              Use UTC\n  --no-color         Disable colors (also NO_COLOR)\n  --no-mouse         Disable mouse capture for tui\n  --version          Print version\n\nTIME accepts RFC3339, local ISO time with --timezone, or a relative duration (30m, 1h).\nOutput control commands change real connected loads. Status never changes outputs.";
+fn help_text(command: Option<&str>, color: bool) -> String {
+    let heading = |text: &str| {
+        if color {
+            format!("\x1b[1;36m{text}\x1b[0m")
+        } else {
+            text.to_owned()
+        }
+    };
+    let mut text = format!("{}  ·  native client\n\n", heading("MYPOWERS"));
+    let mut section = |title: &str, rows: &[(&str, &str)]| {
+        text.push_str(&heading(title));
+        text.push('\n');
+        for (name, description) in rows {
+            let label = format!("{name:<25}");
+            if color {
+                text.push_str(&format!("  \x1b[32m{label}\x1b[0m {description}\n"));
+            } else {
+                text.push_str(&format!("  {label} {description}\n"));
+            }
+        }
+        text.push('\n');
+    };
+    match command {
+        None => {
+            section("Usage", &[("mypowers <command>", "[options]")]);
+            section(
+                "Monitoring",
+                &[
+                    ("status", "One-shot dashboard snapshot"),
+                    ("capabilities", "Device capabilities"),
+                    ("history", "Recorded telemetry"),
+                    ("logs", "Application logs and live stream"),
+                ],
+            );
+            section(
+                "Control",
+                &[
+                    ("ac / dc / light", "Set an output: on or off"),
+                    ("command <UUID>", "Check a command result"),
+                    ("connection", "Bluetooth: pause, resume or retry"),
+                    ("debug", "Server debug logging: on or off"),
+                ],
+            );
+            section("Interface", &[("tui", "Interactive terminal dashboard")]);
+        }
+        Some(name) => {
+            let usage = match name {
+                "ac" | "dc" | "light" | "debug" => format!("mypowers {name} <on|off> [options]"),
+                "connection" => "mypowers connection <pause|resume|retry> [options]".into(),
+                "command" => "mypowers command <UUID> [options]".into(),
+                _ => format!("mypowers {name} [options]"),
+            };
+            section("Usage", &[(&usage, "")]);
+            match name {
+                "status" => section(
+                    "Snapshot",
+                    &[("--require-live", "Fail unless telemetry is fresh and LIVE")],
+                ),
+                "history" | "logs" => {
+                    section(
+                        "Query",
+                        &[
+                            ("--since TIME", "Start time or relative duration"),
+                            ("--until TIME", "End time"),
+                            ("--limit N", "Maximum number of records"),
+                            ("--cursor CURSOR", "Continue a paginated query"),
+                        ],
+                    );
+                    if name == "logs" {
+                        section(
+                            "Logs",
+                            &[
+                                ("--tail N", "Show the most recent records"),
+                                ("--level LEVEL", "DEBUG, INFO, WARNING or ERROR"),
+                                ("--follow", "Stream new records until Ctrl+C"),
+                            ],
+                        );
+                    }
+                }
+                "debug" => section(
+                    "Debug",
+                    &[("--duration TIME", "Debug session duration, e.g. 15m")],
+                ),
+                _ => {}
+            }
+        }
+    }
+    section(
+        "Output",
+        &[
+            ("--json", "Machine-readable JSON"),
+            ("--no-color", "Plain text; also respects NO_COLOR"),
+            (
+                "--timezone ZONE / --utc",
+                "Display and query timestamp timezone",
+            ),
+        ],
+    );
+    section(
+        "Connection",
+        &[
+            ("--server URL", "HTTP(S) daemon origin"),
+            ("--env-file PATH", "Use another dotenv file"),
+            ("--token-file PATH", "Private API token file"),
+            ("--ca-file PATH", "TLS CA bundle"),
+            ("--timeout SECS", "Request timeout"),
+        ],
+    );
+    section(
+        "Help",
+        &[
+            ("-h, --help", "Help for this command"),
+            ("--version", "Print version"),
+            ("--no-mouse", "Disable mouse capture in TUI"),
+        ],
+    );
+    if command.is_none() {
+        text.push_str(
+            "Examples\n  mypowers status\n  mypowers logs --follow\n  mypowers history --help\n\n",
+        );
+    } else if matches!(command, Some("history" | "logs")) {
+        text.push_str("TIME: RFC3339, local ISO time with --timezone, or 30m / 1h.\n");
+    }
+    text.push_str("Global options work before or after the command.\n");
+    text
+}
+
+fn help_command(raw: &[String]) -> Option<&str> {
+    let mut args = raw.iter().map(String::as_str);
+    while let Some(arg) = args.next() {
+        match arg {
+            "--env-file" | "--server" | "--token-file" | "--ca-file" | "--timeout"
+            | "--timezone" => {
+                args.next();
+            }
+            value if value.starts_with('-') => {}
+            value => return Some(value),
+        }
+    }
+    None
+}
 
 #[derive(Default, Debug)]
 struct Arguments {
@@ -687,7 +827,10 @@ pub fn main() -> i32 {
         .iter()
         .any(|arg| matches!(arg.as_str(), "--help" | "-h"))
     {
-        println!("{HELP}");
+        let color = io::stdout().is_terminal()
+            && std::env::var_os("NO_COLOR").is_none()
+            && !raw.iter().any(|arg| arg == "--no-color");
+        print!("{}", help_text(help_command(&raw), color));
         return 0;
     }
     if raw == ["--version"] {
@@ -762,6 +905,20 @@ pub fn main() -> i32 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn help_is_grouped_and_command_options_are_local() {
+        let root = help_text(None, false);
+        assert!(root.contains("Monitoring\n") && root.contains("Control\n"));
+        assert!(!root.contains("--since") && !root.contains('\x1b'));
+        let logs = help_text(Some("logs"), false);
+        assert!(logs.contains("mypowers logs [options]") && logs.contains("--follow"));
+        assert!(logs.contains("--cursor") && !logs.contains("--require-live"));
+        assert!(help_text(Some("status"), false).contains("--require-live"));
+        assert!(help_text(None, true).contains("\x1b[1;36m"));
+        let raw = ["--token-file", "logs", "status", "--help"].map(str::to_owned);
+        assert_eq!(help_command(&raw), Some("status"));
+    }
 
     #[test]
     fn command_arguments_before_and_after_subcommand_and_ranges() {
