@@ -3,7 +3,7 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
 import pytest
-from dbus_fast import Message, MessageType, Variant
+from dbus_fast import BusType, Message, MessageType, Variant
 
 from mypowers.bluetooth import transport
 from mypowers.bluetooth.simulated import SimulatedTransport
@@ -67,7 +67,14 @@ async def test_adapter_resolution_no_fallback(monkeypatch, kind, expected):
         def disconnect(self):
             pass
 
-    monkeypatch.setattr(transport, "MessageBus", lambda **_: Bus())
+    def message_bus(**kwargs):
+        # Let the bus use peer credentials, including remapped LXC UIDs.
+        assert kwargs["bus_type"] == BusType.SYSTEM
+        assert kwargs["auth"]._authentication_start() == "AUTH EXTERNAL"
+        assert kwargs["auth"]._receive_line("DATA") == "DATA"
+        return Bus()
+
+    monkeypatch.setattr(transport, "MessageBus", message_bus)
     monkeypatch.setattr(
         transport, "rfkill", lambda _: None if kind == "unknown" else kind == "blocked"
     )

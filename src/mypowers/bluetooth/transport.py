@@ -9,6 +9,7 @@ from typing import Any, Protocol
 from bleak import BleakClient, BleakScanner
 from dbus_fast import BusType, Message, MessageType
 from dbus_fast.aio import MessageBus
+from dbus_fast.auth import UID_NOT_SPECIFIED, AuthExternal
 
 from mypowers.config.server import ServerConfig
 from mypowers.contracts import AppError
@@ -77,7 +78,11 @@ async def resolve_adapter(address: str) -> str:
     bus: MessageBus | None = None
     try:
         try:
-            bus = await MessageBus(bus_type=BusType.SYSTEM).connect()
+            # Let D-Bus use kernel peer credentials across LXC UID mappings.
+            bus = await MessageBus(
+                bus_type=BusType.SYSTEM,
+                auth=AuthExternal(uid=UID_NOT_SPECIFIED),
+            ).connect()
         except PermissionError:
             raise AppError("permission_denied", "System bus access denied.", 503) from None
         except (OSError, EOFError):
