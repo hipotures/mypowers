@@ -376,3 +376,8 @@ Left/Right on the selected row; Enter/Space cycles its values. Up/Down chooses
 rows and Tab/Shift-Tab switches Settings tabs. Changes remain in the draft until
 Save changes; no device controls or server requests are sent by choosing a segment.
 Longer value lists, including the four graph intervals, retain their picker.
+
+Unsaved settings keep the fixed `[ Save changes ]` label. Its text gently pulses
+between muted and accent theme colors over four seconds; the button does not move.
+The pulse stops after saving or reverting the draft. In no-color mode it uses
+bold/dim text instead of colors.

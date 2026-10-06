@@ -44,6 +44,7 @@ pub enum Scene {
     SettingsNotify,
     SettingsDebug,
     SettingsTheme(&'static str),
+    SettingsDirty(SettingsTab, bool),
     SettingsHelp,
     Help,
     LogsHelp,
@@ -196,6 +197,42 @@ pub const GALLERY: &[(&str, Scene, u16, u16)] = &[
 ];
 
 pub const SCENES: &[(&str, Scene, u16, u16)] = &[
+    (
+        "settings-preferences-unsaved-bright.svg",
+        Scene::SettingsDirty(SettingsTab::Preferences, true),
+        120,
+        30,
+    ),
+    (
+        "settings-preferences-unsaved-dim.svg",
+        Scene::SettingsDirty(SettingsTab::Preferences, false),
+        120,
+        30,
+    ),
+    (
+        "settings-charts-unsaved-bright.svg",
+        Scene::SettingsDirty(SettingsTab::Charts, true),
+        120,
+        30,
+    ),
+    (
+        "settings-charts-unsaved-dim.svg",
+        Scene::SettingsDirty(SettingsTab::Charts, false),
+        120,
+        30,
+    ),
+    (
+        "settings-alerts-unsaved-bright.svg",
+        Scene::SettingsDirty(SettingsTab::Alerts, true),
+        120,
+        30,
+    ),
+    (
+        "settings-alerts-unsaved-dim.svg",
+        Scene::SettingsDirty(SettingsTab::Alerts, false),
+        120,
+        30,
+    ),
     (
         "theme-mypowers-dashboard.svg",
         Scene::Themed(ThemeView::Dashboard, "MyPowers"),
@@ -584,6 +621,24 @@ fn fixed_status(now: DateTime<Utc>) -> Result<Status, String> {
 }
 
 fn app(scene: Scene) -> Result<App, String> {
+    if let Scene::SettingsDirty(tab, bright) = scene {
+        let base = match tab {
+            SettingsTab::Preferences => Scene::Settings,
+            SettingsTab::Charts => Scene::SettingsCharts,
+            SettingsTab::Alerts => Scene::SettingsAlerts,
+            _ => return Err("No save button in this Settings tab".into()),
+        };
+        let mut app = app(base)?;
+        app.settings_draft.battery_alert.enabled = false;
+        app.feedback = None;
+        app.clock = Clock::Fixed {
+            now: app.clock.now(),
+            telemetry_elapsed: Duration::ZERO,
+            animation_elapsed: Duration::from_secs(if bright { 0 } else { 2 }),
+            feedback_elapsed: Duration::ZERO,
+        };
+        return Ok(app);
+    }
     if matches!(scene, Scene::LogsOldest) {
         let mut app = app(Scene::Logs)?;
         let items: Vec<_> = app.logs.records.iter().cloned().collect();
@@ -640,6 +695,7 @@ fn app(scene: Scene) -> Result<App, String> {
     app.selected = None;
     app.feedback = Some(Feedback::new("AC ON confirmed", Severity::Success));
     match scene {
+        Scene::SettingsDirty(_, _) => unreachable!("handled before constructing the fixture"),
         Scene::LogsOldest => unreachable!("handled before constructing the fixture"),
         Scene::Themed(_, _) => unreachable!("handled before constructing the fixture"),
         Scene::Snapshot => {
@@ -971,7 +1027,8 @@ fn app(scene: Scene) -> Result<App, String> {
 pub fn live_gallery_scene(scene: Scene) -> bool {
     !matches!(
         scene,
-        Scene::LogsOldest
+        Scene::SettingsDirty(_, _)
+            | Scene::LogsOldest
             | Scene::ChartNearby
             | Scene::ChartGaps
             | Scene::ChartIdle

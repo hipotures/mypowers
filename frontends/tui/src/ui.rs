@@ -1441,8 +1441,6 @@ fn settings(frame: &mut Frame, area: Rect, app: &mut App) {
             "[ Loading... ]"
         } else if app.pending.as_deref() == Some("settings request") {
             "[ Saving... ]"
-        } else if app.settings.as_ref() != Some(&app.settings_draft) {
-            "[ Save changes ] *"
         } else {
             "[ Save changes ]"
         };
@@ -1455,6 +1453,34 @@ fn settings(frame: &mut Frame, area: Rect, app: &mut App) {
             ),
             app.settings_save,
         );
+        if app.pending.is_none()
+            && app
+                .settings
+                .as_ref()
+                .is_some_and(|saved| saved != &app.settings_draft)
+        {
+            let color =
+                save_pulse_color(&theme, app.clock.animation_elapsed(app.animation_started));
+            for x in app.settings_save.x..app.settings_save.right() {
+                let cell = &mut frame.buffer_mut()[(x, app.settings_save.y)];
+                cell.set_fg(color);
+                if app.no_color {
+                    cell.set_style(
+                        Style::default()
+                            .remove_modifier(Modifier::BOLD | Modifier::DIM)
+                            .add_modifier(
+                                if app.clock.animation_elapsed(app.animation_started).as_secs() % 4
+                                    < 2
+                                {
+                                    Modifier::BOLD
+                                } else {
+                                    Modifier::DIM
+                                },
+                            ),
+                    );
+                }
+            }
+        }
     } else if app.settings_tab == SettingsTab::Notify {
         app.settings_actions[0] = Rect::new(rows[2].x, rows[2].y + 5, rows[2].width, 1);
         let label = if app.pending.as_deref() == Some("telegram test") {
@@ -1581,6 +1607,22 @@ fn settings(frame: &mut Frame, area: Rect, app: &mut App) {
                 inner.height.saturating_sub(search_rows),
             ),
         );
+    }
+}
+
+// A four-second color pulse keeps the label readable and the button geometry fixed.
+fn save_pulse_color(theme: &ratcn::Theme, elapsed: std::time::Duration) -> Color {
+    let phase = elapsed.as_secs_f64() * std::f64::consts::TAU / 4.0;
+    let strength = 0.625 + 0.375 * phase.cos();
+    match (theme.muted_foreground, theme.primary) {
+        (Color::Rgb(r, g, b), Color::Rgb(pr, pg, pb)) => {
+            let blend = |muted: u8, accent: u8| {
+                (f64::from(muted) + (f64::from(accent) - f64::from(muted)) * strength).round() as u8
+            };
+            Color::Rgb(blend(r, pr), blend(g, pg), blend(b, pb))
+        }
+        _ if strength > 0.625 => theme.primary,
+        _ => theme.muted_foreground,
     }
 }
 

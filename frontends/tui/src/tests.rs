@@ -3216,3 +3216,56 @@ fn segmented_fields_stay_disabled_when_settings_are_missing_or_an_operation_is_p
     }
     assert!(!crate::settings::Field::Interval.is_segmented());
 }
+
+#[test]
+fn unsaved_settings_pulse_without_changing_save_label_or_geometry_in_any_tab_or_theme() {
+    use crate::{clock::Clock, settings::SettingsTab};
+    for name in crate::client_ui::THEMES {
+        for tab in [
+            SettingsTab::Preferences,
+            SettingsTab::Charts,
+            SettingsTab::Alerts,
+        ] {
+            for (width, height) in [(60, 19), (120, 30)] {
+                let mut app = fixed_graph_app();
+                app.update(Event::Settings(Settings::default()));
+                app.client_preferences.theme = name.into();
+                app.view = View::Settings;
+                app.settings_tab = tab;
+                app.feedback = None;
+                let clean = render(&mut app, width, height);
+                let rect = app.settings_save;
+                let label = |buffer: &Buffer| {
+                    (rect.x..rect.right())
+                        .map(|x| buffer[(x, rect.y)].symbol())
+                        .collect::<String>()
+                };
+                let clean_label = label(&clean);
+                assert!(clean_label.contains("[ Save changes ]"));
+                app.settings_draft.battery_alert.enabled = false;
+                let now = app.clock.now();
+                let mut colors = Vec::new();
+                for phase in [0, 1, 2, 3, 4] {
+                    app.clock = Clock::Fixed {
+                        now,
+                        telemetry_elapsed: Duration::ZERO,
+                        animation_elapsed: Duration::from_secs(phase),
+                        feedback_elapsed: Duration::ZERO,
+                    };
+                    let buffer = render(&mut app, width, height);
+                    assert_eq!(app.settings_save, rect);
+                    assert_eq!(label(&buffer), clean_label);
+                    assert!(!label(&buffer).contains('*'));
+                    colors.push(buffer[(rect.x + 2, rect.y)].fg);
+                }
+                assert_ne!(colors[0], colors[2]);
+                assert_eq!(colors[0], colors[4]);
+                app.settings_draft = app.settings.clone().unwrap();
+                assert_eq!(
+                    render(&mut app, width, height)[(rect.x + 2, rect.y)].fg,
+                    clean[(rect.x + 2, rect.y)].fg
+                );
+            }
+        }
+    }
+}
