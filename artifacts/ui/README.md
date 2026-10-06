@@ -80,8 +80,9 @@ shows Preferences; `settings-charts.svg`, `settings-alerts.svg`,
 contextual help. Charts fixtures include saved preferences. The value-list scenes
 `settings-interval-picker.svg` and `settings-visualization-picker.svg` show the
 production editors. Debug scenes include Retry, Pause/Resume and Debug buttons.
-The actual TUI persists all preference fields through the daemon settings API; snapshot generation
-uses only fake state. Battery alerts and connectors remain future features. Warning/error counts in these fixtures demonstrate the
+The actual TUI persists preferences and the battery rule through the daemon settings API; snapshot generation
+uses only fake state. Alerts shows the configurable threshold, hysteresis and cooldown;
+Notify shows Telegram configuration status and a test button. Warning/error counts in these fixtures demonstrate the
 production status strip's rendering; they do not implement server alert tracking.
 Zero counters are never displayed.
 

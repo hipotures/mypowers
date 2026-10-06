@@ -8,6 +8,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
+from mypowers.alerts import BatteryAlerts, Telegram
 from mypowers.bluetooth.simulated import SimulatedTransport
 from mypowers.bluetooth.supervisor import Supervisor
 from mypowers.bluetooth.transport import BleakTransport, Transport
@@ -64,12 +65,22 @@ class Service:
             config.logging.level,
             config.logging.max_file_bytes,
             config.logging.backup_count,
-            (config.api_token,) if config.api_token else (),
+            tuple(
+                value
+                for value in (config.api_token, config.telegram_bot_token, config.telegram_chat_id)
+                if value
+            ),
         )
         self.core.log, self.core.log_health = self.logs.log, self.logs.health
         self.history = HistoryStore(
-            self.core, config.data_dir, config.history.enabled, config.history.interval_seconds
+            self.core,
+            config.data_dir,
+            config.history.enabled,
+            config.history.interval_seconds,
+            config.battery_alert,
         )
+        self.telegram = Telegram(config.telegram_bot_token, config.telegram_chat_id)
+        self.alerts = BatteryAlerts(self.core, self.history, self.telegram)
         selected: Callable[[], Transport] = factory or (
             SimulatedTransport if config.backend == "simulated" else lambda: BleakTransport(config)
         )
@@ -90,6 +101,7 @@ class Service:
                 asyncio.create_task(self.supervisor.run(), name="ble-supervisor"),
                 asyncio.create_task(self.history.run(), name="history-writer"),
                 asyncio.create_task(self.monitor(), name="health-monitor"),
+                asyncio.create_task(self.alerts.run(), name="battery-alerts"),
             ]
             for task in self.tasks:
                 task.add_done_callback(self.task_done)

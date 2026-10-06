@@ -110,7 +110,7 @@ class Diagnostics:
 
     def accept(self, level: str, event: str, message: str, context: dict[str, Any]) -> None:
         now = time.monotonic()
-        if level in {"WARNING", "ERROR"}:
+        if level in {"WARNING", "ERROR"} and event != "battery_alert":
             with self.mutex:
                 if now - self.error_times.get(event, -100) < 5:
                     return

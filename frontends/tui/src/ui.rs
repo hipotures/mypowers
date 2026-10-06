@@ -1082,14 +1082,18 @@ fn settings(frame: &mut Frame, area: Rect, app: &mut App) {
     };
     let note = |text: &'static str| Line::from(text).style(Style::default().fg(DIM));
     let lines = match app.settings_tab {
-        SettingsTab::Preferences | SettingsTab::Charts => {
+        SettingsTab::Preferences | SettingsTab::Charts | SettingsTab::Alerts => {
             let fields: &[Field] = if app.settings_tab == SettingsTab::Charts {
                 &Field::CHARTS
+            } else if app.settings_tab == SettingsTab::Alerts {
+                &Field::ALERTS
             } else {
                 &Field::PREFERENCES
             };
             let mut lines = vec![heading(if app.settings_tab == SettingsTab::Charts {
                 "Power graphs"
+            } else if app.settings_tab == SettingsTab::Alerts {
+                "Battery alerts"
             } else {
                 "Preferences"
             })];
@@ -1120,14 +1124,19 @@ fn settings(frame: &mut Frame, area: Rect, app: &mut App) {
             lines.push(note("Save applies choices now and on next start."));
             lines
         }
-        SettingsTab::Alerts => vec![
-            heading("Battery alerts"),
-            note("Battery alerts are not available yet."),
-        ],
         SettingsTab::Notify => vec![
-            heading("Notifications"),
-            note("No notification connectors available yet."),
-            note("Telegram support is planned."),
+            heading("Telegram notifications"),
+            row(
+                "Server connector",
+                match app.settings.as_ref() {
+                    Some(settings) if settings.telegram_configured => "Configured",
+                    Some(_) => "Not configured",
+                    None => "Unavailable",
+                }
+                .into(),
+            ),
+            note("Credentials are configured on the server."),
+            note("Alerts run even when this TUI is closed."),
         ],
         SettingsTab::Debug => vec![
             heading("Debug / Diagnostics"),
@@ -1183,10 +1192,12 @@ fn settings(frame: &mut Frame, area: Rect, app: &mut App) {
     frame.render_widget(Paragraph::new(lines), rows[2]);
     if matches!(
         app.settings_tab,
-        SettingsTab::Preferences | SettingsTab::Charts
+        SettingsTab::Preferences | SettingsTab::Charts | SettingsTab::Alerts
     ) {
         let count = if app.settings_tab == SettingsTab::Charts {
             3
+        } else if app.settings_tab == SettingsTab::Alerts {
+            4
         } else {
             2
         };
@@ -1211,6 +1222,25 @@ fn settings(frame: &mut Frame, area: Rect, app: &mut App) {
                     }),
             ),
             app.settings_save,
+        );
+    } else if app.settings_tab == SettingsTab::Notify {
+        app.settings_actions[0] = Rect::new(rows[2].x, rows[2].y + 5, rows[2].width, 1);
+        frame.render_widget(
+            Paragraph::new(if app.pending.as_deref() == Some("telegram test") {
+                "[ Sending test... ]"
+            } else {
+                "[ Send test message ]"
+            })
+            .style(
+                Style::default()
+                    .fg(if app.connected && app.pending.is_none() {
+                        GREEN
+                    } else {
+                        DIM
+                    })
+                    .bg(TRACK),
+            ),
+            app.settings_actions[0],
         );
     } else if app.settings_tab == SettingsTab::Debug {
         let logging = status
@@ -1318,8 +1348,12 @@ Timezone list supports typing to search."
 Enter     Activate selected button
 Click     Activate a button"
             }
-            SettingsTab::Alerts => "Battery alerts are not available yet.",
-            SettingsTab::Notify => "Notification connectors are not available yet.",
+            SettingsTab::Alerts => {
+                "Enter edits the selected value; type to search.\nSave applies the server rule and persists it.\nALERT at battery <= threshold.\nRECOVERED at battery >= threshold + hysteresis.\nCooldown keeps only the latest state; no repeats.\nOnly fresh LIVE telemetry is evaluated."
+            }
+            SettingsTab::Notify => {
+                "Enter / click sends a Telegram test message.\nThe server stores credentials and sends notifications.\nThe test does not change battery alert state or cooldown."
+            }
         };
         format!(
             "HELP — SETTINGS / {}\n\nTab / Shift-Tab   Switch tab\n\n{}\n\nEsc close   q confirm quit",

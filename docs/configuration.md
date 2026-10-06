@@ -1,5 +1,37 @@
 # Configuration
 
+Battery alerts run in the daemon with or without a TUI. Configure the initial rule in YAML:
+
+```yaml
+battery_alert:
+  enabled: true
+  threshold_percent: 20
+  hysteresis_percent: 5
+  min_notification_interval_minutes: 10
+```
+
+Settings → Alerts edits and saves this rule in SQLite; saved settings override the YAML defaults.
+ALERT begins at battery ≤ threshold; recovery occurs at battery ≥ threshold + hysteresis.
+Hysteresis is at least one percentage point, and the recovery threshold must not exceed 100%.
+Only fresh LIVE telemetry changes the rule or releases a pending notification.
+During cooldown only the latest logical state remains pending. A state already notified is never
+sent again: low → recovered → low within cooldown produces no second low message.
+Pending recovery reports the current battery percentage when it is sent.
+Logical state, last notified state and timestamps persist in `mypowers.db`, independently of
+whether telemetry history recording is enabled. State changes and delivery outcomes enter logs.
+
+Set `MYPOWERS_TELEGRAM_BOT_TOKEN` and `MYPOWERS_TELEGRAM_CHAT_ID` in the server `.env`.
+Both must be supplied together. They are omitted from check-config, API responses and logs.
+The bot must be allowed to send to that chat. Settings → Notify → Send test message sends a
+fixed test through Telegram's [sendMessage API](https://core.telegram.org/bots/api#sendmessage)
+without changing the battery rule or its cooldown. Credentials are never entered in the TUI.
+Without credentials, rule transitions are still logged, but no Telegram messages are sent.
+
+Delivery attempts are reserved durably before contacting Telegram. A failed or uncertain attempt
+retains only the current state and waits at least the cooldown (30 seconds when cooldown is shorter)
+before retrying. Telegram and SQLite cannot be committed atomically: a crash after external delivery
+but before recording its confirmation can cause a later retry, although never an immediate one.
+
 Precedence is CLI overrides, process environment, dotenv, selected YAML, then validated defaults.
 Server, CLI and TUI read `.env` from the current directory when `--env-file` is omitted.
 An explicit `--env-file PATH` replaces that selection; files are not merged and parent directories

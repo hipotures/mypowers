@@ -169,3 +169,23 @@ def test_client_overrides_timezone_and_timeouts(tmp_path, monkeypatch):
         client_config(env, timeout=-1)
     monkeypatch.setenv("MYPOWERS_TEST_ALLOW_OUTPUT_CHANGES", "0")
     assert client_config(env).timezone == "Europe/Warsaw"
+
+
+def test_telegram_credentials_from_dotenv_are_private(tmp_path):
+    from mypowers.config.server import load
+
+    path = tmp_path / "server.env"
+    path.write_text(
+        "MYPOWERS_AUTH_REQUIRED=false\n"
+        "MYPOWERS_TELEGRAM_BOT_TOKEN=123:private-token\n"
+        "MYPOWERS_TELEGRAM_CHAT_ID=-123456\n"
+    )
+    config = load(str(path))
+    assert config.telegram_bot_token == "123:private-token"
+    assert config.telegram_chat_id == "-123456"
+    assert "private-token" not in repr(config)
+    assert "private-token" not in config.model_dump_json()
+    assert "-123456" not in config.model_dump_json()
+    path.write_text("MYPOWERS_AUTH_REQUIRED=false\nMYPOWERS_TELEGRAM_CHAT_ID=123\n")
+    with pytest.raises(ValueError, match="both"):
+        load(str(path))

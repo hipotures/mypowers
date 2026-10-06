@@ -45,6 +45,7 @@ pub enum Event {
 
 pub enum Intent {
     SaveSettings(crate::settings::Settings),
+    TestTelegram,
     Output {
         output: &'static str,
         enabled: bool,
@@ -186,12 +187,31 @@ impl Api {
 
     async fn perform(&self, intent: Intent, events: &mpsc::Sender<Event>) -> Feedback {
         match intent {
+            Intent::TestTelegram => {
+                match self
+                    .request(
+                        reqwest::Method::POST,
+                        "/notifications/telegram/test",
+                        Some(json!({})),
+                        None,
+                    )
+                    .await
+                {
+                    Ok(value) if value["status"].as_str() == Some("sent") => {
+                        Feedback::new("Telegram test sent", Severity::Success)
+                    }
+                    _ => Feedback::new(
+                        "Telegram test failed; see server logs/configuration",
+                        Severity::Error,
+                    ),
+                }
+            }
             Intent::SaveSettings(draft) => {
                 let result = self
                     .request(
                         reqwest::Method::PUT,
                         "/settings",
-                        Some(json!({"graph_interval_seconds": draft.graph_interval_seconds, "graph_visualization": draft.graph_visualization, "graph_base_scale_w": draft.graph_base_scale_w, "timezone": draft.timezone, "logs_page_size": draft.logs_page_size})),
+                        Some(json!({"graph_interval_seconds": draft.graph_interval_seconds, "graph_visualization": draft.graph_visualization, "graph_base_scale_w": draft.graph_base_scale_w, "timezone": draft.timezone, "logs_page_size": draft.logs_page_size, "battery_alert": draft.battery_alert})),
                         None,
                     )
                     .await
@@ -2412,6 +2432,40 @@ mod tests {
         assert_eq!(result.severity, Severity::Warning);
         server.await.unwrap();
     }
+    #[tokio::test]
+    async fn telegram_test_requires_confirmed_receipt_and_never_replays() {
+        for body in [
+            json!({"status":"sent"}),
+            json!({"status":"queued"}),
+            json!({}),
+        ] {
+            let valid = body["status"] == "sent";
+            let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+            let api = api_for(&listener);
+            let server = tokio::spawn(async move {
+                let (mut socket, request) = accept_http_request(&listener).await;
+                assert!(request.starts_with("POST /api/v1/notifications/telegram/test HTTP/1.1"));
+                respond_json(&mut socket, body).await;
+                assert!(
+                    timeout(Duration::from_millis(200), listener.accept())
+                        .await
+                        .is_err()
+                );
+            });
+            let (events, _) = mpsc::channel(4);
+            let feedback = api.perform(Intent::TestTelegram, &events).await;
+            assert_eq!(
+                feedback.severity,
+                if valid {
+                    Severity::Success
+                } else {
+                    Severity::Error
+                }
+            );
+            server.await.unwrap();
+        }
+    }
+
     #[tokio::test]
     async fn settings_loader_validates_schema_and_save_requires_matching_receipt_without_replay() {
         for body in [

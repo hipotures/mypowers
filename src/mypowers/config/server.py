@@ -10,7 +10,7 @@ import yaml
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
 
 from mypowers.config import base_url, environment, token
-from mypowers.contracts import Level
+from mypowers.contracts import BatteryAlert, Level
 from mypowers.protocol import PROFILE, STATION_ADDRESS, STATION_NAME
 
 
@@ -72,6 +72,7 @@ class ServerConfig(Settings):
     device: Device = Field(default_factory=Device)
     bluetooth: Bluetooth = Field(default_factory=Bluetooth)
     history: History = Field(default_factory=History)
+    battery_alert: BatteryAlert = Field(default_factory=BatteryAlert)
     logging: Logging = Field(default_factory=Logging)
     api: API = Field(default_factory=API)
     environment: Literal["development", "production"] = "development"
@@ -80,6 +81,8 @@ class ServerConfig(Settings):
     log_dir: Path
     runtime_dir: Path
     api_token: str | None = Field(default=None, repr=False, exclude=True)
+    telegram_bot_token: str | None = Field(default=None, repr=False, exclude=True)
+    telegram_chat_id: str | None = Field(default=None, repr=False, exclude=True)
     public_url: str | None = None
 
 
@@ -167,6 +170,10 @@ def load(
             else:
                 data[key] = value
     data["api_token"] = token(values)
+    data["telegram_bot_token"] = values.get("MYPOWERS_TELEGRAM_BOT_TOKEN") or None
+    data["telegram_chat_id"] = values.get("MYPOWERS_TELEGRAM_CHAT_ID") or None
+    if bool(data["telegram_bot_token"]) != bool(data["telegram_chat_id"]):
+        raise ValueError("Telegram requires both TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID.")
     try:
         cfg = ServerConfig.model_validate(data)
     except ValidationError as error:

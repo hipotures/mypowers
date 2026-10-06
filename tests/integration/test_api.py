@@ -2,6 +2,7 @@ import asyncio
 import json
 import logging
 import time
+from unittest.mock import AsyncMock
 from uuid import uuid4
 
 import pytest
@@ -11,6 +12,58 @@ from starlette.websockets import WebSocketDisconnect
 from mypowers.api import create_app
 from mypowers.contracts import Settings, Status, StreamMessage
 from mypowers.daemon.service import Service
+
+
+def test_telegram_test_requires_auth_and_never_returns_credentials(config):
+    config.api.auth_required = True
+    config.api_token = "test-api-token-" + "x" * 32
+    config.telegram_bot_token = "test-bot-secret"
+    config.telegram_chat_id = "private-chat"
+    runtime = Service(config)
+    sender = AsyncMock()
+    runtime.telegram.send = sender
+    with TestClient(create_app(config, runtime)) as client:
+        assert client.post("/api/v1/notifications/telegram/test", json={}).status_code == 401
+        sender.assert_not_awaited()
+        client.headers["Authorization"] = f"Bearer {config.api_token}"
+        ready(client)
+        response = client.get("/api/v1/settings")
+        assert response.json()["telegram_configured"] is True
+        assert "test-bot-secret" not in response.text and "private-chat" not in response.text
+        assert client.post("/api/v1/notifications/telegram/test", json={}).json() == {
+            "status": "sent"
+        }
+        sender.assert_awaited_once_with("MyPowers: Telegram test notification.")
+        assert (
+            client.post(
+                "/api/v1/notifications/telegram/test", json={"text": "arbitrary"}
+            ).status_code
+            == 422
+        )
+
+
+def test_battery_rule_settings_persist_and_invalid_rules_are_rejected(config):
+    rule = {
+        "enabled": True,
+        "threshold_percent": 30,
+        "hysteresis_percent": 7,
+        "min_notification_interval_minutes": 4,
+    }
+    with TestClient(create_app(config)) as client:
+        ready(client)
+        response = client.put("/api/v1/settings", json={"battery_alert": rule})
+        assert response.status_code == 200 and response.json()["battery_alert"] == rule
+        assert (
+            client.put(
+                "/api/v1/settings", json={"battery_alert": {**rule, "threshold_percent": 99}}
+            ).status_code
+            == 422
+        )
+        assert client.get("/api/v1/settings").json()["battery_alert"] == rule
+        assert client.post("/api/v1/notifications/telegram/test", json={}).status_code == 503
+    with TestClient(create_app(config)) as client:
+        ready(client)
+        assert client.get("/api/v1/settings").json()["battery_alert"] == rule
 
 
 def ready(client):
@@ -440,6 +493,7 @@ def test_settings_api_validates_partial_updates_and_persists_across_restart(conf
             == 422
         )
         preferences = {
+            "battery_alert": Settings().battery_alert.model_dump(),
             "graph_interval_seconds": 30,
             "graph_visualization": "chart",
             "graph_base_scale_w": 300,
@@ -449,6 +503,7 @@ def test_settings_api_validates_partial_updates_and_persists_across_restart(conf
         assert client.put("/api/v1/settings", json=preferences).json() == {
             **preferences,
             "schema_version": 1,
+            "telegram_configured": False,
         }
         for field, invalid in [
             ("graph_visualization", "other"),
@@ -465,11 +520,16 @@ def test_settings_api_validates_partial_updates_and_persists_across_restart(conf
                 ).status_code
                 == 422
             )
-            assert client.get("/api/v1/settings").json() == {**preferences, "schema_version": 1}
+            assert client.get("/api/v1/settings").json() == {
+                **preferences,
+                "schema_version": 1,
+                "telegram_configured": False,
+            }
         assert client.put("/api/v1/settings", json={"logs_page_size": 500}).json() == {
             **preferences,
             "logs_page_size": 500,
             "schema_version": 1,
+            "telegram_configured": False,
         }
     with TestClient(create_app(config)) as client:
         for _ in range(100):
@@ -477,4 +537,9 @@ def test_settings_api_validates_partial_updates_and_persists_across_restart(conf
             if response.status_code == 200:
                 break
             time.sleep(0.02)
-        assert response.json() == {**preferences, "logs_page_size": 500, "schema_version": 1}
+        assert response.json() == {
+            **preferences,
+            "logs_page_size": 500,
+            "schema_version": 1,
+            "telegram_configured": False,
+        }

@@ -23,6 +23,8 @@ import httpx
 import pyte
 import pytest
 
+from mypowers.contracts import Settings
+
 ROOT = Path(__file__).resolve().parents[2]
 BINARY = ROOT / "frontends/tui/target/debug/mypowers-tui"
 CADDY_BINARY = os.environ.get("MYPOWERS_CADDY_TEST_BINARY")
@@ -1354,6 +1356,7 @@ def test_settings_form_saves_all_preferences_and_restores_them_on_next_tui_start
             session.write(b"\x1b[B\r")
             session.read(b"Settings saved")
             expected = {
+                **Settings().model_dump(),
                 "schema_version": 1,
                 "graph_interval_seconds": 30,
                 "graph_visualization": "chart",
@@ -1378,3 +1381,27 @@ def test_settings_form_saves_all_preferences_and_restores_them_on_next_tui_start
             restarted.read(b"300")
         finally:
             restarted.close()
+
+
+def test_battery_alert_form_saves_and_notify_test_reports_missing_connector(
+    daemon_process, tui_binary, tmp_path
+):
+    _, url, env = daemon_process
+    with httpx.Client(base_url=url, trust_env=False) as client:
+        session = Session(tui_binary, tmp_path, env, "--server", url)
+        try:
+            session.read(b"CONNECTED")
+            session.write(b"s\t\t")
+            session.read(b"Battery alerts")
+            session.write(b"\x1b[B\r")
+            session.read(b"Available values")
+            session.write(b"\x1b[B\r")
+            session.write(b"\x1b[B\x1b[B\x1b[B\r")
+            session.read(b"Settings saved")
+            assert client.get("/api/v1/settings").json()["battery_alert"]["threshold_percent"] == 21
+            session.write(b"\t")
+            session.read(b"Not configured")
+            session.write(b"\r")
+            session.read(b"Telegram test failed")
+        finally:
+            session.close()

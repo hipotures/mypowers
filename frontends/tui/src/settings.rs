@@ -37,6 +37,26 @@ impl SettingsTab {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(default)]
+pub struct BatteryAlert {
+    pub enabled: bool,
+    pub threshold_percent: u8,
+    pub hysteresis_percent: u8,
+    pub min_notification_interval_minutes: u16,
+}
+
+impl Default for BatteryAlert {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            threshold_percent: 20,
+            hysteresis_percent: 5,
+            min_notification_interval_minutes: 10,
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
 pub struct Settings {
     pub schema_version: u8,
     pub graph_interval_seconds: i64,
@@ -44,6 +64,10 @@ pub struct Settings {
     pub graph_base_scale_w: u64,
     pub timezone: String,
     pub logs_page_size: usize,
+    #[serde(default)]
+    pub battery_alert: BatteryAlert,
+    #[serde(default, skip_serializing)]
+    pub telegram_configured: bool,
 }
 
 impl Default for Settings {
@@ -55,6 +79,8 @@ impl Default for Settings {
             graph_base_scale_w: 100,
             timezone: "system".into(),
             logs_page_size: 100,
+            battery_alert: BatteryAlert::default(),
+            telegram_configured: false,
         }
     }
 }
@@ -65,6 +91,12 @@ impl Settings {
             && [100, 300].contains(&self.graph_base_scale_w)
             && [50, 100, 250, 500, 1000].contains(&self.logs_page_size)
             && (self.timezone == "system" || self.timezone.parse::<chrono_tz::Tz>().is_ok())
+            && self.battery_alert.threshold_percent < 100
+            && self.battery_alert.hysteresis_percent > 0
+            && u16::from(self.battery_alert.threshold_percent)
+                + u16::from(self.battery_alert.hysteresis_percent)
+                <= 100
+            && self.battery_alert.min_notification_interval_minutes <= 1440
     }
 
     pub fn resolution(&self) -> Option<Resolution> {
@@ -93,6 +125,18 @@ impl Settings {
                 }
             }
             Field::PageSize => self.logs_page_size.to_string(),
+            Field::AlertEnabled => if self.battery_alert.enabled {
+                "Enabled"
+            } else {
+                "Disabled"
+            }
+            .into(),
+            Field::AlertThreshold => format!("{}%", self.battery_alert.threshold_percent),
+            Field::AlertHysteresis => format!("{} pp", self.battery_alert.hysteresis_percent),
+            Field::AlertCooldown => format!(
+                "{} min",
+                self.battery_alert.min_notification_interval_minutes
+            ),
         }
     }
 
@@ -104,6 +148,12 @@ impl Settings {
             Field::Interval => self.graph_interval_seconds = [10, 30, 60, 3600][index],
             Field::Scale => self.graph_base_scale_w = [100, 300][index],
             Field::PageSize => self.logs_page_size = [50, 100, 250, 500, 1000][index],
+            Field::AlertEnabled => self.battery_alert.enabled = index == 0,
+            Field::AlertThreshold => self.battery_alert.threshold_percent = index as u8,
+            Field::AlertHysteresis => self.battery_alert.hysteresis_percent = (index + 1) as u8,
+            Field::AlertCooldown => {
+                self.battery_alert.min_notification_interval_minutes = index as u16
+            }
             Field::Timezone => {
                 self.timezone = if index == 0 {
                     "system".into()
@@ -122,11 +172,21 @@ pub enum Field {
     Scale,
     Timezone,
     PageSize,
+    AlertEnabled,
+    AlertThreshold,
+    AlertHysteresis,
+    AlertCooldown,
 }
 
 impl Field {
     pub const CHARTS: [Self; 3] = [Self::Visualization, Self::Interval, Self::Scale];
     pub const PREFERENCES: [Self; 2] = [Self::Timezone, Self::PageSize];
+    pub const ALERTS: [Self; 4] = [
+        Self::AlertEnabled,
+        Self::AlertThreshold,
+        Self::AlertHysteresis,
+        Self::AlertCooldown,
+    ];
     pub fn label(self) -> &'static str {
         match self {
             Self::Visualization => "Visualization",
@@ -134,6 +194,10 @@ impl Field {
             Self::Scale => "Base scale",
             Self::Timezone => "Timezone",
             Self::PageSize => "Logs page size",
+            Self::AlertEnabled => "Battery alert",
+            Self::AlertThreshold => "Low threshold",
+            Self::AlertHysteresis => "Hysteresis",
+            Self::AlertCooldown => "Cooldown",
         }
     }
     pub fn choices(self) -> Vec<String> {
@@ -144,6 +208,10 @@ impl Field {
                 .map(String::from)
                 .to_vec(),
             Self::PageSize => [50, 100, 250, 500, 1000].map(|v| v.to_string()).to_vec(),
+            Self::AlertEnabled => vec!["Enabled".into(), "Disabled".into()],
+            Self::AlertThreshold => (0..100).map(|v| format!("{v}%")).collect(),
+            Self::AlertHysteresis => (1..=100).map(|v| format!("{v} pp")).collect(),
+            Self::AlertCooldown => (0..=1440).map(|v| format!("{v} min")).collect(),
             Self::Timezone => std::iter::once("System local".into())
                 .chain(
                     chrono_tz::TZ_VARIANTS

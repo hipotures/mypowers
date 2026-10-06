@@ -64,7 +64,15 @@ def main() -> None:
         logging_config["filters"] = {
             "redaction": {
                 "()": RedactionFilter,
-                "secrets": (config.api_token,) if config.api_token else (),
+                "secrets": tuple(
+                    value
+                    for value in (
+                        config.api_token,
+                        config.telegram_bot_token,
+                        config.telegram_chat_id,
+                    )
+                    if value
+                ),
             }
         }
         for handler in logging_config["handlers"].values():

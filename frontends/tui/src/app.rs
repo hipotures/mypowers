@@ -629,7 +629,8 @@ impl App {
             SettingsTab::Preferences => 3,
             SettingsTab::Charts => 4,
             SettingsTab::Debug => 3,
-            _ => 0,
+            SettingsTab::Alerts => 5,
+            SettingsTab::Notify => 1,
         }
     }
 
@@ -640,6 +641,14 @@ impl App {
         if self.settings_tab == SettingsTab::Debug {
             return self.operation(['r', 'p', 'b'][self.settings_selected]);
         }
+        if self.settings_tab == SettingsTab::Notify {
+            if self.connected && self.pending.is_none() {
+                self.pending = Some("telegram test".into());
+                self.feedback = Some(Feedback::new("Sending Telegram test...", Severity::Info));
+                return Effect::Request(Intent::TestTelegram);
+            }
+            return Effect::None;
+        }
         if self.settings.is_none() || self.pending.is_some() {
             return Effect::None;
         }
@@ -649,6 +658,7 @@ impl App {
         let field = match self.settings_tab {
             SettingsTab::Preferences => Field::PREFERENCES[self.settings_selected],
             SettingsTab::Charts => Field::CHARTS[self.settings_selected],
+            SettingsTab::Alerts => Field::ALERTS[self.settings_selected],
             _ => return Effect::None,
         };
         let selected = field
@@ -715,20 +725,25 @@ impl App {
             }
             KeyCode::Enter => {
                 if let Some((index, _)) = options.get(picker.selected) {
-                    self.settings_draft.choose(picker.field, *index);
+                    let mut candidate = self.settings_draft.clone();
+                    candidate.choose(picker.field, *index);
+                    if !candidate.valid() {
+                        self.feedback = Some(Feedback::new(
+                            "Threshold + hysteresis must be at most 100%",
+                            Severity::Warning,
+                        ));
+                        return Effect::None;
+                    }
+                    self.settings_draft = candidate;
                     self.settings_picker = None;
                     self.resize();
                 }
             }
-            KeyCode::Char(character)
-                if picker.field == Field::Timezone
-                    && !character.is_control()
-                    && picker.query.len() < 128 =>
-            {
+            KeyCode::Char(character) if !character.is_control() && picker.query.len() < 128 => {
                 picker.query.push(character);
                 picker.selected = 0;
             }
-            KeyCode::Backspace if picker.field == Field::Timezone => {
+            KeyCode::Backspace => {
                 picker.query.pop();
                 picker.selected = 0;
             }
@@ -860,6 +875,9 @@ impl App {
                         return self.save_settings();
                     }
                 } else if self.settings_actions[index].contains(position) {
+                    if self.settings_tab == SettingsTab::Notify {
+                        return self.edit_setting();
+                    }
                     return self.operation(['r', 'p', 'b'][index]);
                 }
             }

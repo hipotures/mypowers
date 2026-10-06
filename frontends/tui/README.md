@@ -66,7 +66,8 @@ uv run mypowers tui
 | Retry / Pause or Resume / Debug buttons in Settings → Debug | Click or focus with Up/Down and activate with Enter |
 | Tab / Shift-Tab or click in Settings | Select Preferences / Charts / Alerts / Notify / Debug |
 | Up/Down, Enter or click in Settings | Select a field, open its value list and confirm a value |
-| Save changes in Preferences or Charts | Persist all preference fields and apply them now |
+| Save changes in Preferences, Charts or Alerts | Persist preferences and battery alert rule on the server |
+| Send test message in Notify | Ask the server to send a Telegram test; does not change alert cooldown |
 | Double-click MYPOWERS | Copy current rendered API snapshot through Wayland `wl-copy` |
 | Double-click LOGS title | Copy every currently loaded log record, including rows outside the viewport |
 

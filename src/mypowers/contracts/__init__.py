@@ -7,7 +7,7 @@ from typing import Any, Literal
 from uuid import UUID
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from pydantic import BaseModel, ConfigDict, Field, StrictBool, field_validator
+from pydantic import BaseModel, ConfigDict, Field, StrictBool, field_validator, model_validator
 
 
 class DTO(BaseModel):
@@ -46,12 +46,26 @@ class LogLevelRequest(DTO):
     duration_seconds: float | None = Field(default=None, gt=0, le=86400, allow_inf_nan=False)
 
 
+class BatteryAlert(DTO):
+    enabled: StrictBool = True
+    threshold_percent: int = Field(default=20, strict=True, ge=0, le=99)
+    hysteresis_percent: int = Field(default=5, strict=True, ge=1, le=100)
+    min_notification_interval_minutes: int = Field(default=10, strict=True, ge=0, le=1440)
+
+    @model_validator(mode="after")
+    def reachable_recovery(self) -> "BatteryAlert":
+        if self.threshold_percent + self.hysteresis_percent > 100:
+            raise ValueError("Recovery threshold must not exceed 100%.")
+        return self
+
+
 class Preferences(DTO):
     graph_interval_seconds: Literal[10, 30, 60, 3600] = 10
     graph_visualization: Literal["sparkline", "chart"] = "sparkline"
     graph_base_scale_w: Literal[100, 300] = 100
     timezone: str = Field(default="system", max_length=128)
     logs_page_size: Literal[50, 100, 250, 500, 1000] = 100
+    battery_alert: BatteryAlert = Field(default_factory=BatteryAlert)
 
     @field_validator(
         "graph_interval_seconds", "graph_base_scale_w", "logs_page_size", mode="before"
@@ -75,6 +89,7 @@ class Preferences(DTO):
 
 class Settings(Preferences):
     schema_version: Literal[1] = 1
+    telegram_configured: bool = False
 
 
 class SettingsUpdate(Preferences):

@@ -141,6 +141,67 @@ fn settings_tabs_wrap_route_contextual_keys_and_mouse_without_dashboard_actions(
 }
 
 #[test]
+fn battery_alert_settings_and_telegram_test_work_at_minimum_size() {
+    let mut app = app();
+    app.update(Event::Settings(Settings::default()));
+    app.view = View::Settings;
+    app.settings_tab = SettingsTab::Alerts;
+    let screen = text(&render(&mut app, 60, 19));
+    for label in [
+        "Battery alert",
+        "Low threshold",
+        "20%",
+        "Hysteresis",
+        "5 pp",
+        "10 min",
+        "Save changes",
+    ] {
+        assert!(screen.contains(label), "Missing {label}");
+    }
+    app.settings_selected = 1;
+    app.key(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE));
+    app.key(KeyEvent::new(KeyCode::Down, KeyModifiers::NONE));
+    app.key(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE));
+    assert_eq!(app.settings_draft.battery_alert.threshold_percent, 21);
+    app.settings_selected = 4;
+    assert!(matches!(
+        app.key(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE)),
+        Effect::Request(Intent::SaveSettings(_))
+    ));
+    app.update(Event::Finished(Feedback::new(
+        "Settings saved",
+        Severity::Success,
+    )));
+    app.settings_tab = SettingsTab::Notify;
+    app.settings_selected = 0;
+    let screen = text(&render(&mut app, 60, 19));
+    assert!(screen.contains("Not configured") && screen.contains("Send test message"));
+    let rect = app.settings_actions[0];
+    assert!(matches!(
+        app.mouse(MouseEvent {
+            kind: MouseEventKind::Down(MouseButton::Left),
+            column: rect.x,
+            row: rect.y,
+            modifiers: KeyModifiers::NONE
+        }),
+        Effect::None
+    ));
+    assert!(matches!(
+        app.mouse(MouseEvent {
+            kind: MouseEventKind::Up(MouseButton::Left),
+            column: rect.x,
+            row: rect.y,
+            modifiers: KeyModifiers::NONE
+        }),
+        Effect::Request(Intent::TestTelegram)
+    ));
+    assert!(matches!(
+        app.key(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE)),
+        Effect::None
+    ));
+}
+
+#[test]
 fn settings_form_lists_values_saves_every_field_and_preserves_failed_drafts() {
     let mut app = app();
     let original = Settings {

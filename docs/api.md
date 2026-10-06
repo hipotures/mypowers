@@ -13,6 +13,7 @@ the checked-in [OpenAPI artifact](openapi.json) describes typed requests and res
 | GET `/api/v1/capabilities` | Only qualified reads and AC/DC/common-lamp outputs |
 | GET `/api/v1/settings` | Persisted application settings and defaults |
 | PUT `/api/v1/settings` | Validate and persist supplied settings fields; omitted fields stay unchanged |
+| POST `/api/v1/notifications/telegram/test` | Empty JSON object; send fixed test, return `{"status":"sent"}` after confirmation |
 | GET `/api/v1/history` | UTC `[since,until)` state change page, limit/cursor |
 | GET `/api/v1/history/aggregates` | UTC duration-weighted power averages per 10s / 30s / 60s / 1h bucket |
 | PUT `/api/v1/outputs/{ac,dc,light}` | One explicit boolean intention with idempotency UUID |

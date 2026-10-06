@@ -223,14 +223,21 @@ def create_app(config: ServerConfig, service: Service | None = None) -> FastAPI:
 
     @app.get("/api/v1/settings", response_model=Settings, operation_id="settings")
     async def settings() -> Settings:
-        return await runtime.history.settings()
+        result = await runtime.history.settings()
+        return result.model_copy(update={"telegram_configured": runtime.telegram.configured})
 
     @app.put("/api/v1/settings", response_model=Settings, operation_id="update_settings")
     async def update_settings(body: SettingsUpdate) -> Settings:
         result = await runtime.history.settings(body)
+        runtime.alerts.reload = True
         if body.model_fields_set:
             runtime.logs.log("INFO", "settings_saved", "Settings saved.")
-        return result
+        return result.model_copy(update={"telegram_configured": runtime.telegram.configured})
+
+    @app.post("/api/v1/notifications/telegram/test", operation_id="test_telegram")
+    async def test_telegram(body: Empty) -> dict[str, str]:
+        await runtime.alerts.test()
+        return {"status": "sent"}
 
     @app.get("/api/v1/history", response_model=Page, operation_id="history")
     async def history(
