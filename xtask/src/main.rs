@@ -4,6 +4,15 @@ mod svg;
 use std::{env, fs, path::Path};
 
 fn snapshots(output: &Path, check: bool, gallery: bool) -> Result<Vec<&'static str>, String> {
+    snapshots_with_data(output, check, gallery, None)
+}
+
+fn snapshots_with_data(
+    output: &Path,
+    check: bool,
+    gallery: bool,
+    data: Option<&serde_json::Value>,
+) -> Result<Vec<&'static str>, String> {
     // Render and export every scene before touching output or reporting any success.
     let images = scenes::SCENES
         .iter()
@@ -13,10 +22,14 @@ fn snapshots(output: &Path, check: bool, gallery: bool) -> Result<Vec<&'static s
         } else {
             [].iter()
         })
+        .filter(|&&(_, scene, _, _)| data.is_none() || scenes::live_gallery_scene(scene))
         .map(|&(name, scene, width, height)| {
             let (width, height) = if gallery { (98, 31) } else { (width, height) };
-            let buffer =
-                scenes::render(scene, width, height).map_err(|error| format!("{name}: {error}"))?;
+            let buffer = match data {
+                Some(data) => scenes::render_captured(scene, width, height, data),
+                None => scenes::render(scene, width, height),
+            }
+            .map_err(|error| format!("{name}: {error}"))?;
             let svg = svg::export(&buffer).map_err(|error| format!("{name}: {error}"))?;
             Ok((name, svg))
         })
@@ -44,18 +57,21 @@ fn snapshots(output: &Path, check: bool, gallery: bool) -> Result<Vec<&'static s
 
 fn run() -> Result<(), String> {
     let args: Vec<_> = env::args().skip(1).collect();
-    let usage = "Usage: cargo xtask ui-snapshots [--check] [--gallery] [--output PATH]";
+    let usage =
+        "Usage: cargo xtask ui-snapshots [--check] [--gallery] [--output PATH] [--data PATH]";
     if args.first().map(String::as_str) != Some("ui-snapshots") {
         return Err(usage.into());
     }
     let mut check = false;
     let mut gallery = false;
     let mut selected_output = None;
+    let mut selected_data = None;
     let mut remaining = args.iter().skip(1);
     while let Some(flag) = remaining.next() {
         match flag.as_str() {
             "--check" => check = true,
             "--gallery" => gallery = true,
+            "--data" => selected_data = Some(remaining.next().ok_or(usage)?),
             "--output" => selected_output = Some(remaining.next().ok_or(usage)?),
             _ => return Err(usage.into()),
         }
@@ -69,7 +85,28 @@ fn run() -> Result<(), String> {
     let output = selected_output
         .map(std::path::PathBuf::from)
         .unwrap_or_else(|| root.join("artifacts/ui"));
-    let names = snapshots(&output, check, gallery)?;
+    if selected_data.is_some() && !gallery {
+        return Err("Captured data requires --gallery --output PATH.".into());
+    }
+    let data: Option<serde_json::Value> = selected_data
+        .map(|path| {
+            let content = fs::read_to_string(path).map_err(|e| e.to_string())?;
+            serde_json::from_str(&content).map_err(|e| e.to_string())
+        })
+        .transpose()?;
+    let names = if data.is_some() {
+        snapshots_with_data(&output, check, gallery, data.as_ref())?
+    } else {
+        snapshots(&output, check, gallery)?
+    };
+    if gallery && !check {
+        let manifest = serde_json::json!({"width":980,"height":620,"source":if data.is_some(){"daemon telemetry and database history"}else{"synthetic fixtures"},"captured_at":data.as_ref().map(|d| &d["status"]["server_time"]),"screenshots":names});
+        fs::write(
+            output.join("manifest.json"),
+            serde_json::to_string_pretty(&manifest).map_err(|e| e.to_string())?,
+        )
+        .map_err(|e| e.to_string())?;
+    }
     println!(
         "{} {} UI snapshots:",
         if check { "Verified" } else { "Generated" },

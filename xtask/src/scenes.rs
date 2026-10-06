@@ -1,4 +1,4 @@
-//! Fixed data only. Layout and widgets live exclusively in the production TUI crate.
+//! Fixture or read-only captured state; layout lives in the production TUI crate.
 use chrono::{DateTime, Duration as TimeDelta, Utc};
 use mypowers_tui::{
     app::{App, View},
@@ -600,6 +600,112 @@ fn app(scene: Scene) -> Result<App, String> {
     Ok(app)
 }
 
+/// Only views that can truthfully display a captured live state.
+pub fn live_gallery_scene(scene: Scene) -> bool {
+    !matches!(
+        scene,
+        Scene::ChartNearby
+            | Scene::ChartGaps
+            | Scene::ChartIdle
+            | Scene::ChartLowLoad
+            | Scene::ChartOffline
+            | Scene::LowLoad
+            | Scene::Idle
+            | Scene::Reconnecting
+            | Scene::DeviceOffline
+            | Scene::DaemonOffline
+            | Scene::CommandPending
+            | Scene::NotifyState(_)
+            | Scene::DebugState(_)
+    )
+}
+
+pub fn render_captured(
+    scene: Scene,
+    width: u16,
+    height: u16,
+    data: &serde_json::Value,
+) -> Result<Buffer, String> {
+    let mut app = app(scene)?;
+    let status: Status =
+        serde_json::from_value(data["status"].clone()).map_err(|e| e.to_string())?;
+    if !status.valid() {
+        return Err("Invalid captured status".into());
+    }
+    let now = DateTime::parse_from_rfc3339(&status.server_time)
+        .map_err(|e| e.to_string())?
+        .with_timezone(&Utc);
+    let settings: Settings =
+        serde_json::from_value(data["settings"].clone()).map_err(|e| e.to_string())?;
+    if !settings.valid() {
+        return Err("Invalid captured settings".into());
+    }
+    app.clock = Clock::Fixed {
+        now,
+        telemetry_elapsed: Duration::ZERO,
+        animation_elapsed: Duration::from_secs(10),
+        feedback_elapsed: Duration::ZERO,
+    };
+    app.timezone = settings.timezone.parse().ok();
+    app.graph_base_scale_w = settings.graph_base_scale_w;
+    app.graph.resolution = match scene {
+        Scene::Live | Scene::Chart => Resolution::TenSeconds,
+        Scene::LiveMinute | Scene::ChartMinute => Resolution::Minute,
+        Scene::LiveHour | Scene::ChartHour => Resolution::Hour,
+        Scene::ThirtySeconds(_) => Resolution::ThirtySeconds,
+        _ => settings.resolution().ok_or("Invalid graph interval")?,
+    };
+    app.graph.visualization = if matches!(
+        scene,
+        Scene::Live | Scene::LiveMinute | Scene::LiveHour | Scene::ThirtySeconds(false)
+    ) {
+        Visualization::Sparkline
+    } else {
+        Visualization::Chart
+    };
+    app.settings = Some(settings.clone());
+    app.settings_draft = settings;
+    if let Some(picker) = &mut app.settings_picker {
+        picker.selected = picker
+            .field
+            .choices()
+            .iter()
+            .position(|value| *value == app.settings_draft.value(picker.field))
+            .unwrap_or(0);
+    }
+    app.feedback = None;
+    app.warning_count = 0;
+    app.error_count = 0;
+    app.graph.points = serde_json::from_value(
+        data["history"][app.graph.resolution.seconds().to_string()]["items"].clone(),
+    )
+    .map_err(|e| e.to_string())?;
+    let level = app.logs.level;
+    app.logs = mypowers_tui::logs::Logs::new_at(app.timezone, now);
+    app.logs.level = level;
+    if let Some(records) = data["logs"]["items"].as_array() {
+        for record in records {
+            if mypowers_tui::logs::LEVELS
+                .iter()
+                .position(|v| Some(*v) == record["level"].as_str())
+                .is_some_and(|i| i >= level)
+            {
+                app.logs.records.push_back(record.clone());
+            }
+        }
+    }
+    app.status = Some(status);
+    draw_app(app, width, height)
+}
+
+fn draw_app(mut app: App, width: u16, height: u16) -> Result<Buffer, String> {
+    let mut terminal = Terminal::new(TestBackend::new(width, height)).map_err(|e| e.to_string())?;
+    terminal
+        .draw(|frame| ui::draw(frame, &mut app))
+        .map_err(|e| e.to_string())?;
+    Ok(terminal.backend().buffer().clone())
+}
+
 pub fn render(scene: Scene, width: u16, height: u16) -> Result<Buffer, String> {
     let mut app = app(scene)?;
     let mut terminal =
@@ -622,6 +728,36 @@ mod tests {
             .map(|row| row.iter().map(|cell| cell.symbol()).collect::<String>())
             .collect::<Vec<_>>()
             .join("\n")
+    }
+
+    #[test]
+    fn captured_gallery_uses_capture_instead_of_fixture_readings() {
+        let now: DateTime<Utc> = "2026-10-06T09:48:00Z".parse().unwrap();
+        let mut status = fixed_status(now).unwrap();
+        let sample = status.telemetry.sample.as_mut().unwrap();
+        sample.battery_percent = 99;
+        sample.input_power_w = 42;
+        sample.output_power_w = 9;
+        let settings = Settings {
+            graph_interval_seconds: 30,
+            graph_visualization: Visualization::Chart,
+            timezone: "Europe/Warsaw".into(),
+            ..Settings::default()
+        };
+        let data = json!({"status":status,"settings":settings,"history":{"30":{"items":[]}},"logs":{"items":[]}});
+        let buffer = render_captured(Scene::ThirtySeconds(true), 98, 31, &data).unwrap();
+        let content = text(&buffer);
+        assert!(content.contains("99%"));
+        assert!(content.contains("42") && content.contains("9"));
+        assert!(!content.contains("AC ON confirmed"));
+        assert_eq!(
+            svg::export(&buffer).unwrap(),
+            svg::export(&render_captured(Scene::ThirtySeconds(true), 98, 31, &data).unwrap())
+                .unwrap()
+        );
+        assert!(!live_gallery_scene(Scene::ChartLowLoad));
+        assert!(!live_gallery_scene(Scene::NotifyState(NotifyState::Sent)));
+        assert!(live_gallery_scene(Scene::SettingsNotify));
     }
 
     #[test]

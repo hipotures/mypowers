@@ -24,7 +24,24 @@ Gallery mode uses 98x31 terminal cells (980x620 SVG pixels), leaving two columns
 side and one row above and below the 94x29 application. It omits the smaller-terminal
 variants, and adds every settings value picker, contextual help, log filters, 30-second graphs,
 Debug/Pause states and Telegram test outcomes. It requires an explicit output directory to keep
-the canonical regression images unchanged. All data is deterministic and no messages are sent.
+the canonical regression images unchanged. The default gallery uses synthetic deterministic data and sends no messages.
+
+To use real telemetry, settings, application logs and database history:
+
+```sh
+uv run python scripts/capture-ui-data.py /tmp/mypowers-ui-live.json
+cargo xtask ui-snapshots --gallery --data /tmp/mypowers-ui-live.json --output /tmp/scr
+cargo xtask ui-snapshots --gallery --data /tmp/mypowers-ui-live.json --output /tmp/scr --check
+```
+
+Capture uses only GET requests and existing client configuration from `.env`.
+The JSON contains no client credentials. Capture it once and reuse the same file
+for reproducible comparisons. Real galleries use Chart behind overlays and actual
+settings, timezone and logs. Explicit `dashboard-live*` images retain Sparkline.
+Simulated offline, pending-command and Telegram delivery outcomes are omitted.
+`manifest.json` identifies the data source, capture time and uniform image size.
+Use an empty output directory when changing modes so old fixture images are not
+mistaken for real captures. Live capture is separate from offline regression checks.
 
 To verify the current renderer against the saved images without overwriting them:
 
