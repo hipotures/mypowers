@@ -20,6 +20,7 @@ const STREAM_MESSAGE_LIMIT: usize = 32 * 1024;
 
 #[derive(Clone, Copy, PartialEq)]
 pub enum ClipboardTarget {
+    Settings,
     Snapshot,
     Logs,
 }

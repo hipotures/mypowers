@@ -146,6 +146,15 @@ fn run() -> Result<(), String> {
                             app.update(Event::Copied(false, ClipboardTarget::Snapshot));
                         }
                     }
+                    Effect::CopySettings => {
+                        let json = serde_json::to_string_pretty(&app.settings_clipboard_json())
+                            .map_err(io::Error::other)?;
+                        runtime.spawn(clipboard::copy(
+                            json,
+                            ClipboardTarget::Settings,
+                            events.clone(),
+                        ));
+                    }
                     Effect::CopyLogs => {
                         let text = app.logs.clipboard_text();
                         let events = events.clone();

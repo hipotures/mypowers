@@ -106,6 +106,7 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
     app.title = Rect::default();
     app.quit_buttons = [Rect::default(); 2];
     app.settings_tabs = [Rect::default(); 5];
+    app.settings_title = Rect::default();
     app.settings_fields.clear();
     app.settings_segments.clear();
     app.settings_choices.clear();
@@ -184,6 +185,9 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
             dim_background(frame, &palette);
             app.controls = [Rect::default(); 3];
             let modal = centered(area, area.width - 4, area.height - 4);
+            if app.view == View::Settings && app.settings_picker.is_none() {
+                app.settings_title = Rect::new(modal.x + (modal.width - 10) / 2 + 1, modal.y, 8, 1);
+            }
             frame.render_widget(Clear, modal);
             let theme = app.client_preferences.theme();
             let block = panel(

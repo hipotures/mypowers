@@ -93,6 +93,7 @@ uv run mypowers tui
 | Change a setting | Autosave on the server after 5 seconds without another change; closing Settings saves immediately |
 | Send test message in Notify | Ask the server to send a Telegram test; does not change alert cooldown |
 | Double-click MYPOWERS | Copy current rendered API snapshot to the local terminal clipboard (OSC 52 over SSH) |
+| Double-click SETTINGS title | Copy displayed settings JSON, unsaved-change flag and local theme/color/keybinding preferences |
 | Double-click LOGS title | Copy every currently loaded log record, including rows outside the viewport |
 
 Only q, Ctrl-Q, and Esc are global. Other shortcuts belong to the active view;

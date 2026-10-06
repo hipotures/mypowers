@@ -40,6 +40,7 @@ pub struct App {
     pub pending: Option<String>,
     pub settings_tab: SettingsTab,
     pub settings_tabs: [Rect; 5],
+    pub settings_title: Rect,
     pub settings: Option<Settings>,
     pub settings_draft: Settings,
     pub settings_selected: usize,
@@ -79,6 +80,7 @@ pub enum Effect {
     Quit,
     Copy,
     CopyLogs,
+    CopySettings,
     Request(Intent),
     Logs(crate::logs::Request),
 }
@@ -111,6 +113,7 @@ impl App {
             pending: None,
             settings_tab: SettingsTab::default(),
             settings_tabs: [Rect::default(); 5],
+            settings_title: Rect::default(),
             settings: None,
             settings_draft: Settings::default(),
             settings_selected: 0,
@@ -291,6 +294,7 @@ impl App {
                     match (success, target) {
                         (true, ClipboardTarget::Logs) => "Logs copied",
                         (true, ClipboardTarget::Snapshot) => "JSON copied",
+                        (true, ClipboardTarget::Settings) => "Settings JSON copied",
                         (false, _) => "Copy failed; check clipboard access",
                     },
                     if success {
@@ -764,6 +768,19 @@ impl App {
         Effect::None
     }
 
+    pub fn settings_clipboard_json(&self) -> serde_json::Value {
+        serde_json::json!({
+            "schema_version": 1,
+            "settings": self.settings.as_ref().map(|_| &self.settings_draft),
+            "unsaved_changes": self.settings_dirty(),
+            "client": {
+                "theme": self.client_preferences.theme,
+                "colors": self.client_preferences.colors,
+                "keybindings": self.client_preferences.keybindings,
+            },
+        })
+    }
+
     pub fn settings_dirty(&self) -> bool {
         self.settings
             .as_ref()
@@ -956,6 +973,7 @@ impl App {
         self.title = Rect::default();
         self.quit_buttons = [Rect::default(); 2];
         self.settings_tabs = [Rect::default(); 5];
+        self.settings_title = Rect::default();
         self.settings_fields.clear();
         self.settings_segments.clear();
         self.settings_choices.clear();
@@ -993,6 +1011,24 @@ impl App {
         }
         if self.view == View::Settings {
             let position = Position::new(mouse.column, mouse.row);
+            if mouse.kind == MouseEventKind::Down(MouseButton::Left)
+                && self.settings_picker.is_none()
+            {
+                let previous = self.title_click.take();
+                if self.settings_title.contains(position) {
+                    if let Some((time, old)) = previous
+                        && time.elapsed() <= Duration::from_millis(400)
+                        && old.y == position.y
+                        && old.x.abs_diff(position.x) <= 1
+                    {
+                        return Effect::CopySettings;
+                    }
+                    self.title_click = Some((Instant::now(), position));
+                }
+            } else if matches!(mouse.kind, MouseEventKind::Down(_)) {
+                self.title_click = None;
+            }
+
             if let Some(picker) = &mut self.settings_picker {
                 if mouse.kind == MouseEventKind::Down(MouseButton::Left)
                     && let Some((_, index)) = self

@@ -3464,3 +3464,44 @@ fn footer_hotkeys_use_foreground_in_each_menu_without_the_theme_accent() {
         }
     }
 }
+
+#[test]
+fn settings_title_double_click_copies_displayed_settings_without_saving() {
+    let mut app = app();
+    app.update(Event::Settings(Settings::default()));
+    app.view = View::Settings;
+    app.client_preferences.theme = "Nord".into();
+    app.settings_draft.battery_alert.threshold_percent = 22;
+    for (width, height) in [(60, 19), (120, 30)] {
+        app.resize();
+        render(&mut app, width, height);
+        let rect = app.settings_title;
+        assert_eq!(rect.width, 8);
+        let click = MouseEvent {
+            kind: MouseEventKind::Down(MouseButton::Left),
+            column: rect.x + 2,
+            row: rect.y,
+            modifiers: KeyModifiers::NONE,
+        };
+        assert!(matches!(app.mouse(click), Effect::None));
+        assert!(matches!(app.mouse(click), Effect::CopySettings));
+        assert!(app.pending.is_none());
+        let copied = app.settings_clipboard_json();
+        assert_eq!(copied["settings"]["battery_alert"]["threshold_percent"], 22);
+        assert_eq!(copied["client"]["theme"], "Nord");
+        assert_eq!(copied["unsaved_changes"], true);
+        app.mouse(click);
+        app.resize();
+        render(&mut app, width, height);
+        assert!(matches!(app.mouse(click), Effect::None));
+    }
+    app.settings = None;
+    assert!(app.settings_clipboard_json()["settings"].is_null());
+    app.settings_picker = Some(crate::settings::Picker {
+        field: crate::settings::Field::Theme,
+        selected: 0,
+        query: String::new(),
+    });
+    render(&mut app, 120, 30);
+    assert_eq!(app.settings_title, ratatui::layout::Rect::default());
+}
