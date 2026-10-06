@@ -1307,7 +1307,11 @@ fn settings(frame: &mut Frame, area: Rect, app: &mut App) {
             1,
         ));
         for (index, label) in labels.into_iter().enumerate() {
-            app.settings_actions[index] = buttons[index];
+            let button = Rect {
+                width: buttons[index].width.min(label.len() as u16),
+                ..buttons[index]
+            };
+            app.settings_actions[index] = button;
             frame.render_widget(
                 Paragraph::new(label).style(
                     Style::default()
@@ -1322,7 +1326,7 @@ fn settings(frame: &mut Frame, area: Rect, app: &mut App) {
                             BACKGROUND
                         }),
                 ),
-                buttons[index],
+                button,
             );
         }
     }

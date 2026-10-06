@@ -2449,6 +2449,7 @@ fn settings_and_help_are_bounded_modal_overlays_with_inactive_dashboard_hitboxes
         assert!(screen.contains("https://mypowers.lxc.efez.net"));
         assert!(screen.contains("A8:3B:76:E6:D4:A0") && screen.contains("Runtime logging"));
         assert!(app.settings_actions.iter().all(|rect| !rect.is_empty()));
+        assert_eq!(app.settings_actions.map(|rect| rect.width), [9, 9, 13]);
         let buttons_y = app.settings_actions[0].y;
         assert!(app.settings_actions.iter().all(|rect| rect.y == buttons_y));
         assert_eq!(buttons_y, height - 5);
