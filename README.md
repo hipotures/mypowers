@@ -5,7 +5,7 @@ MyPowers connects over Bluetooth, records telemetry in SQLite and sends low-batt
 notifications through Telegram. Its terminal dashboard displays battery charge,
 estimated remaining time and input/output power history.
 
-![MyPowers dashboard with a 30-second power chart](docs/screenshots/dashboard-chart-30s.svg)
+![MyPowers dashboard with hourly power history](docs/screenshots/dashboard-chart-1h.png)
 
 A Python daemon owns the Bluetooth connection and runs collection and alerts continuously.
 The Rust/Ratatui TUI and native Rust CLI connect through an HTTP/WebSocket API, locally or remotely.
