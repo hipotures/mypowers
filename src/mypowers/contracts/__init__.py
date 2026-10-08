@@ -59,6 +59,13 @@ class BatteryAlert(DTO):
         return self
 
 
+class ConnectionAlert(DTO):
+    enabled: StrictBool = True
+    outage_seconds: int = Field(default=60, strict=True, ge=1, le=86400)
+    recovery_seconds: int = Field(default=15, strict=True, ge=1, le=3600)
+    min_notification_interval_minutes: int = Field(default=10, strict=True, ge=0, le=1440)
+
+
 class Preferences(DTO):
     graph_interval_seconds: Literal[10, 30, 60, 3600] = 10
     graph_visualization: Literal["sparkline", "chart"] = "sparkline"
@@ -66,6 +73,7 @@ class Preferences(DTO):
     timezone: str = Field(default="system", max_length=128)
     logs_page_size: Literal[50, 100, 250, 500, 1000] = 100
     battery_alert: BatteryAlert = Field(default_factory=BatteryAlert)
+    connection_alert: ConnectionAlert = Field(default_factory=ConnectionAlert)
 
     @field_validator(
         "graph_interval_seconds", "graph_base_scale_w", "logs_page_size", mode="before"

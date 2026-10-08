@@ -582,6 +582,7 @@ pub const SCENES: &[(&str, Scene, u16, u16)] = &[
         30,
     ),
     ("settings-alerts.svg", Scene::SettingsAlerts, 120, 30),
+    ("settings-alerts-60x19.svg", Scene::SettingsAlerts, 60, 19),
     ("settings-notify.svg", Scene::SettingsNotify, 120, 30),
     ("settings-debug.svg", Scene::SettingsDebug, 120, 30),
     ("settings-debug-60x19.svg", Scene::SettingsDebug, 60, 19),

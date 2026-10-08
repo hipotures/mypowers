@@ -19,6 +19,7 @@ import aiosqlite
 from mypowers.contracts import (
     AppError,
     BatteryAlert,
+    ConnectionAlert,
     HistoryAggregates,
     HistoryBucket,
     Page,
@@ -32,6 +33,10 @@ from mypowers.storage.schema import AGGREGATES, INSERT_STATE, SCHEMA, STATE_FIEL
 SETTINGS_SCHEMA = """
 CREATE TABLE IF NOT EXISTS settings (
  key TEXT PRIMARY KEY, value_json TEXT NOT NULL
+) STRICT;
+CREATE TABLE IF NOT EXISTS connection_alert_state (
+ device_address TEXT PRIMARY KEY,
+ state_json TEXT NOT NULL
 ) STRICT;
 CREATE TABLE IF NOT EXISTS battery_alert_state (
  device_address TEXT PRIMARY KEY,
@@ -74,8 +79,10 @@ class HistoryStore:
         enabled: bool,
         interval: float,
         battery_alert: BatteryAlert | None = None,
+        connection_alert: ConnectionAlert | None = None,
     ):
         self.battery_alert_defaults = battery_alert or BatteryAlert()
+        self.connection_alert_defaults = connection_alert or ConnectionAlert()
         self.core, self.path, self.enabled, self.interval = (
             core,
             directory / "mypowers.db",
@@ -480,6 +487,18 @@ class HistoryStore:
                                     "Recovery threshold must not exceed 100%.",
                                     422,
                                 ) from None
+                        if "connection_alert" in values:
+                            async with self.db.execute(
+                                "SELECT value_json FROM settings WHERE key='connection_alert'"
+                            ) as cursor:
+                                previous = await cursor.fetchone()
+                            merged = self.connection_alert_defaults.model_dump()
+                            if previous:
+                                merged.update(json.loads(previous[0]))
+                            merged.update(values["connection_alert"])
+                            values["connection_alert"] = ConnectionAlert.model_validate(
+                                merged
+                            ).model_dump()
                         try:
                             await self.db.executemany(
                                 "INSERT INTO settings(key,value_json) VALUES (?,?) "
@@ -494,7 +513,10 @@ class HistoryStore:
                         rows = await cursor.fetchall()
                     fields = SettingsUpdate.model_fields.keys()
                     return Settings.model_validate(
-                        {"battery_alert": self.battery_alert_defaults.model_dump()}
+                        {
+                            "battery_alert": self.battery_alert_defaults.model_dump(),
+                            "connection_alert": self.connection_alert_defaults.model_dump(),
+                        }
                         | {key: json.loads(value) for key, value in rows if key in fields}
                     )
         except (TimeoutError, sqlite3.Error, ValueError):
@@ -503,13 +525,25 @@ class HistoryStore:
             ) from None
 
     async def alert_state(self, value: dict[str, Any] | None = None) -> dict[str, Any] | None:
+        return await self._alert_state("battery_alert_state", value)
+
+    async def connection_alert_state(
+        self, value: dict[str, Any] | None = None
+    ) -> dict[str, Any] | None:
+        return await self._alert_state("connection_alert_state", value)
+
+    async def _alert_state(
+        self,
+        table: Literal["battery_alert_state", "connection_alert_state"],
+        value: dict[str, Any] | None,
+    ) -> dict[str, Any] | None:
         async with self.lock:
             if self.db is None:
                 raise AppError("settings_unavailable", "Alert storage is unavailable.", 503)
             if value is not None:
                 try:
                     await self.db.execute(
-                        "INSERT INTO battery_alert_state VALUES (?,?) "
+                        f"INSERT INTO {table} VALUES (?,?) "
                         "ON CONFLICT(device_address) DO UPDATE SET state_json=excluded.state_json",
                         (self.core.address, json.dumps(value)),
                     )
@@ -518,7 +552,7 @@ class HistoryStore:
                     await self.db.rollback()
                     raise
             async with self.db.execute(
-                "SELECT state_json FROM battery_alert_state WHERE device_address=?",
+                f"SELECT state_json FROM {table} WHERE device_address=?",
                 (self.core.address,),
             ) as cursor:
                 row = await cursor.fetchone()

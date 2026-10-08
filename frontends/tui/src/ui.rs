@@ -184,7 +184,13 @@ pub fn draw(frame: &mut Frame, app: &mut App) {
             dashboard(frame, content, app);
             dim_background(frame, &palette);
             app.controls = [Rect::default(); 3];
-            let modal = centered(area, area.width - 4, area.height - 4);
+            let modal_height =
+                if app.view == View::Settings && app.settings_tab == SettingsTab::Alerts {
+                    (area.height - 4).max(18).min(area.height)
+                } else {
+                    area.height - 4
+                };
+            let modal = centered(area, area.width - 4, modal_height);
             if app.view == View::Settings && app.settings_picker.is_none() {
                 app.settings_title = Rect::new(modal.x + (modal.width - 10) / 2 + 1, modal.y, 8, 1);
             }
@@ -1248,6 +1254,11 @@ fn settings(frame: &mut Frame, area: Rect, app: &mut App) {
                 "Preferences"
             })];
             for (index, field) in fields.iter().enumerate() {
+                if *field == Field::ConnectionEnabled {
+                    lines.push(Line::default());
+                    lines.push(heading("Bluetooth connection"));
+                }
+                let field_y = rows[2].y + lines.len() as u16;
                 let available = *field == Field::Theme || app.settings.is_some();
                 let value = if field.is_segmented() {
                     String::new()
@@ -1272,10 +1283,8 @@ fn settings(frame: &mut Frame, area: Rect, app: &mut App) {
                         theme.background
                     },
                 ));
-                app.settings_fields.push((
-                    Rect::new(rows[2].x, rows[2].y + index as u16 + 1, rows[2].width, 1),
-                    *field,
-                ));
+                app.settings_fields
+                    .push((Rect::new(rows[2].x, field_y, rows[2].width, 1), *field));
                 lines.push(line);
             }
             lines.push(Line::default());
@@ -1444,7 +1453,7 @@ fn settings(frame: &mut Frame, area: Rect, app: &mut App) {
                 frame.render_widget(Paragraph::new("]"), Rect::new(x, rect.y, 1, 1));
             }
         } else {
-            let mut line = lines[index + 1].clone();
+            let mut line = lines[usize::from(rect.y - rows[2].y)].clone();
             line.style.bg = None;
             let items = [ratatui::text::Text::from(line)];
             frame.render_widget(

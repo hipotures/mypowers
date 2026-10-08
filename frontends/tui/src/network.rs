@@ -253,7 +253,7 @@ impl Api {
                     .request(
                         reqwest::Method::PUT,
                         "/settings",
-                        Some(json!({"graph_interval_seconds": draft.graph_interval_seconds, "graph_visualization": draft.graph_visualization, "graph_base_scale_w": draft.graph_base_scale_w, "timezone": draft.timezone, "logs_page_size": draft.logs_page_size, "battery_alert": draft.battery_alert})),
+                        Some(json!({"graph_interval_seconds": draft.graph_interval_seconds, "graph_visualization": draft.graph_visualization, "graph_base_scale_w": draft.graph_base_scale_w, "timezone": draft.timezone, "logs_page_size": draft.logs_page_size, "battery_alert": draft.battery_alert, "connection_alert": draft.connection_alert})),
                         None,
                     )
                     .await

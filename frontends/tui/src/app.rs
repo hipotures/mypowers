@@ -658,7 +658,7 @@ impl App {
             SettingsTab::Preferences => 3,
             SettingsTab::Charts => 3,
             SettingsTab::Debug => 3,
-            SettingsTab::Alerts => 4,
+            SettingsTab::Alerts => Field::ALERTS.len(),
             SettingsTab::Notify => 1,
         }
     }

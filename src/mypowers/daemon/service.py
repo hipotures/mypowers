@@ -8,7 +8,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
-from mypowers.alerts import BatteryAlerts, Telegram
+from mypowers.alerts import BatteryAlerts, ConnectionAlerts, Telegram
 from mypowers.bluetooth.simulated import SimulatedTransport
 from mypowers.bluetooth.supervisor import Supervisor
 from mypowers.bluetooth.transport import BleakTransport, Transport
@@ -78,9 +78,11 @@ class Service:
             config.history.enabled,
             config.history.interval_seconds,
             config.battery_alert,
+            config.connection_alert,
         )
         self.telegram = Telegram(config.telegram_bot_token, config.telegram_chat_id)
         self.alerts = BatteryAlerts(self.core, self.history, self.telegram)
+        self.connection_alerts = ConnectionAlerts(self.core, self.history, self.telegram)
         selected: Callable[[], Transport] = factory or (
             SimulatedTransport if config.backend == "simulated" else lambda: BleakTransport(config)
         )
@@ -102,6 +104,7 @@ class Service:
                 asyncio.create_task(self.history.run(), name="history-writer"),
                 asyncio.create_task(self.monitor(), name="health-monitor"),
                 asyncio.create_task(self.alerts.run(), name="battery-alerts"),
+                asyncio.create_task(self.connection_alerts.run(), name="connection-alerts"),
             ]
             for task in self.tasks:
                 task.add_done_callback(self.task_done)

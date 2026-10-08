@@ -230,6 +230,7 @@ def create_app(config: ServerConfig, service: Service | None = None) -> FastAPI:
     async def update_settings(body: SettingsUpdate) -> Settings:
         result = await runtime.history.settings(body)
         runtime.alerts.reload = True
+        runtime.connection_alerts.reload = True
         if body.model_fields_set:
             runtime.logs.log("INFO", "settings_saved", "Settings saved.")
         return result.model_copy(update={"telegram_configured": runtime.telegram.configured})

@@ -199,3 +199,207 @@ class BatteryAlerts:
             self.core.log("ERROR", "notification_test_failed", "Telegram test notification failed.")
             raise
         self.core.log("INFO", "notification_test", "Telegram test notification sent.")
+
+
+class ConnectionAlertState(AlertState):
+    unavailable_since: float | None = Field(default=None, ge=0)
+    last_sample_at: str | None = None
+    reason_code: str | None = None
+
+
+class ConnectionAlerts(BatteryAlerts):
+    """Durable outage/recovery episodes; fresh data must survive recovery hysteresis."""
+
+    state: ConnectionAlertState
+
+    def __init__(
+        self,
+        core: Core,
+        store: HistoryStore,
+        telegram: Telegram,
+        send: Callable[[str], Awaitable[None]] | None = None,
+    ):
+        super().__init__(core, store, telegram, send)
+        self.state = ConnectionAlertState()
+        self.connection_rule = store.connection_alert_defaults
+        # A process restart must observe recovery again, not trust an old timer.
+        self.live_since: float | None = None
+        self.live_segment: str | None = None
+
+    async def save(self) -> None:
+        self.dirty = True
+        await self.store.connection_alert_state(self.state.model_dump())
+        self.dirty = False
+
+    async def evaluate_connection(self) -> bool:
+        if self.reload:
+            self.connection_rule = (await self.store.settings()).connection_alert
+            self.reload = False
+        before = self.state.model_dump()
+        if not self.connection_rule.enabled:
+            self.state = ConnectionAlertState(
+                last_notification=self.state.last_notification, last_attempt=self.state.last_attempt
+            )
+            self.live_since = None
+            active = False
+        elif self.core.connection.desired == "paused" or self.core.closing:
+            if self.state.notified == "NORMAL":
+                self.state.state = "NORMAL"
+            self.state.unavailable_since = None
+            self.live_since = None
+            active = False
+        elif self.core.telemetry_state() == "live":
+            assert self.core.latest is not None
+            segment = self.core.latest.sample.segment_id
+            if self.live_since is None or self.live_segment != segment:
+                self.live_since = self.core.clock.monotonic()
+            self.live_segment = segment
+            # An outage shorter than the alarm threshold is not an episode.
+            if self.state.state == "NORMAL" and self.state.notified == "NORMAL":
+                self.state.unavailable_since = None
+            elif (
+                self.core.clock.monotonic() - self.live_since
+                >= self.connection_rule.recovery_seconds
+            ):
+                self.state.state = "NORMAL"
+                self.state.unavailable_since = None
+            active = True
+        else:
+            self.live_since = None
+            now = self.core.clock.time()
+            reason = self.core.connection.reason_code
+            if reason:
+                self.state.reason_code = reason
+            if self.core.latest:
+                self.state.last_sample_at = self.core.latest.sample.received_at
+            if self.state.unavailable_since is None:
+                self.state.unavailable_since = now
+            if now - self.state.unavailable_since >= self.connection_rule.outage_seconds:
+                self.state.state = "ALERT"
+            active = True
+        if before != self.state.model_dump():
+            await self.save()
+            if before["state"] != self.state.state:
+                self.core.log(
+                    "WARNING" if self.state.state == "ALERT" else "INFO",
+                    "connection_alert" if self.state.state == "ALERT" else "connection_recovered",
+                    "Bluetooth data unavailable."
+                    if self.state.state == "ALERT"
+                    else "Fresh Bluetooth data recovered.",
+                )
+        return active
+
+    async def step(self) -> None:
+        if self.delivery is not None and self.delivery.done():
+            delivery, self.delivery = self.delivery, None
+            delivery.result()
+        if self.store.db is None:
+            return
+        async with self.state_lock:
+            if not self.loaded:
+                saved = await self.store.connection_alert_state()
+                self.state = ConnectionAlertState.model_validate(saved or {})
+                self.loaded = True
+            if self.dirty:
+                await self.save()
+            if not await self.evaluate_connection():
+                return
+            # Recovery is eligible only after uninterrupted live telemetry.
+            if (
+                self.state.state == "NORMAL"
+                and self.state.notified == "ALERT"
+                and (
+                    self.live_since is None
+                    or self.core.clock.monotonic() - self.live_since
+                    < self.connection_rule.recovery_seconds
+                )
+            ):
+                return
+            if self.state.state == self.state.notified or not self.telegram.configured:
+                return
+            if self.delivery is not None and not self.delivery.done():
+                return
+            now = self.core.clock.time()
+            cooldown = self.connection_rule.min_notification_interval_minutes * 60
+            if (
+                self.state.last_notification is not None
+                and now < self.state.last_notification + cooldown
+            ):
+                return
+            if (
+                self.state.last_attempt is not None
+                and (
+                    self.state.last_notification is None
+                    or self.state.last_attempt > self.state.last_notification
+                )
+                and now < self.state.last_attempt + max(30, cooldown)
+            ):
+                return
+            previous_attempt = self.state.last_attempt
+            self.state.last_attempt = now
+            await self.save()
+            self.delivery = asyncio.create_task(self.deliver(self.state.state, previous_attempt))
+
+    def outage_reason(self) -> str:
+        phase = (
+            self.core.connection.reason_code or self.state.reason_code or self.core.connection.phase
+        )
+        reasons = {
+            "adapter_missing": "Bluetooth controller missing.",
+            "adapter_off": "Bluetooth controller powered off.",
+            "adapter_blocked": "Bluetooth controller blocked.",
+            "adapter_not_ready": "Bluetooth controller not ready.",
+            "bluez_unavailable": "Bluetooth service unavailable.",
+            "system_bus_unavailable": "Bluetooth system bus unavailable.",
+            "permission_denied": "Bluetooth access denied.",
+            "station_not_found": (
+                "S300 not detected (station Bluetooth/power, range or another client)."
+            ),
+            "connection_failed": "S300 Bluetooth connection setup failed.",
+            "connection_lost": "S300 Bluetooth link lost.",
+        }
+        return reasons.get(phase, "Fresh S300 telemetry unavailable.")
+
+    async def deliver(
+        self, target: Literal["NORMAL", "ALERT"], previous_attempt: float | None
+    ) -> None:
+        async with self.state_lock:
+            active = await self.evaluate_connection()
+            eligible = active and self.state.state == target and self.state.notified != target
+            if target == "ALERT":
+                eligible = eligible and self.core.telemetry_state() != "live"
+            else:
+                eligible = (
+                    eligible
+                    and self.live_since is not None
+                    and (
+                        self.core.clock.monotonic() - self.live_since
+                        >= self.connection_rule.recovery_seconds
+                    )
+                )
+            if not eligible:
+                self.state.last_attempt = previous_attempt
+                await self.save()
+                return
+            if target == "ALERT":
+                last = self.state.last_sample_at or "no sample received"
+                text = (
+                    f"MyPowers: Bluetooth connection alert. {self.outage_reason()} "
+                    f"Last data: {last}."
+                )
+            else:
+                text = "MyPowers: Bluetooth connection recovered; fresh S300 telemetry is stable."
+        try:
+            await self.send(text)
+        except Exception:
+            self.core.log(
+                "ERROR",
+                "connection_notification_failed",
+                "Telegram connection alert delivery failed; latest state retained.",
+            )
+            return
+        async with self.state_lock:
+            self.state.notified = target
+            self.state.last_notification = self.core.clock.time()
+            await self.save()
+        self.core.log("INFO", "connection_notification_sent", text, connector="telegram")

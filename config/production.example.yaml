@@ -18,6 +18,11 @@ battery_alert:
   threshold_percent: 20
   hysteresis_percent: 5
   min_notification_interval_minutes: 10
+connection_alert:
+  enabled: true
+  outage_seconds: 60
+  recovery_seconds: 15
+  min_notification_interval_minutes: 10
 logging:
   level: INFO
   max_file_bytes: 10485760

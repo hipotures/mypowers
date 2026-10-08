@@ -3505,3 +3505,40 @@ fn settings_title_double_click_copies_displayed_settings_without_saving() {
     render(&mut app, 120, 30);
     assert_eq!(app.settings_title, ratatui::layout::Rect::default());
 }
+
+#[test]
+fn bluetooth_alert_section_is_separate_visible_and_autosaved() {
+    for (width, height) in [(60, 19), (120, 30)] {
+        let mut app = app();
+        app.update(Event::Settings(Settings::default()));
+        app.view = View::Settings;
+        app.settings_tab = SettingsTab::Alerts;
+        app.settings_selected = 4;
+        let screen = text(&render(&mut app, width, height));
+        for label in [
+            "Battery alerts",
+            "Bluetooth connection",
+            "Connection alert",
+            "En",
+            "Dis",
+            "Alert after",
+            "60 s",
+            "Stable recovery",
+            "15 s",
+        ] {
+            assert!(
+                screen.contains(label),
+                "Missing {label} at {width}x{height}: {screen}"
+            );
+        }
+        assert!(screen.find("Bluetooth connection").unwrap() > screen.find("Hysteresis").unwrap());
+        let original_battery = app.settings_draft.battery_alert.clone();
+        app.key(KeyEvent::new(KeyCode::Right, KeyModifiers::NONE));
+        assert!(!app.settings_draft.connection_alert.enabled);
+        assert_eq!(app.settings_draft.battery_alert, original_battery);
+        assert!(matches!(
+            app.key(KeyEvent::new(KeyCode::Esc, KeyModifiers::NONE)),
+            Effect::Request(Intent::SaveSettings(_))
+        ));
+    }
+}

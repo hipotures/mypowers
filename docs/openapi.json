@@ -2204,6 +2204,39 @@
         ],
         "title": "Connection"
       },
+      "ConnectionAlert": {
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled",
+            "default": true
+          },
+          "outage_seconds": {
+            "type": "integer",
+            "maximum": 86400.0,
+            "minimum": 1.0,
+            "title": "Outage Seconds",
+            "default": 60
+          },
+          "recovery_seconds": {
+            "type": "integer",
+            "maximum": 3600.0,
+            "minimum": 1.0,
+            "title": "Recovery Seconds",
+            "default": 15
+          },
+          "min_notification_interval_minutes": {
+            "type": "integer",
+            "maximum": 1440.0,
+            "minimum": 0.0,
+            "title": "Min Notification Interval Minutes",
+            "default": 10
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "ConnectionAlert"
+      },
       "ConnectionRequest": {
         "properties": {
           "desired": {
@@ -2733,6 +2766,9 @@
           "battery_alert": {
             "$ref": "#/components/schemas/BatteryAlert"
           },
+          "connection_alert": {
+            "$ref": "#/components/schemas/ConnectionAlert"
+          },
           "schema_version": {
             "type": "integer",
             "const": 1,
@@ -2800,6 +2836,9 @@
           },
           "battery_alert": {
             "$ref": "#/components/schemas/BatteryAlert"
+          },
+          "connection_alert": {
+            "$ref": "#/components/schemas/ConnectionAlert"
           }
         },
         "additionalProperties": false,

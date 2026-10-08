@@ -10,7 +10,7 @@ import yaml
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
 
 from mypowers.config import base_url, environment, token
-from mypowers.contracts import BatteryAlert, Level
+from mypowers.contracts import BatteryAlert, ConnectionAlert, Level
 from mypowers.protocol import PROFILE, STATION_ADDRESS, STATION_NAME
 
 
@@ -73,6 +73,7 @@ class ServerConfig(Settings):
     bluetooth: Bluetooth = Field(default_factory=Bluetooth)
     history: History = Field(default_factory=History)
     battery_alert: BatteryAlert = Field(default_factory=BatteryAlert)
+    connection_alert: ConnectionAlert = Field(default_factory=ConnectionAlert)
     logging: Logging = Field(default_factory=Logging)
     api: API = Field(default_factory=API)
     environment: Literal["development", "production"] = "development"

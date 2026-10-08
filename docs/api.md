@@ -168,3 +168,9 @@ draft. Explicit TUI timezone flags override the saved timezone at startup.
 Dashboard graph shortcuts change only that session. Debug connection controls
 and the runtime log override are actions, separate from persisted preferences.
 Connector credentials must not be added to this client-visible document.
+
+`connection_alert` is an independent nested rule: `enabled` (strict boolean),
+`outage_seconds` (integer 1–86400), `recovery_seconds` (integer 1–3600), and
+`min_notification_interval_minutes` (integer 0–1440). A partial nested update
+preserves the other saved fields, e.g. `{"connection_alert":{"enabled":false}}`.
+Both alert rules and `telegram_configured` are included in the settings response.

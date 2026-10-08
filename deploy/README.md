@@ -147,11 +147,9 @@ tail -n 50 /var/log/mypowers/daemon-console.log
 tail -n 50 /var/log/mypowers/caddy.log
 ```
 
-For an update, install a new bundle, then restart only the daemon:
-
-```sh
-supervisorctl -c /etc/mypowers/supervisord.conf restart mypowers
-```
+For updates, use `scripts/deploy-lxc.py` or the bundle's `update.py` as described
+in **Updating an existing LXC from development** below. It restarts only the daemon
+and verifies the new process before declaring success.
 
 Older release directories are retained. To roll back the code, point
 `/opt/mypowers/current` to the previous release printed by the installer, then
@@ -393,3 +391,46 @@ to stage `database-before-history-import.db` for the active database, check
 integrity and schema, then atomically replace it after releasing all connections
 and handling its WAL/shm sidecars. Restore service ownership before starting
 MyPowers. This deliberately discards telemetry recorded after the import.
+
+## Updating an existing LXC from development
+
+From a clean, committed checkout on the development VM:
+
+```bash
+uv run python scripts/deploy-lxc.py
+# A different SSH host/user:
+uv run python scripts/deploy-lxc.py --target root@192.168.100.222
+```
+
+SSH authentication is required; an existing terminal's SSH login does not give
+another process those credentials. The script builds the locked Alpine/Python 3.14
+bundle, uploads it into a private temporary directory, then runs `update.py`.
+It installs a separate release without changing Caddy, Supervisor configuration,
+server.env, tokens or the boot script. It takes a consistent SQLite backup into
+`database-before-update.db` in the new release (root-only, mode 0600), validates
+configuration, switches `current` atomically, and restarts only `mypowers`.
+An authenticated API check requires a healthy daemon and a new server instance.
+A restart/health failure switches back to the previous code and checks it again.
+BLE acquisition can still be pending after a successful code deployment.
+
+When SSH is available only in an already-open terminal, build without deploying:
+
+```bash
+uv run python scripts/deploy-lxc.py --build-only
+```
+
+Transfer the printed archive to the LXC, extract it in a private directory, then:
+
+```sh
+python3 mypowers-install/update.py
+```
+
+Unlike the initial `install.py`, `update.py` does not install OS packages or
+rewrite infrastructure configuration. On an uncertain SSH result, inspect
+Supervisor status and `/opt/mypowers/current/manifest.json` before retrying.
+Failed deployments retain their upload and release for diagnosis.
+
+The connection-alert migration is additive and automatic: the old code can run
+with the extra table present. Rollback restores code, not the database; future
+incompatible database migrations need their own rollback procedure. Keep the
+SQLite backup until the deployment has been validated.

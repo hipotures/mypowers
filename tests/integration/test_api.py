@@ -494,6 +494,7 @@ def test_settings_api_validates_partial_updates_and_persists_across_restart(conf
         )
         preferences = {
             "battery_alert": Settings().battery_alert.model_dump(),
+            "connection_alert": Settings().connection_alert.model_dump(),
             "graph_interval_seconds": 30,
             "graph_visualization": "chart",
             "graph_base_scale_w": 300,
@@ -543,3 +544,44 @@ def test_settings_api_validates_partial_updates_and_persists_across_restart(conf
             "schema_version": 1,
             "telegram_configured": False,
         }
+
+
+def test_connection_alert_settings_save_reload_and_reject_invalid(config):
+    with TestClient(create_app(config)) as client:
+        for _ in range(100):
+            initial = client.get("/api/v1/settings")
+            if initial.status_code == 200:
+                break
+            time.sleep(0.02)
+        before = initial.json()
+        response = client.put(
+            "/api/v1/settings",
+            json={
+                "connection_alert": {
+                    "outage_seconds": 90,
+                    "recovery_seconds": 20,
+                    "min_notification_interval_minutes": 3,
+                }
+            },
+        )
+        assert response.status_code == 200
+        assert response.json()["battery_alert"] == before["battery_alert"]
+        disabled = client.put("/api/v1/settings", json={"connection_alert": {"enabled": False}})
+        assert disabled.json()["connection_alert"] == {
+            "enabled": False,
+            "outage_seconds": 90,
+            "recovery_seconds": 20,
+            "min_notification_interval_minutes": 3,
+        }
+        for invalid in [{"enabled": 1}, {"outage_seconds": 0}, {"recovery_seconds": True}]:
+            assert (
+                client.put("/api/v1/settings", json={"connection_alert": invalid}).status_code
+                == 422
+            )
+    with TestClient(create_app(config)) as client:
+        for _ in range(100):
+            response = client.get("/api/v1/settings")
+            if response.status_code == 200:
+                break
+            time.sleep(0.02)
+        assert response.json()["connection_alert"] == disabled.json()["connection_alert"]

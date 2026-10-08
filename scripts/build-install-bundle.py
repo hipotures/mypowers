@@ -68,6 +68,7 @@ def main() -> None:
         )
         for source, target in [
             ("deploy/bundle/install.py", "install.py"),
+            ("deploy/bundle/update.py", "update.py"),
             ("deploy/bundle/supervisord.conf", "supervisord.conf"),
             ("config/production.example.yaml", "config.yaml"),
             (".env.production.example", "server.env"),

@@ -120,3 +120,39 @@ and UI editor, without changing the table. Unknown fields are rejected. Secrets
 stay outside public mutable settings. YAML configures deployment, authentication
 and hardware access. Retry, pause/resume and runtime DEBUG are actions rather than
 persistent preferences. Explicit TUI timezone flags take precedence on startup.
+
+## Bluetooth connection alerts
+
+Settings → Alerts has a separate **Bluetooth connection** section. Its En/Dis
+switch is independent of battery alerts. The daemon sends Telegram alerts for a
+missing/off/blocked controller, loss of the S300 link, or unavailable fresh data.
+It cannot distinguish S300 Bluetooth being switched off from station power loss,
+range problems or another client solely from a failed scan; the message says so.
+
+Configure the initial rule in server YAML:
+
+```yaml
+connection_alert:
+  enabled: true
+  outage_seconds: 60
+  recovery_seconds: 15
+  min_notification_interval_minutes: 10
+```
+
+All four values are editable in Settings and saved in SQLite. Saved settings
+supersede YAML defaults. `outage_seconds` accepts 1–86400, `recovery_seconds`
+1–3600, and the notification interval 0–1440 minutes. Recovery requires continuous
+LIVE telemetry for the configured duration; any stale interval resets that timer.
+The interval applies to both outage and recovery messages. Pending changes
+collapse to the latest state, and a continuing outage is not repeatedly announced.
+A failed or uncertain delivery waits at least 30 seconds and the configured interval
+before retrying. Exactly-once delivery across a crash during Telegram delivery is
+not possible; the attempt is reserved durably before contacting Telegram.
+
+Intentional connection Pause, daemon shutdown and a disabled rule do not raise an
+alert. Disabling clears the pending episode. Re-enabling starts a new outage delay.
+No initial recovery message is sent unless an outage was successfully notified.
+Outage start, delivery attempts and confirmed notification state survive restart;
+recovery hysteresis is observed again after restart. The daemon creates the new
+`connection_alert_state` table automatically on startup, preserving history and
+battery alert state. History recording may be disabled without disabling alerts.
