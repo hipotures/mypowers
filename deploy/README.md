@@ -155,19 +155,22 @@ Older release directories are retained. To roll back the code, point
 `/opt/mypowers/current` to the previous release printed by the installer, then
 restart the daemon. Database migration compatibility must be checked separately.
 
-## Verified Bluetooth deployment: pve2 / LXC 110 (2026-10-06)
+## Verified Bluetooth deployment: pve2 / LXC 110
 
 The production endpoint is `https://mypowers.lxc.efez.net`; LXC 110 is
 `192.168.100.222`, Alpine 3.24.2 / Python 3.14.8. It remains unprivileged.
 PID 1 is Supervisor, reached through the existing `/startup.py`; services
 use `/etc/mypowers/supervisord.conf`.
 
-### Controller allocation
+The initial deployment was verified on 2026-10-06. The pve2 controller
+assignments below were swapped and verified again on 2026-10-08.
+
+### Controller allocation (updated 2026-10-08)
 
 | Controller | Identity | Physical host and assignment |
 |---|---|---|
-| Baseus / Actions | `10d7:b012`, `F4:4E:FC:A1:CB:FF` | pve2 USB `1-5.4`, host BlueZ `hci0`, used by LXC 110 |
-| Built-in MediaTek MT7922 | `0e8d:0616`, `A8:3B:76:E6:D4:A0` | pve2 USB `1-7`, VM 210 `usb0: host=1-7`, reserved for dev |
+| Baseus / Actions | `10d7:b012`, `F4:4E:FC:A1:CB:FF` | pve2 USB `1-5.4`, VM 210 `usb0: host=1-5.4`, guest BlueZ `hci0`, reserved for dev |
+| Built-in MediaTek MT7922 | `0e8d:0616`, `A8:3B:76:E6:D4:A0` | pve2 USB `1-7`, host BlueZ `hci1`, used by LXC 110 |
 | Built-in Intel AX200 | `8087:0029`, `64:BC:58:16:C6:59` | pve1 USB `1-6`, desktop VM 100 `usb10`, retained |
 | Ugreen / CSR8510 A10 | `0a12:0001`, `00:1A:7D:DA:71:11` | Physically disconnected; desktop's existing `usb9: host=5-4` was left unchanged |
 
@@ -180,10 +183,14 @@ resolve by MAC and rediscover the physical USB path before modifying assignments
 The Bluetooth interface of the MediaTek card is USB; its associated Wi-Fi
 function is PCI `0000:0c:00.0` on pve2.
 
-The station is `2A:02:01:48:6B:D0` / `AP S300 V2.0`. The configured
-adapter address `F4:4E:FC:A1:CB:FF` is now the measured production controller,
-rather than an assumed example. Dev's foreground daemon in VM 210 was stopped
-with SIGTERM, its station connection was confirmed disconnected, and the user
+The pve1 and disconnected-controller rows record the initial deployment;
+they were outside the scope of the 2026-10-08 swap.
+
+The station is `2A:02:01:48:6B:D0` / `AP S300 V2.0`. Production initially
+used Actions `F4:4E:FC:A1:CB:FF` and now uses the verified MediaTek
+`A8:3B:76:E6:D4:A0`. During the initial deployment, dev's foreground daemon
+in VM 210 was stopped with SIGTERM, its station connection was confirmed
+disconnected, and the user
 also disconnected another host before production acquisition. Keep dev paused
 while production owns the station.
 
@@ -330,7 +337,7 @@ if no other workload has begun using it. Restore VM 100's `usb13: host=5-2`
 only if Actions has physically returned to that port on pve1. Do not overwrite
 unrelated subsequent VM configuration changes with a whole-file backup.
 
-### Verification
+### Initial deployment verification (2026-10-06)
 
 - As container user `mypowers`: resolver selected `hci0` /
   `F4:4E:FC:A1:CB:FF`; Bleak scan found the exact S300, RSSI -82 dBm.
@@ -391,6 +398,90 @@ to stage `database-before-history-import.db` for the active database, check
 integrity and schema, then atomically replace it after releasing all connections
 and handling its WAL/shm sidecars. Restore service ownership before starting
 MyPowers. This deliberately discards telemetry recorded after the import.
+
+### Controller swap verification and rollback (2026-10-08)
+
+Live inspection confirmed LXC 110 at `192.168.100.222` and running VM 210
+at `192.168.100.210`. Before the swap, host BlueZ exposed Actions on USB
+`1-5.4`; MediaTek on USB `1-7` was owned by VM 210 through `usb0`.
+The dev daemon was already stopped, with no system or user MyPowers service;
+its HTTP TUI remained running. Production was scanning without live telemetry.
+
+Production's actual command was `mypowersd --env-file /etc/mypowers/server.env`,
+with working directory `/var/lib/mypowers`. That environment file selects
+`MYPOWERS_CONFIG=/etc/mypowers/config.yaml`. Dev's inspected working directory
+was `/home/user/DEV/mypowers`; its `.env` selects `./config/development.yaml`.
+Loading the configuration as the dev user confirmed the absolute YAML path
+and the existing data directory `/home/user/DEV/mypowers/.local/dev/data`.
+Only `bluetooth.adapter_address` was changed in each deployed YAML.
+
+Before mutation, root-only configuration backups and `rollback.md` were saved
+on pve2 in `/root/mypowers-controller-swap-20261008T200928Z`. The same directory
+basename inside LXC 110 holds `/etc/mypowers` and `before.json`; inside VM 210
+it holds the original `.env`, development YAML and guest boot ID. Host backups
+include VM/LXC configuration, the dedicated D-Bus policy and BlueZ configuration.
+No database copy, replacement or migration was performed.
+
+Production acquisition was paused through the authenticated local API, then
+the `mypowers` Supervisor program was stopped. No AC/DC/light commands were
+sent. With dev still stopped and no host BlueZ station connection remaining,
+the host command `qm set 210 --usb0 host=1-5.4` replaced MediaTek with Actions
+through USB hotplug. Installed Proxmox code confirmed USB hotplug support for
+this running Linux/q35 guest. The USB change was applied to the current
+configuration without a pending change. MediaTek automatically rebound to
+host `btusb`; Actions interfaces became owned by QEMU's `usbfs`.
+No driver reset, BlueZ restart, host restart, container restart or VM restart
+was needed. QEMU PID stayed `34861`; guest boot ID stayed
+`4f6a0e23-9050-4a3b-a3e0-b81ce14d07a0`.
+
+Both daemon configurations passed `check-config`. Production was started on
+MediaTek; dev was verified still stopped. Verification used the authenticated
+loopback API inside LXC, keeping the token local:
+
+- The configured MAC was `A8:3B:76:E6:D4:A0`, resolved as `hci1` by the
+  actual `mypowers` service UID 101. Host D-Bus reported that MAC on `hci1`,
+  and sysfs placed the controller under `1-7:1.0` / USB `0e8d:0616`.
+- BlueZ reported `Connected=true` and `ServicesResolved=true` for the exact
+  S300 under `hci1`. API connection was `connected`, telemetry `live`.
+  Four observations had increasing sample sequences, including 49, 50 and 52,
+  with sample ages below one second and no rejected frames.
+- Live output flags were AC on, DC off and light off (`status_flags=14`),
+  matching the last historical observation before the swap. Since production
+  had no live sample immediately before the swap, that comparison uses the
+  last known state, rather than claiming a fresh pre-swap hardware reading.
+- All persisted application settings were identical before and after.
+  The connection alert stayed enabled with outage 60 seconds, recovery
+  15 seconds and minimum notification interval 10 minutes; Telegram stayed
+  configured. No test notification was sent.
+- The existing production database retained its inode and ownership;
+  `PRAGMA integrity_check` returned `ok` and history continued advancing.
+  Release `/opt/mypowers/releases/019e851d028f-1791488137102244691`, tokens,
+  environment files and other configuration were retained.
+- VM BlueZ exposed Actions `F4:4E:FC:A1:CB:FF` as `hci0`; dev YAML selected
+  that MAC. There was no running dev daemon after verification.
+- LXC remained unprivileged with the identical read-only
+  `/run/dbus,mp=/host-dbus,ro=1` mount. Supervisor still provided
+  `DBUS_SYSTEM_BUS_ADDRESS=unix:path=/host-dbus/system_bus_socket` and
+  `BLEAK_DBUS_AUTH_UID=-1`. The host D-Bus policy was byte-for-byte unchanged;
+  service-account access to host systemd `ListUnits` still returned
+  `org.freedesktop.DBus.Error.AccessDenied`.
+
+The deployed API's `connection.adapter_name` still contains the hardcoded
+historical label `Actions`. It is not a hardware identity measurement;
+use the verified MAC, resolved HCI path, BlueZ and sysfs above. This swap
+did not deploy application code or change TUI server addresses.
+
+To roll back, keep dev stopped, pause and stop production first, rediscover
+USB identities/ports, then hotplug VM 210 back with
+`qm set 210 --usb0 host=1-7`. Verify that Actions returns to host BlueZ and
+MediaTek to guest BlueZ, without a pending USB change or changed guest boot ID.
+Restore only the adapter MAC in each YAML from the saved configurations:
+production Actions, dev MediaTek. Validate configuration and start only
+production, then check connected/live telemetry and output flags. If a VM
+restart would be required, stop and report instead of restarting it.
+Preserve unrelated later configuration changes and all database contents;
+do not blindly replace the complete VM/LXC configurations or database.
+The detailed pre-change plan remains in the host backup's `rollback.md`.
 
 ## Updating an existing LXC from development
 
