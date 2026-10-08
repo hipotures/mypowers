@@ -630,11 +630,11 @@
 <rect x="260" y="200" width="10" height="20" fill="#76cb89"/>
 <rect x="270" y="200" width="10" height="20" fill="#76cb89"/>
 <rect x="280" y="200" width="10" height="20" fill="#76cb89"/>
-<rect x="290" y="200" width="10" height="20" fill="#10151b"/>
-<rect x="300" y="200" width="10" height="20" fill="#10151b"/>
-<rect x="310" y="200" width="10" height="20" fill="#10151b"/>
-<rect x="320" y="200" width="10" height="20" fill="#10151b"/>
-<rect x="330" y="200" width="10" height="20" fill="#10151b"/>
+<rect x="290" y="200" width="10" height="20" fill="#76cb89"/>
+<rect x="300" y="200" width="10" height="20" fill="#76cb89"/>
+<rect x="310" y="200" width="10" height="20" fill="#76cb89"/>
+<rect x="320" y="200" width="10" height="20" fill="#76cb89"/>
+<rect x="330" y="200" width="10" height="20" fill="#76cb89"/>
 <rect x="340" y="200" width="10" height="20" fill="#10151b"/>
 <rect x="350" y="200" width="10" height="20" fill="#10151b"/>
 <rect x="360" y="200" width="10" height="20" fill="#10151b"/>
@@ -1397,11 +1397,21 @@
 <svg x="240" y="200" width="10" height="20" overflow="hidden"><text x="0" y="16" fill="#e0e8ec" transform="scale(0.9 1)">[</text></svg>
 <svg x="260" y="200" width="10" height="20" overflow="hidden"><text x="0" y="16" fill="#10151b" transform="scale(0.9 1)" font-weight="bold">E</text></svg>
 <svg x="270" y="200" width="10" height="20" overflow="hidden"><text x="0" y="16" fill="#10151b" transform="scale(0.9 1)" font-weight="bold">n</text></svg>
-<svg x="290" y="200" width="10" height="20" overflow="hidden"><text x="0" y="16" fill="#445e69" transform="scale(0.9 1)">|</text></svg>
-<svg x="310" y="200" width="10" height="20" overflow="hidden"><text x="0" y="16" fill="#e0e8ec" transform="scale(0.9 1)">D</text></svg>
-<svg x="320" y="200" width="10" height="20" overflow="hidden"><text x="0" y="16" fill="#e0e8ec" transform="scale(0.9 1)">i</text></svg>
-<svg x="330" y="200" width="10" height="20" overflow="hidden"><text x="0" y="16" fill="#e0e8ec" transform="scale(0.9 1)">s</text></svg>
-<svg x="350" y="200" width="10" height="20" overflow="hidden"><text x="0" y="16" fill="#e0e8ec" transform="scale(0.9 1)">]</text></svg>
+<svg x="280" y="200" width="10" height="20" overflow="hidden"><text x="0" y="16" fill="#10151b" transform="scale(0.9 1)" font-weight="bold">a</text></svg>
+<svg x="290" y="200" width="10" height="20" overflow="hidden"><text x="0" y="16" fill="#10151b" transform="scale(0.9 1)" font-weight="bold">b</text></svg>
+<svg x="300" y="200" width="10" height="20" overflow="hidden"><text x="0" y="16" fill="#10151b" transform="scale(0.9 1)" font-weight="bold">l</text></svg>
+<svg x="310" y="200" width="10" height="20" overflow="hidden"><text x="0" y="16" fill="#10151b" transform="scale(0.9 1)" font-weight="bold">e</text></svg>
+<svg x="320" y="200" width="10" height="20" overflow="hidden"><text x="0" y="16" fill="#10151b" transform="scale(0.9 1)" font-weight="bold">d</text></svg>
+<svg x="340" y="200" width="10" height="20" overflow="hidden"><text x="0" y="16" fill="#445e69" transform="scale(0.9 1)">|</text></svg>
+<svg x="360" y="200" width="10" height="20" overflow="hidden"><text x="0" y="16" fill="#e0e8ec" transform="scale(0.9 1)">D</text></svg>
+<svg x="370" y="200" width="10" height="20" overflow="hidden"><text x="0" y="16" fill="#e0e8ec" transform="scale(0.9 1)">i</text></svg>
+<svg x="380" y="200" width="10" height="20" overflow="hidden"><text x="0" y="16" fill="#e0e8ec" transform="scale(0.9 1)">s</text></svg>
+<svg x="390" y="200" width="10" height="20" overflow="hidden"><text x="0" y="16" fill="#e0e8ec" transform="scale(0.9 1)">a</text></svg>
+<svg x="400" y="200" width="10" height="20" overflow="hidden"><text x="0" y="16" fill="#e0e8ec" transform="scale(0.9 1)">b</text></svg>
+<svg x="410" y="200" width="10" height="20" overflow="hidden"><text x="0" y="16" fill="#e0e8ec" transform="scale(0.9 1)">l</text></svg>
+<svg x="420" y="200" width="10" height="20" overflow="hidden"><text x="0" y="16" fill="#e0e8ec" transform="scale(0.9 1)">e</text></svg>
+<svg x="430" y="200" width="10" height="20" overflow="hidden"><text x="0" y="16" fill="#e0e8ec" transform="scale(0.9 1)">d</text></svg>
+<svg x="450" y="200" width="10" height="20" overflow="hidden"><text x="0" y="16" fill="#e0e8ec" transform="scale(0.9 1)">]</text></svg>
 <svg x="570" y="200" width="10" height="20" overflow="hidden"><text x="0" y="16" fill="#445e69" transform="scale(0.833333 1)" font-size="20">│</text></svg>
 <svg x="590" y="200" width="10" height="20" overflow="hidden"><text x="0" y="16" fill="#4f5d66" transform="scale(0.833333 1)" font-size="20">│</text></svg>
 <svg x="0" y="220" width="10" height="20" overflow="hidden"><text x="0" y="16" fill="#4f5d66" transform="scale(0.833333 1)" font-size="20">│</text></svg>

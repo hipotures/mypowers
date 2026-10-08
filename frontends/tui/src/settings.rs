@@ -159,9 +159,9 @@ impl Settings {
             }
             .into(),
             Field::ConnectionEnabled => if self.connection_alert.enabled {
-                "En"
+                "Enabled"
             } else {
-                "Dis"
+                "Disabled"
             }
             .into(),
             Field::ConnectionDelay => format!("{} s", self.connection_alert.outage_seconds),
@@ -286,7 +286,7 @@ impl Field {
                 .map(String::from)
                 .to_vec(),
             Self::PageSize => [50, 100, 250, 500, 1000].map(|v| v.to_string()).to_vec(),
-            Self::ConnectionEnabled => vec!["En".into(), "Dis".into()],
+            Self::ConnectionEnabled => vec!["Enabled".into(), "Disabled".into()],
             Self::ConnectionDelay => (1..=86400).map(|v| format!("{v} s")).collect(),
             Self::ConnectionRecovery => (1..=3600).map(|v| format!("{v} s")).collect(),
             Self::ConnectionCooldown => (0..=1440).map(|v| format!("{v} min")).collect(),
